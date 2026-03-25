@@ -1,0 +1,169 @@
+# Configuration for FMD Sensitivity Analysis Project
+
+# Data Configuration
+data:
+  raw_data_dir: "data/raw"
+  processed_data_dir: "data/processed"
+  embeddings_dir: "data/embeddings"
+  datasets:
+    - name: "maestro"
+      url: "https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip"
+      version: "v3.0.0"
+    - name: "midicaps"
+      url: "https://github.com/Yujia-Yan/MidiCaps"
+      version: "1.0"
+    - name: "pop909"
+      url: "https://github.com/music-x-lab/POP909-Dataset"
+      version: "1.0"
+
+# Preprocessing Configuration
+preprocessing:
+  # Quantization settings (beats per quarter note)
+  quantization_resolution: 480
+  # MIDI Note range
+  min_note: 21  # A0
+  max_note: 108  # C8
+  # Velocity handling
+  remove_velocity: false  # Will be modified for ablation study
+  # Hard quantization (rhythm grid)
+  hard_quantization: false  # Will be modified for experiments
+
+# Tokenization Configuration
+tokenization:
+  tokenizers:
+    - type: "REMI"
+      params:
+        beat_res: 480
+        nb_velocities: 32
+    - type: "TSD"
+      params:
+        beat_res: 480
+        nb_velocities: 32
+    - type: "Octuple"
+      params:
+        beat_res: 480
+        nb_velocities: 16
+    - type: "MIDI-Like"
+      params:
+        beat_res: 480
+        nb_velocities: 32
+
+# Embedding Model Configuration
+embeddings:
+  models:
+    - name: "CLaMP-1"
+      model_name: "clamp-1"
+      format_type: "abc"  # Abstract text format
+    - name: "CLaMP-2"
+      model_name: "clamp-2"
+      format_type: "midi"  # Direct MIDI structure
+  # Embedding extraction settings
+  batch_size: 32
+  device: "cuda"  # or "cpu" if CUDA not available
+  cache_embeddings: true
+
+# FMD Metric Configuration
+fmd_metric:
+  metric_name: "Frechet Music Distance"
+  # Statistical parameters
+  use_mean: true
+  use_std: true
+  # Correlation method
+  correlation_method: "pearson"
+
+# Experiments Configuration
+experiments:
+  exp1_tokenization_sensitivity:
+    name: "Tokenization Sensitivity"
+    description: "Study FMD sensitivity to tokenization choice"
+    enabled: true
+    variants:
+      - tokenizer: "REMI"
+        model: "CLaMP-2"
+        dataset: "maestro"
+      - tokenizer: "TSD"
+        model: "CLaMP-2"
+        dataset: "maestro"
+      - tokenizer: "Octuple"
+        model: "CLaMP-2"
+        dataset: "maestro"
+      - tokenizer: "MIDI-Like"
+        model: "CLaMP-2"
+        dataset: "maestro"
+
+  exp2_model_sensitivity:
+    name: "Model Sensitivity"
+    description: "Study FMD sensitivity to embedding model choice"
+    enabled: true
+    variants:
+      - tokenizer: "REMI"
+        model: "CLaMP-1"
+        dataset: "maestro"
+      - tokenizer: "REMI"
+        model: "CLaMP-2"
+        dataset: "maestro"
+
+  exp3_expression_ablation:
+    name: "Expression Ablation"
+    description: "Study FMD sensitivity to expression removal (velocity)"
+    enabled: true
+    variants:
+      - tokenizer: "REMI"
+        model: "CLaMP-2"
+        dataset: "maestro"
+        remove_velocity: false
+      - tokenizer: "REMI"
+        model: "CLaMP-2"
+        dataset: "maestro"
+        remove_velocity: true
+
+  exp4_quantization_sensitivity:
+    name: "Quantization Sensitivity"
+    description: "Study FMD sensitivity to hard rhythm quantization"
+    enabled: true
+    variants:
+      - tokenizer: "REMI"
+        model: "CLaMP-2"
+        dataset: "maestro"
+        hard_quantization: false
+      - tokenizer: "REMI"
+        model: "CLaMP-2"
+        dataset: "maestro"
+        hard_quantization: true
+
+  exp5_cross_genre:
+    name: "Cross-Genre Stability"
+    description: "Test FMD consistency across different music genres"
+    enabled: true
+    pairs:
+      - ("maestro", "pop909")
+      - ("maestro", "midicaps")
+      - ("pop909", "midicaps")
+    tokenizer: "REMI"
+    model: "CLaMP-2"
+
+# Evaluation Configuration
+evaluation:
+  # Ranking comparison
+  compare_rankings: true
+  # Cross-validation folds
+  cv_folds: 5
+  # Statistical tests
+  perform_statistical_tests: true
+  test_type: "spearman"  # Spearman or Pearson correlation
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  log_file: "logs/experiment.log"
+  console_output: true
+
+# Results Configuration
+results:
+  plots_dir: "results/plots"
+  reports_dir: "results/reports"
+  save_raw_data: true
+  save_raw_embeddings: true
+  save_rankings: true
+  export_format: ["csv", "json"]
+
