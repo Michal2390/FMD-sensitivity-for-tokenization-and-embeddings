@@ -226,7 +226,7 @@ Projekt spełnia wszystkie wymagania z regulaminu WIMU:
 
 ## Autorzy
 
-Projekt realizowany w ramach przedmiotu **WIMU** (Wzmacnianie Inteligencji w Muzyce Użytkownika) na Wydziale Elektroniki i Technik Informacyjnych (EITI) Politechniki Warszawskiej.
+Projekt realizowany w ramach przedmiotu **WIMU** (Wyszukiwanie Informacji Muzycznych) na Wydziale Elektroniki i Technik Informacyjnych (EITI) Politechniki Warszawskiej.
 
 ## Licencja
 
