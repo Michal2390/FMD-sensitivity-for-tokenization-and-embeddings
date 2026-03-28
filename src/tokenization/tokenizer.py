@@ -6,7 +6,6 @@ from loguru import logger
 import pretty_midi
 from abc import ABC, abstractmethod
 from miditok import REMI, TSD, Octuple, MIDILike, TokenizerConfig
-from miditok.utils import get_midi_programs
 
 
 def create_tokenizer_config(params: Dict) -> TokenizerConfig:
