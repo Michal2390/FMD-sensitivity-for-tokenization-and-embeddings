@@ -15,7 +15,7 @@ Projekt analizuje wrażliwość metryki **Frechet Music Distance (FMD)** na wyb�
 ## Harmonogram projektu
 
 - **Tydzień 1 (23.03-29.03.2026)**: Inicjalizacja i przygotowanie danych ✓
-- **Tydzień 2 (30.03-05.04.2026)**: Preprocessing i tokenizacja
+- **Tydzień 2 (30.03-05.04.2026)**: Preprocessing i tokenizacja ✓
 - **Tydzień 3 (06.04-12.04.2026)**: Integracja modeli CLaMP
 - **Tydzień 4 (13.04-19.04.2026)**: Kalkulacja FMD
 - **Tydzień 5 (20.04-26.04.2026)**: Eksperymenty z preprocessing
