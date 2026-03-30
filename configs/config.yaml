@@ -61,6 +61,7 @@ embeddings:
   batch_size: 32
   device: "cuda"  # or "cpu" if CUDA not available
   cache_embeddings: true
+  cache_dir: "data/embeddings/cache"  # Directory for caching extracted embeddings
 
 # FMD Metric Configuration
 fmd_metric:
