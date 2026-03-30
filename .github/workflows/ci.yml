@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: "3.10"
+  LINT_PATHS: "src/ tests/ run_experiment.py"
+
 jobs:
   lint:
     name: Lint
@@ -19,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
       - name: Install dependencies
@@ -28,10 +32,10 @@ jobs:
           pip install flake8 ruff
 
       - name: Run flake8
-        run: flake8 src/ tests/ run_experiment.py
+        run: flake8 ${{ env.LINT_PATHS }}
 
       - name: Run ruff
-        run: ruff check src/ tests/ run_experiment.py
+        run: ruff check ${{ env.LINT_PATHS }}
 
   type-check:
     name: Type Check
@@ -42,7 +46,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
       - name: Install dependencies
@@ -63,7 +67,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
       - name: Install dependencies
