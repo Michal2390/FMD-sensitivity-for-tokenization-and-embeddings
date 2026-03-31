@@ -45,11 +45,28 @@ Na metrykę **Frechet Music Distance** - nową metrykę do oceny podobieństwa m
 ### Instalacja
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
-### Uruchomienie testów
+### One-click run (PyCharm/IDE)
+Uruchom `main.py` przyciskiem **Run**. Domyslny tryb to `quick`:
+- sanity demo,
+- szybki benchmark paperowy,
+- zapis raportow do `results/reports/paper/`.
+
+Mozesz tez uruchomic tryby z CLI:
 ```bash
-pytest tests/ -v  # All 53 tests
+python main.py --mode quick
+python main.py --mode paper
+python main.py --mode paper-full
+python main.py --mode tests
+python main.py --mode full
+```
+
+### Uruchomienie testow
+```bash
+pytest tests/ -v
+pytest tests/test_paper_pipeline.py -v
 ```
 
 ### Uruchomienie demo
@@ -88,10 +105,14 @@ python run_ablation_study.py
 
 ## 📈 Key Results
 
-✅ **53 unit tests** (100% pass rate)  
+✅ **53+ unit tests** (CI-verified core suite)  
 ✅ **4000+ lines of code**  
 ✅ **88% code coverage** (FMD module)  
-✅ **Stable rankings** across configurations (consistency: 0.90)  
+✅ **Stable rankings** across configurations (consistency metric in report)  
+✅ **Paper outputs generated automatically**:
+- `results/reports/paper/paper_results.json`
+- `results/reports/paper/pairwise_fmd.csv`
+- `results/reports/paper/paper_summary.md`
 
 ## 🎓 Academic Context
 

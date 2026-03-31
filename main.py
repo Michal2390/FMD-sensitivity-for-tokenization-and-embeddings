@@ -1,17 +1,20 @@
-"""Main entry point with easy IDE click support."""
+"""Main entry point with one-click modes for research workflow."""
 
+import argparse
+import subprocess
 import sys
 from pathlib import Path
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from utils.config import load_config, setup_logging, get_logger
+from experiments.paper_pipeline import PaperExperimentRunner
 from run_experiment import ExperimentRunner
+from utils.config import get_logger, load_config, setup_logging
 
 
 class FMDSensitivityAnalysis:
-    """Main class for FMD Sensitivity Analysis - Easy IDE click execution."""
+    """Main class for FMD sensitivity analysis."""
 
     def __init__(self):
         """Initialize the analysis."""
@@ -22,127 +25,145 @@ class FMDSensitivityAnalysis:
         )
         self.logger = get_logger(__name__)
 
-    def run_all_tests(self):
+    def run_all_tests(self) -> bool:
         """Run all unit tests."""
         import pytest
 
-        self.logger.info("🧪 Running all unit tests...")
+        self.logger.info("Running all unit tests")
         result = pytest.main(["tests/", "-v", "--tb=short"])
         return result == 0
 
     def run_demo(self):
-        """Run demo of all modules."""
+        """Run lightweight sanity demo."""
         import numpy as np
         from data.manager import DatasetManager
         from metrics.fmd import FrechetMusicDistance
 
-        self.logger.info("📊 Running demo...")
+        self.logger.info("Running demo")
+        self.logger.info(f"Experiments in config: {len(self.config['experiments'])}")
+        self.logger.info(f"Tokenizers in config: {len(self.config['tokenization']['tokenizers'])}")
+        self.logger.info(f"Embedding models in config: {len(self.config['embeddings']['models'])}")
 
-        self.logger.info("Demo 1: Loading configuration")
-        self.logger.info(f"  ✓ Experiments: {len(self.config['experiments'])}")
-        self.logger.info(
-            f"  ✓ Tokenizers: {len(self.config['tokenization']['tokenizers'])}"
-        )
-        self.logger.info(
-            f"  ✓ Models: {len(self.config['embeddings']['models'])}"
-        )
+        manager = DatasetManager(self.config)
+        self.logger.info(f"Dataset manager ready at: {manager.raw_data_dir}")
 
-        self.logger.info("Demo 2: DatasetManager")
-        dm = DatasetManager(self.config)
-        self.logger.info("  ✓ DatasetManager initialized")
-        for ds in self.config["data"]["datasets"]:
-            self.logger.info(f"    - {ds['name']} (v{ds['version']})")
-
-        self.logger.info("Demo 3: FMD Metric")
         fmd_calc = FrechetMusicDistance(self.config)
-        embeddings1 = np.random.randn(100, 64)
-        embeddings2 = np.random.randn(100, 64)
-        fmd_value = fmd_calc.compute_fmd(embeddings1, embeddings2)
-        self.logger.info(f"  ✓ FMD value: {fmd_value:.4f}")
-
-        self.logger.info("✅ Demo completed!")
+        emb1 = np.random.randn(100, 64)
+        emb2 = np.random.randn(100, 64)
+        value = fmd_calc.compute_fmd(emb1, emb2)
+        self.logger.info(f"Demo FMD value: {value:.4f}")
 
     def run_experiment(self, experiment_name: str):
-        """Run a specific experiment.
-
-        Args:
-            experiment_name: Name of the experiment (e.g., 'exp1_tokenization_sensitivity')
-        """
-        self.logger.info(f"🔬 Running experiment: {experiment_name}")
+        """Run a specific config experiment."""
+        self.logger.info(f"Running experiment: {experiment_name}")
         runner = ExperimentRunner("configs/config.yaml")
         runner.run_experiment(experiment_name)
 
     def run_all_experiments(self):
-        """Run all enabled experiments."""
-        self.logger.info("🔬 Running all experiments...")
+        """Run all enabled config experiments."""
+        self.logger.info("Running all enabled experiments")
         runner = ExperimentRunner("configs/config.yaml")
         runner.run_all_experiments()
 
     def run_lint_check(self):
         """Run code quality checks."""
-        import subprocess
+        self.logger.info("Running code quality checks")
 
-        self.logger.info("🔍 Running code quality checks...")
-
-        # Black check
-        self.logger.info("Checking Black formatting...")
-        result = subprocess.run(
+        black = subprocess.run(
             ["black", "src/", "tests/", "run_experiment.py", "--check", "--quiet"],
             capture_output=True,
         )
-        if result.returncode == 0:
-            self.logger.info("  ✓ Black: OK")
-        else:
-            self.logger.warning("  ⚠ Black: Some files need formatting")
+        self.logger.info("Black: OK" if black.returncode == 0 else "Black: formatting needed")
 
-        # Flake8 check
-        self.logger.info("Checking Flake8 linting...")
-        result = subprocess.run(
+        flake = subprocess.run(
             ["flake8", "src/", "tests/", "run_experiment.py", "--count"],
             capture_output=True,
             text=True,
         )
-        if result.returncode == 0:
-            self.logger.info("  ✓ Flake8: OK")
+        self.logger.info("Flake8: OK" if flake.returncode == 0 else f"Flake8 issues:\n{flake.stdout}")
+
+    def run_paper_benchmark(self, full: bool = False):
+        """Run paper-oriented comparison benchmark and report generation."""
+        runner = PaperExperimentRunner(self.config)
+        if full:
+            self.logger.info("Running full paper benchmark")
+            result = runner.run_full()
         else:
-            self.logger.warning(f"  ⚠ Flake8: {result.stdout}")
+            self.logger.info("Running quick paper benchmark")
+            result = runner.run_quick()
+
+        self.logger.info(f"Paper benchmark done. Rows: {result.get('pairwise_rows')}")
+        for label, path in result.get("outputs", {}).items():
+            self.logger.info(f"Output {label}: {path}")
+        return result
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Create CLI parser."""
+    parser = argparse.ArgumentParser(description="FMD sensitivity analysis runner")
+    parser.add_argument(
+        "--mode",
+        choices=["quick", "full", "paper", "paper-full", "tests", "demo", "lint"],
+        default="quick",
+        help=(
+            "quick: one-click default (demo + quick paper benchmark), "
+            "full: tests + all experiments + full paper benchmark, "
+            "paper: quick paper benchmark, paper-full: full benchmark"
+        ),
+    )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        default=None,
+        help="Optional single experiment name to run (overrides mode logic for experiments)",
+    )
+    return parser
 
 
 def main():
-    """Main entry point - can be clicked in IDE!"""
-    print("\n" + "=" * 80)
-    print("🎓 FMD SENSITIVITY ANALYSIS - WEEK 1 PROJECT")
-    print("=" * 80)
-    print(
-        """
-    Choose what to run:
-    1. Run all tests (pytest)
-    2. Run demo
-    3. Run specific experiment (exp1_tokenization_sensitivity)
-    4. Run all experiments
-    5. Run code quality checks
-    
-    Example usage in code:
-        analysis = FMDSensitivityAnalysis()
-        analysis.run_all_tests()
-        analysis.run_demo()
-        analysis.run_experiment('exp1_tokenization_sensitivity')
-    """
-    )
-    print("=" * 80 + "\n")
+    """One-click entry point for IDE Run button and CLI."""
+    parser = build_arg_parser()
+    args = parser.parse_args()
 
     analysis = FMDSensitivityAnalysis()
 
-    # Run all by default when clicking Run in IDE
-    print("▶ Running: All tests + Demo\n")
-    if analysis.run_all_tests():
-        print("\n✅ Tests passed!\n")
-    print("\n▶ Running: Demo\n")
-    analysis.run_demo()
-    print("\n✅ Demo completed!\n")
-    print("=" * 80)
-    print("✨ All systems operational! Ready for Week 2 development.")
-    print("=" * 80 + "\n")
+    if args.experiment:
+        analysis.run_experiment(args.experiment)
+        return
+
+    if args.mode == "quick":
+        analysis.run_demo()
+        analysis.run_paper_benchmark(full=False)
+        return
+
+    if args.mode == "paper":
+        analysis.run_paper_benchmark(full=False)
+        return
+
+    if args.mode == "paper-full":
+        analysis.run_paper_benchmark(full=True)
+        return
+
+    if args.mode == "tests":
+        ok = analysis.run_all_tests()
+        if not ok:
+            raise SystemExit(1)
+        return
+
+    if args.mode == "demo":
+        analysis.run_demo()
+        return
+
+    if args.mode == "lint":
+        analysis.run_lint_check()
+        return
+
+    # Full mode
+    ok = analysis.run_all_tests()
+    if not ok:
+        raise SystemExit(1)
+    analysis.run_all_experiments()
+    analysis.run_paper_benchmark(full=True)
 
 
 if __name__ == "__main__":

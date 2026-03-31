@@ -168,3 +168,17 @@ results:
   save_rankings: true
   export_format: ["csv", "json"]
 
+# Paper-oriented benchmark configuration
+paper:
+  seed: 42
+  max_files_per_dataset: 8
+  synthetic_fallback_samples: 12
+  # Leave empty to use all tokenizers/models from config sections above
+  tokenizers: []
+  models: []
+  # Expected stylistic order used for ranking agreement analysis
+  expected_orders:
+    - reference: "maestro"
+      order: ["maestro", "midicaps", "pop909"]
+    - reference: "pop909"
+      order: ["pop909", "midicaps", "maestro"]
