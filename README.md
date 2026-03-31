@@ -2,136 +2,141 @@
 
 **Advanced Music Information Retrieval Research Project**
 
-> Systematyczne badanie wrażliwości metryki Frechet Music Distance (FMD) na wybór tokenizacji i modelu embeddingów dla symbolicznej muzyki
+> A systematic study of how Frechet Music Distance (FMD) responds to tokenization choices and embedding models for symbolic music.
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue)](https://www.python.org/downloads/)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-red)](https://pytorch.org/)
 [![Tests: 53/53](https://img.shields.io/badge/Tests-53%2F53%20✓-success)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)]()
 
-## 📋 Szybki przegląd
+## Quick Overview
 
-Projekt implementuje pełny pipeline do badania wpływu:
-- **4 strategii tokenizacji**: REMI, TSD, Octuple, MIDI-Like
-- **2 modeli embeddingów**: CLaMP-1, CLaMP-2  
-- **Preprocessing modifications**: Usuwanie velocity, hard quantization
+This project implements a full experimental pipeline to analyze the impact of:
+- **4 tokenization strategies**: REMI, TSD, Octuple, MIDI-Like
+- **2 embedding models**: CLaMP-1, CLaMP-2
+- **Preprocessing modifications**: velocity removal and hard quantization
 
-Na metrykę **Frechet Music Distance** - nową metrykę do oceny podobieństwa muzyki symbolicznej.
+on **Frechet Music Distance (FMD)**, a metric for symbolic music similarity.
 
-## 🏗️ Struktura projektu
+## Project Structure
 
 ```
-├── docs/                          # 📚 Dokumentacja
-│   ├── weekly_summaries/          # Podsumowania tygodni (Weeks 1-5)
-│   ├── setup/                     # Instrukcje konfiguracji
-│   ├── references/                # Materiały referencyjne
-│   └── private/                   # Private analysis (nie w repo)
+├── docs/                          # Documentation
+│   ├── weekly_summaries/          # Weekly summaries (Weeks 1-5)
+│   ├── setup/                     # Setup instructions
+│   ├── references/                # Reference materials
+│   └── private/                   # Private analysis (not in repo)
 │
-├── src/                           # 💻 Kod źródłowy
+├── src/                           # Source code
 │   ├── preprocessing/             # MIDI preprocessing
-│   ├── tokenization/              # 4 tokenizatory
+│   ├── tokenization/              # 4 tokenizers
 │   ├── embeddings/                # CLaMP embeddings
-│   ├── metrics/                   # Metryka FMD
-│   └── utils/                     # Config & helpers
+│   ├── metrics/                   # FMD metric
+│   └── utils/                     # Config and helpers
 │
-├── tests/                         # ✅ 53 testy (100% pass)
-├── configs/                       # ⚙️ Konfiguracja
-├── data/                          # 📊 Dane
-└── results/                       # 📈 Wyniki
+├── tests/                         # Test suite
+├── configs/                       # Configuration
+├── data/                          # Data
+└── results/                       # Results
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### Instalacja
+### Installation
 ```bash
 pip install -r requirements.txt
 pip install -e .
 ```
 
 ### One-click run (PyCharm/IDE)
-Uruchom `main.py` przyciskiem **Run**. Domyslny tryb to `quick`:
+Run `main.py` with the **Run** button. The default mode is `quick`:
 - sanity demo,
-- szybki benchmark paperowy,
-- zapis raportow do `results/reports/paper/`.
+- quick paper benchmark,
+- report generation in `results/reports/paper/`.
 
-Mozesz tez uruchomic tryby z CLI:
+You can also run modes from CLI:
 ```bash
 python main.py --mode quick
 python main.py --mode paper
 python main.py --mode paper-full
 python main.py --mode paper-plots
+python main.py --mode fetch-data
 python main.py --mode tests
 python main.py --mode full
 ```
 
-### Starter dane i specjalne porownania gatunkow
-Do materialu artykulowego mozesz wygenerowac duze, zbalansowane i bardziej zroznicowane zbiory MIDI (proceduralnie, lokalnie):
+Each mode prints stage-level progress (percentage) and a final elapsed-time message.
+
+### Starter Data and Special Genre Comparisons
+For article-oriented experiments, you can generate large, balanced, and more diverse MIDI sets (procedurally, locally):
 
 ```bash
 python scripts/generate_starter_midis.py --count-per-dataset 120 --bars 16
 ```
 
-Zrodlo tych plikow: **syntetyczna generacja wlasna** z `scripts/generate_starter_midis.py` (nie pobierane z zewnetrznych repozytoriow audio/MIDI).
+Source of those files: **local synthetic generation** via `scripts/generate_starter_midis.py` (not downloaded from external audio/MIDI repositories).
 
-Po `paper-full` automatycznie tworza sie raporty dla par specjalnych (np. `jazz vs rock`, `classical vs pop`, `rap vs pop`) oraz wykresy publikacyjne. Sam krok wykresow mozna uruchomic osobno:
+After `paper-full`, special-pair reports (e.g., `jazz vs rock`, `classical vs pop`, `rap vs pop`) and publication plots are generated automatically. You can also run plotting as a separate step:
 
 ```bash
 python scripts/generate_publication_plots.py
 ```
 
-Mapowanie aliasow gatunkow do datasetow jest trzymane w osobnym pliku `configs/genre_mapping.yaml`.
+Genre alias mapping is stored in `configs/genre_mapping.yaml`.
 
-W pipeline `paper` sa dodatkowo:
-- `fallback_mode: synthetic|strict` (strict = brak fallbacku, brak realnych embeddingow daje invalid),
-- podzial raportow na `all` i `real-only`,
-- `bootstrap_ci` dla FMD (mean/std/CI).
+Additional `paper` pipeline features:
+- `fallback_mode: synthetic|strict|hard_strict` (`hard_strict` stops the run immediately),
+- split analysis into `all` and `real-only`,
+- bootstrap CI for FMD (`mean`, `std`, and confidence interval).
 
-### Uruchomienie testow
+Embeddings are computed in inference mode (no neural network training). With `embeddings.device: auto`, CUDA is used when available (e.g., RTX 4070 Ti).
+
+### Run Tests
 ```bash
 pytest tests/ -v
 pytest tests/test_paper_pipeline.py -v
 ```
 
-### Uruchomienie demo
+### Run Demo
 ```bash
 python demo_embeddings.py --demo all
 python demo_fmd.py --demo basic
 python run_ablation_study.py
 ```
 
-## 📊 Weeks Overview
+## Weeks Overview
 
 | Week | Topic | Status | Tests |
 |------|-------|--------|-------|
 | 1 | Initialization | ✅ | - |
-| 2 | Preprocessing & Tokenization | ✅ | 47 |
+| 2 | Preprocessing and Tokenization | ✅ | 47 |
 | 3 | CLaMP Embeddings | ✅ | 29 |
 | 4 | FMD Metric | ✅ | 24 |
 | 5 | Ablation Study | ✅ | 13 |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
-## 🔬 Main Components
+## Main Components
 
 - **Preprocessing**: MIDI loading, velocity removal, quantization
 - **Tokenization**: REMI, TSD, Octuple, MIDI-Like (4 schemes)
 - **Embeddings**: CLaMP-1/2 with dual-level cache
-- **Metrics**: Frechet Music Distance with ranking & stability
+- **Metrics**: Frechet Music Distance with ranking and stability
 - **Experiments**: Ablation study for sensitivity analysis
 
-## 📚 Documentation
+## Documentation
 
 - **[Weekly Summaries](docs/weekly_summaries/)** - Detailed progress reports
 - **[How to Run](docs/INSTRUKCJA_URUCHAMIANIA.md)** - Execution guide
-- **[Setup](docs/setup/)** - Configuration & installation
-- **[References](docs/references/)** - Design proposal & papers
+- **[Setup](docs/setup/)** - Configuration and installation
+- **[References](docs/references/)** - Design proposal and papers
 
-## 📈 Key Results
+## Key Results
 
 ✅ **53+ unit tests** (CI-verified core suite)  
 ✅ **4000+ lines of code**  
 ✅ **88% code coverage** (FMD module)  
-✅ **Stable rankings** across configurations (consistency metric in report)  
+✅ **Stable rankings** across configurations (consistency metric in the report)  
 ✅ **Paper outputs generated automatically**:
 - `results/reports/paper/paper_results.json`
 - `results/reports/paper/pairwise_fmd.csv`
@@ -154,11 +159,11 @@ python run_ablation_study.py
 - `fig_ranking_stability.png`
 - `fig_rank_consistency.png`
 
-## 🎓 Academic Context
+## Academic Context
 
-**Project**: Wrażliwość Frechet Music Distance  
-**Institution**: Politechnika Warszawska, EITI  
-**Course**: WIMU (Wyszukiwanie Informacji Muzycznych)  
+**Project**: Frechet Music Distance Sensitivity  
+**Institution**: Warsaw University of Technology, EITI  
+**Course**: WIMU (Music Information Retrieval)  
 **Duration**: February-June 2026
 
 ---
