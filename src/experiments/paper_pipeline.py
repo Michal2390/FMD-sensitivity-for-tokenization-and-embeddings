@@ -326,8 +326,8 @@ class PaperExperimentRunner:
     def run_full(self) -> Dict:
         """Run full benchmark suited for research reporting."""
         paper_cfg = self.config.get("paper", {})
-        tokenizers = paper_cfg.get("tokenizers")
-        models = paper_cfg.get("models")
+        tokenizers = paper_cfg.get("tokenizers") or None
+        models = paper_cfg.get("models") or None
 
         variants = self.build_variants(tokenizers=tokenizers, models=models)
         pairwise_rows = self.run_pairwise_benchmark(variants)

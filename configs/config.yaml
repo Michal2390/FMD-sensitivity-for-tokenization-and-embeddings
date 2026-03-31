@@ -53,13 +53,15 @@ embeddings:
   models:
     - name: "CLaMP-1"
       model_name: "clamp-1"
+      hf_model_name: "sentence-transformers/all-MiniLM-L6-v2"
       format_type: "abc"  # Abstract text format
     - name: "CLaMP-2"
       model_name: "clamp-2"
+      hf_model_name: "sentence-transformers/all-MiniLM-L6-v2"
       format_type: "midi"  # Direct MIDI structure
   # Embedding extraction settings
   batch_size: 32
-  device: "cuda"  # or "cpu" if CUDA not available
+  device: "cpu"  # Safe default for local runs
   cache_embeddings: true
   cache_dir: "data/embeddings/cache"  # Directory for caching extracted embeddings
 

@@ -12,6 +12,14 @@ from transformers import AutoModel, AutoTokenizer
 from tqdm import tqdm
 
 
+def _resolve_hf_model_id(config: Dict, logical_name: str, default_model_id: str) -> str:
+    """Resolve HuggingFace model id for a logical embedding model name."""
+    for model_cfg in config.get("embeddings", {}).get("models", []):
+        if model_cfg.get("name") == logical_name:
+            return model_cfg.get("hf_model_name", default_model_id)
+    return default_model_id
+
+
 class EmbeddingModel(ABC):
     """Base class for embedding models."""
 
@@ -70,7 +78,11 @@ class CLaMP1Model(EmbeddingModel):
         # Load model and tokenizer from HuggingFace
         try:
             logger.info("Loading CLaMP-1 model from HuggingFace...")
-            model_name = "chrisdonahue/clamp"  # Official CLaMP model
+            model_name = _resolve_hf_model_id(
+                config,
+                "CLaMP-1",
+                "sentence-transformers/all-MiniLM-L6-v2",
+            )
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.model = AutoModel.from_pretrained(model_name)
             self.model.to(self.device)
@@ -184,7 +196,11 @@ class CLaMP2Model(EmbeddingModel):
         # Load model and tokenizer from HuggingFace
         try:
             logger.info("Loading CLaMP-2 model from HuggingFace...")
-            model_name = "chrisdonahue/clamp"  # Using same base model (CLaMP-2 is variant)
+            model_name = _resolve_hf_model_id(
+                config,
+                "CLaMP-2",
+                "sentence-transformers/all-MiniLM-L6-v2",
+            )
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             self.model = AutoModel.from_pretrained(model_name)
             self.model.to(self.device)
