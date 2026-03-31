@@ -76,7 +76,7 @@ embeddings:
       format_type: "midi"  # Direct MIDI structure
   # Embedding extraction settings
   batch_size: 32
-  device: "cpu"  # Safe default for local runs
+  device: "auto"  # auto -> CUDA when available, otherwise CPU
   cache_embeddings: true
   cache_dir: "data/embeddings/cache"  # Directory for caching extracted embeddings
 
@@ -201,8 +201,9 @@ paper:
   max_files_per_dataset: 120
   synthetic_fallback_samples: 12
   compare_all_pairs: true
-  # synthetic (fallback) or strict (fail row as invalid when real embeddings are missing)
-  fallback_mode: "synthetic"
+  # synthetic | strict (invalid rows) | hard_strict (immediate exception)
+  fallback_mode: "hard_strict"
+  progress_log_every: 20
   # Leave empty to use all tokenizers/models from config sections above
   tokenizers: []
   models: []

@@ -60,6 +60,7 @@ class PaperExperimentRunner:
         self.dataset_names = self._dataset_names()
         self.compare_all_pairs = bool(paper_cfg.get("compare_all_pairs", False))
         self.fallback_mode = str(paper_cfg.get("fallback_mode", "synthetic")).strip().lower()
+        self.progress_log_every = int(paper_cfg.get("progress_log_every", 25))
         self.bootstrap_cfg = paper_cfg.get("bootstrap_ci", {})
         self.bootstrap_enabled = bool(self.bootstrap_cfg.get("enabled", True))
         self.bootstrap_resamples = int(self.bootstrap_cfg.get("n_resamples", 50))
@@ -281,7 +282,7 @@ class PaperExperimentRunner:
                 logger.warning(f"Skipping {midi_path} for {variant.name}: {exc}")
 
         if not vectors:
-            if self.fallback_mode == "strict":
+            if self.fallback_mode in {"strict", "hard_strict"}:
                 return {
                     "embeddings": None,
                     "source": "missing",
@@ -336,6 +337,14 @@ class PaperExperimentRunner:
                 emb_b = cache[key_b]["embeddings"]
                 is_valid = emb_a is not None and emb_b is not None
                 real_pair = cache[key_a]["source"] == "real" and cache[key_b]["source"] == "real"
+
+                if self.fallback_mode == "hard_strict" and not real_pair:
+                    raise RuntimeError(
+                        "Hard strict mode failed: non-real embeddings detected for "
+                        f"variant={variant.name}, pair=({ds_a}, {ds_b}), "
+                        f"sources=({cache[key_a]['source']}, {cache[key_b]['source']})"
+                    )
+
                 bootstrap = {
                     "mean": None,
                     "std": None,
@@ -374,6 +383,13 @@ class PaperExperimentRunner:
                         "bootstrap_ci_upper": bootstrap["ci_upper"],
                     }
                 )
+
+                if self.progress_log_every > 0:
+                    processed = len(rows)
+                    total = max(1, len(variants) * len(pairs))
+                    if processed % self.progress_log_every == 0 or processed == total:
+                        pct = 100.0 * processed / total
+                        logger.info(f"Pairwise benchmark progress: {processed}/{total} ({pct:.1f}%)")
 
         return rows
 
@@ -470,8 +486,13 @@ class PaperExperimentRunner:
             for ds_name in dataset_names:
                 payload = self._normalize_embedding_payload(self._extract_dataset_embeddings(ds_name, variant))
                 emb = payload["embeddings"]
+                if self.fallback_mode == "hard_strict" and payload.get("source") != "real":
+                    raise RuntimeError(
+                        f"Hard strict mode failed in ranking: dataset={ds_name}, "
+                        f"variant={variant.name}, source={payload.get('source')}"
+                    )
                 if emb is None:
-                    if self.fallback_mode == "strict":
+                    if self.fallback_mode in {"strict", "hard_strict"}:
                         raise RuntimeError(
                             f"Missing real embeddings for dataset={ds_name}, variant={variant.name} in strict mode"
                         )

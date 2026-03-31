@@ -3,13 +3,16 @@
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
+from tqdm import tqdm
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from experiments.paper_pipeline import PaperExperimentRunner
 from experiments.publication_plots import generate_publication_plots
+from data.manager import DatasetManager
 from run_experiment import ExperimentRunner
 from utils.config import get_logger, load_config, setup_logging
 
@@ -114,19 +117,55 @@ class FMDSensitivityAnalysis:
             self.logger.info(f"Plot {label}: {path}")
         return outputs
 
+    def run_fetch_data(self, dataset_names: list[str] | None = None) -> bool:
+        """Download MIDI datasets from configured external sources."""
+        manager = DatasetManager(self.config)
+        configured = [d["name"] for d in self.config.get("data", {}).get("datasets", [])]
+        targets = dataset_names or configured
+        self.logger.info(f"Fetching datasets: {targets}")
+
+        ok_all = True
+        total = max(1, len(targets))
+        for idx, dataset_name in enumerate(
+            tqdm(targets, desc="Fetch datasets", unit="dataset", dynamic_ncols=True),
+            start=1,
+        ):
+            pct = 100.0 * idx / total
+            self.logger.info(f"[Progress] fetch-data {idx}/{total} ({pct:.1f}%) -> {dataset_name}")
+            info = manager.get_dataset_info(dataset_name)
+            url = str(info.get("url", "")).strip().lower()
+            if not url.startswith("http"):
+                self.logger.warning(f"Skipping {dataset_name}: no external downloadable URL configured ({url})")
+                ok = manager.ensure_dataset_exists(dataset_name, download=False)
+            else:
+                ok = manager.ensure_dataset_exists(dataset_name, download=True)
+            ok_all = ok_all and ok
+        return ok_all
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     """Create CLI parser."""
     parser = argparse.ArgumentParser(description="FMD sensitivity analysis runner")
     parser.add_argument(
         "--mode",
-        choices=["quick", "full", "paper", "paper-full", "paper-plots", "tests", "demo", "lint"],
+        choices=[
+            "quick",
+            "full",
+            "paper",
+            "paper-full",
+            "paper-plots",
+            "fetch-data",
+            "tests",
+            "demo",
+            "lint",
+        ],
         default="quick",
         help=(
             "quick: one-click default (demo + quick paper benchmark), "
             "full: tests + all experiments + full paper benchmark, "
             "paper: quick paper benchmark, paper-full: full benchmark, "
-            "paper-plots: only generate plots from existing paper outputs"
+            "paper-plots: only generate plots from existing paper outputs, "
+            "fetch-data: download datasets from configured external sources"
         ),
     )
     parser.add_argument(
@@ -134,6 +173,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Optional single experiment name to run (overrides mode logic for experiments)",
+    )
+    parser.add_argument(
+        "--datasets",
+        nargs="*",
+        default=None,
+        help="Optional list of dataset names for --mode fetch-data",
     )
     return parser
 
@@ -144,48 +189,100 @@ def main():
     args = parser.parse_args()
 
     analysis = FMDSensitivityAnalysis()
+    start_time = time.perf_counter()
 
-    if args.experiment:
-        analysis.run_experiment(args.experiment)
-        return
+    def _done(success: bool = True):
+        elapsed = time.perf_counter() - start_time
+        status = "SUCCESS" if success else "FAILED"
+        print(f"\n=== Program finished: {status} | elapsed: {elapsed:.1f}s ===")
 
-    if args.mode == "quick":
-        analysis.run_demo()
-        analysis.run_paper_benchmark(full=False)
-        return
+    try:
+        if args.experiment:
+            analysis.run_experiment(args.experiment)
+            _done(True)
+            return
 
-    if args.mode == "paper":
-        analysis.run_paper_benchmark(full=False)
-        return
+        if args.mode == "quick":
+            steps = [
+                ("demo", lambda: analysis.run_demo()),
+                ("paper-quick", lambda: analysis.run_paper_benchmark(full=False)),
+            ]
+            for i, (label, fn) in enumerate(
+                tqdm(steps, desc="Quick pipeline", unit="step", dynamic_ncols=True),
+                start=1,
+            ):
+                pct = 100.0 * i / len(steps)
+                analysis.logger.info(f"[Progress] {i}/{len(steps)} ({pct:.1f}%) -> {label}")
+                fn()
+            _done(True)
+            return
 
-    if args.mode == "paper-full":
-        analysis.run_paper_benchmark(full=True)
-        return
+        if args.mode == "paper":
+            analysis.logger.info("[Progress] 100.0% -> paper")
+            analysis.run_paper_benchmark(full=False)
+            _done(True)
+            return
 
-    if args.mode == "paper-plots":
-        analysis.run_publication_plots()
-        return
+        if args.mode == "paper-full":
+            analysis.logger.info("[Progress] 100.0% -> paper-full")
+            analysis.run_paper_benchmark(full=True)
+            _done(True)
+            return
 
-    if args.mode == "tests":
-        ok = analysis.run_all_tests()
-        if not ok:
-            raise SystemExit(1)
-        return
+        if args.mode == "paper-plots":
+            analysis.logger.info("[Progress] 100.0% -> paper-plots")
+            analysis.run_publication_plots()
+            _done(True)
+            return
 
-    if args.mode == "demo":
-        analysis.run_demo()
-        return
+        if args.mode == "fetch-data":
+            ok = analysis.run_fetch_data(args.datasets)
+            if not ok:
+                _done(False)
+                raise SystemExit(1)
+            _done(True)
+            return
 
-    if args.mode == "lint":
-        analysis.run_lint_check()
-        return
+        if args.mode == "tests":
+            ok = analysis.run_all_tests()
+            if not ok:
+                _done(False)
+                raise SystemExit(1)
+            _done(True)
+            return
 
-    # Full mode
-    ok = analysis.run_all_tests()
-    if not ok:
-        raise SystemExit(1)
-    analysis.run_all_experiments()
-    analysis.run_paper_benchmark(full=True)
+        if args.mode == "demo":
+            analysis.logger.info("[Progress] 100.0% -> demo")
+            analysis.run_demo()
+            _done(True)
+            return
+
+        if args.mode == "lint":
+            analysis.logger.info("[Progress] 100.0% -> lint")
+            analysis.run_lint_check()
+            _done(True)
+            return
+
+        # Full mode
+        steps = [
+            ("tests", lambda: analysis.run_all_tests()),
+            ("experiments", lambda: analysis.run_all_experiments()),
+            ("paper-full", lambda: analysis.run_paper_benchmark(full=True)),
+        ]
+        for i, (label, fn) in enumerate(
+            tqdm(steps, desc="Full pipeline", unit="step", dynamic_ncols=True),
+            start=1,
+        ):
+            pct = 100.0 * i / len(steps)
+            analysis.logger.info(f"[Progress] {i}/{len(steps)} ({pct:.1f}%) -> {label}")
+            result = fn()
+            if label == "tests" and result is False:
+                _done(False)
+                raise SystemExit(1)
+        _done(True)
+    except Exception:
+        _done(False)
+        raise
 
 
 if __name__ == "__main__":

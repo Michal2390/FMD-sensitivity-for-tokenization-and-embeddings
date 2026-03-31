@@ -33,8 +33,21 @@ class EmbeddingModel(ABC):
         """
         self.config = config
         self.model_name = model_name
-        self.device = config["embeddings"].get("device", "cpu")
-        logger.info(f"Initialized {model_name} embedding model")
+        requested_device = str(config["embeddings"].get("device", "cpu")).lower()
+        if requested_device == "auto":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        elif requested_device == "cuda" and not torch.cuda.is_available():
+            logger.warning("CUDA requested but not available; falling back to CPU")
+            self.device = "cpu"
+        else:
+            self.device = requested_device
+
+        if self.device == "cuda":
+            gpu_name = torch.cuda.get_device_name(0)
+            logger.info(f"Initialized {model_name} on CUDA GPU: {gpu_name}")
+        else:
+            logger.info(f"Initialized {model_name} on device: {self.device}")
+        logger.info("Embedding stage runs inference only (no neural network training)")
 
     @abstractmethod
     def encode(self, tokens: List[int]) -> np.ndarray:

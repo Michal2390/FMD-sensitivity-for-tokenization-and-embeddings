@@ -196,6 +196,27 @@ def test_strict_mode_marks_invalid_pair(monkeypatch, light_config):
     assert rows[0]["fmd"] is None
 
 
+def test_hard_strict_raises_immediately(monkeypatch, light_config):
+    monkeypatch.setattr(pipeline_mod, "DatasetManager", _FakeDatasetManager)
+    monkeypatch.setattr(pipeline_mod, "MIDIPreprocessor", _FakePreprocessor)
+    monkeypatch.setattr(pipeline_mod, "TokenizationPipeline", _FakeTokenizerPipeline)
+    monkeypatch.setattr(pipeline_mod, "EmbeddingExtractor", _FakeEmbeddings)
+    monkeypatch.setattr(pipeline_mod, "FrechetMusicDistance", _FakeFMD)
+
+    light_config["paper"]["fallback_mode"] = "hard_strict"
+    local_runner = pipeline_mod.PaperExperimentRunner(light_config)
+
+    def _fake_extract(dataset_name, variant):
+        if dataset_name == "midicaps":
+            return {"embeddings": None, "source": "missing", "real_files": 0, "total_files": 0}
+        return np.zeros((5, 8), dtype=np.float32)
+
+    local_runner._extract_dataset_embeddings = _fake_extract  # type: ignore[attr-defined]
+    variants = local_runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    with pytest.raises(RuntimeError):
+        local_runner.run_pairwise_benchmark(variants)
+
+
 def test_split_rows_and_effects(runner):
     variants = runner.build_variants(tokenizers=["REMI", "Octuple"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
     rows = runner.run_pairwise_benchmark(variants)

@@ -1,5 +1,11 @@
 """Data management module for MIDI datasets."""
 
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import urllib.request
+import zipfile
 from pathlib import Path
 from typing import List, Dict, Optional
 from loguru import logger
@@ -105,14 +111,76 @@ class DatasetManager:
             return True
 
         if download:
-            logger.warning(f"Dataset '{dataset_name}' not found. Would download from source.")
-            logger.info(
-                "Download functionality needs to be implemented based on specific dataset requirements."
-            )
-            # Actual download logic would be implemented here for each dataset
-            return False
+            info = self.get_dataset_info(dataset_name)
+            url = str(info.get("url", "")).strip()
+            if not url:
+                logger.error(f"Dataset '{dataset_name}' has no URL configured")
+                return False
+
+            logger.info(f"Dataset '{dataset_name}' not found. Downloading from: {url}")
+            ok = self._download_dataset(url=url, dataset_path=dataset_path)
+            if not ok:
+                return False
+
+            midi_count = len(list(dataset_path.rglob("*.mid"))) + len(list(dataset_path.rglob("*.midi")))
+            logger.info(f"Download completed for '{dataset_name}'. MIDI files found: {midi_count}")
+            return midi_count > 0
 
         return False
+
+    def _download_dataset(self, url: str, dataset_path: Path) -> bool:
+        dataset_path.mkdir(parents=True, exist_ok=True)
+
+        # Archive URLs can be downloaded and extracted directly.
+        if url.endswith(".zip") or url.endswith(".tar") or url.endswith(".tar.gz") or url.endswith(".tgz"):
+            return self._download_and_extract_archive(url, dataset_path)
+
+        # For GitHub repositories (e.g., MidiCaps/POP909), shallow clone is usually enough.
+        if "github.com" in url:
+            return self._clone_repository(url, dataset_path)
+
+        # Best effort: attempt archive download even if extension is unknown.
+        return self._download_and_extract_archive(url, dataset_path)
+
+    def _download_and_extract_archive(self, url: str, dataset_path: Path) -> bool:
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_dir_path = Path(tmp_dir)
+                archive_path = tmp_dir_path / "dataset_archive"
+                logger.info(f"Downloading archive: {url}")
+                urllib.request.urlretrieve(url, str(archive_path))
+
+                if zipfile.is_zipfile(archive_path):
+                    with zipfile.ZipFile(archive_path, "r") as zip_ref:
+                        zip_ref.extractall(dataset_path)
+                    return True
+
+                if tarfile.is_tarfile(archive_path):
+                    with tarfile.open(archive_path, "r:*") as tar_ref:
+                        tar_ref.extractall(dataset_path)
+                    return True
+
+                logger.error(f"Unsupported archive format from URL: {url}")
+                return False
+        except Exception as exc:
+            logger.error(f"Archive download/extract failed for {url}: {exc}")
+            return False
+
+    def _clone_repository(self, url: str, dataset_path: Path) -> bool:
+        try:
+            # Clean empty target to avoid clone failure on existing directory.
+            if dataset_path.exists() and not any(dataset_path.iterdir()):
+                shutil.rmtree(dataset_path)
+
+            cmd = ["git", "clone", "--depth", "1", url, str(dataset_path)]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Git clone failed: {result.stderr.strip()}")
+                return False
+            return True
+        except Exception as exc:
+            logger.error(f"Git clone exception for {url}: {exc}")
+            return False
 
 
 class DataProcessor:

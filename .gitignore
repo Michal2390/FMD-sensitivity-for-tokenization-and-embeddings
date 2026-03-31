@@ -26,6 +26,11 @@ data/embeddings/**
 .vscode/
 extract_pdf.py
 
+# Temporary helper files
+.gen_*.txt
+.last_*.txt
+.pytest_status.txt
+
 # Private files (not for public repo)
 PUBLIKACJA_OPINIA.md
 docs/private/**
