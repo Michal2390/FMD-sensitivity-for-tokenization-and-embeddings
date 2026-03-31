@@ -119,7 +119,7 @@ python run_ablation_study.py
 **Project**: Wrażliwość Frechet Music Distance  
 **Institution**: Politechnika Warszawska, EITI  
 **Course**: WIMU (Wyszukiwanie Informacji Muzycznych)  
-**Duration**: 5 weeks (March-April 2026)
+**Duration**: February-June 2026
 
 ---
 
