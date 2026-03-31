@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from hashlib import md5
 from itertools import product
@@ -11,6 +12,7 @@ import csv
 import json
 
 import numpy as np
+import yaml
 from loguru import logger
 from scipy.stats import kendalltau, spearmanr
 
@@ -55,6 +57,17 @@ class PaperExperimentRunner:
         self.max_files = int(paper_cfg.get("max_files_per_dataset", 8))
         self.synthetic_fallback_samples = int(paper_cfg.get("synthetic_fallback_samples", 12))
         self.seed = int(paper_cfg.get("seed", 42))
+        self.dataset_names = self._dataset_names()
+        self.compare_all_pairs = bool(paper_cfg.get("compare_all_pairs", False))
+        self.fallback_mode = str(paper_cfg.get("fallback_mode", "synthetic")).strip().lower()
+        self.bootstrap_cfg = paper_cfg.get("bootstrap_ci", {})
+        self.bootstrap_enabled = bool(self.bootstrap_cfg.get("enabled", True))
+        self.bootstrap_resamples = int(self.bootstrap_cfg.get("n_resamples", 50))
+        self.bootstrap_ci = float(self.bootstrap_cfg.get("confidence", 0.95))
+        self.bootstrap_seed = int(self.bootstrap_cfg.get("seed", self.seed))
+
+        self.genre_aliases = self._load_genre_aliases(paper_cfg)
+        self.top_variants_per_pair = int(paper_cfg.get("top_variants_per_pair", 3))
 
         reports_dir = config.get("results", {}).get("reports_dir", "results/reports")
         self.output_dir = Path(reports_dir) / "paper"
@@ -101,6 +114,80 @@ class PaperExperimentRunner:
     def _dataset_names(self) -> List[str]:
         return [d["name"] for d in self.config["data"]["datasets"]]
 
+    def _load_genre_aliases(self, paper_cfg: Dict) -> Dict[str, str]:
+        """Load alias mapping from config and optional standalone YAML file."""
+        aliases: Dict[str, str] = {}
+
+        inline_aliases = paper_cfg.get("genre_aliases", {})
+        if isinstance(inline_aliases, dict):
+            aliases.update(
+                {
+                    str(alias).strip().lower(): str(dataset).strip()
+                    for alias, dataset in inline_aliases.items()
+                    if str(alias).strip() and str(dataset).strip()
+                }
+            )
+
+        mapping_file = paper_cfg.get("genre_mapping_file")
+        if not mapping_file:
+            return aliases
+
+        mapping_path = Path(mapping_file)
+        if not mapping_path.exists():
+            logger.warning(f"Genre mapping file not found: {mapping_path}")
+            return aliases
+
+        with open(mapping_path, "r", encoding="utf-8") as handle:
+            payload = yaml.safe_load(handle) or {}
+
+        file_aliases = payload.get("aliases", payload)
+        if isinstance(file_aliases, dict):
+            for alias, dataset in file_aliases.items():
+                alias_text = str(alias).strip().lower()
+                dataset_text = str(dataset).strip()
+                if alias_text and dataset_text:
+                    aliases[alias_text] = dataset_text
+
+        return aliases
+
+    def _resolve_dataset_name(self, name_or_alias: str) -> str | None:
+        label = str(name_or_alias).strip()
+        if not label:
+            return None
+
+        label_lower = label.lower()
+        if label in self.dataset_names:
+            return label
+        if label_lower in self.genre_aliases:
+            resolved = self.genre_aliases[label_lower]
+            return resolved if resolved in self.dataset_names else None
+        if label_lower in [x.lower() for x in self.dataset_names]:
+            by_lower = {x.lower(): x for x in self.dataset_names}
+            return by_lower[label_lower]
+        return None
+
+    def _resolve_special_pairs(self) -> List[Dict]:
+        paper_cfg = self.config.get("paper", {})
+        parsed = self._parse_pairs(paper_cfg.get("special_pairs", []))
+
+        resolved: List[Dict] = []
+        for left, right in parsed:
+            ds_left = self._resolve_dataset_name(left)
+            ds_right = self._resolve_dataset_name(right)
+            if not ds_left or not ds_right:
+                logger.warning(f"Skipping special pair ({left}, {right}) - unresolved dataset alias")
+                continue
+            resolved.append(
+                {
+                    "genre_a": left,
+                    "genre_b": right,
+                    "dataset_a": ds_left,
+                    "dataset_b": ds_right,
+                }
+            )
+
+        return resolved
+
     def _list_dataset_midis(self, dataset_name: str) -> List[Path]:
         files = self.dataset_manager.list_midi_files(dataset_name, processed=False, limit=self.max_files)
         if files:
@@ -129,9 +216,54 @@ class PaperExperimentRunner:
         rng = np.random.default_rng(seed)
         return rng.normal(0.0, 1.0, size=(self.synthetic_fallback_samples, dim)).astype(np.float32)
 
-    def _extract_dataset_embeddings(self, dataset_name: str, variant: PipelineVariant) -> np.ndarray:
+    @staticmethod
+    def _normalize_embedding_payload(payload) -> Dict:
+        if isinstance(payload, dict):
+            return {
+                "embeddings": payload.get("embeddings"),
+                "source": str(payload.get("source", "real")),
+                "real_files": int(payload.get("real_files", 0)),
+                "total_files": int(payload.get("total_files", 0)),
+            }
+        return {
+            "embeddings": payload,
+            "source": "real",
+            "real_files": int(payload.shape[0]) if payload is not None else 0,
+            "total_files": int(payload.shape[0]) if payload is not None else 0,
+        }
+
+    def _bootstrap_ci_for_pair(self, emb_a: np.ndarray, emb_b: np.ndarray, key: str) -> Dict:
+        if not self.bootstrap_enabled or emb_a.size == 0 or emb_b.size == 0:
+            return {"mean": None, "std": None, "ci_lower": None, "ci_upper": None}
+
+        local_seed = int(md5(f"{key}|{self.bootstrap_seed}".encode("utf-8")).hexdigest()[:8], 16)
+        rng = np.random.default_rng(local_seed)
+        n_a = emb_a.shape[0]
+        n_b = emb_b.shape[0]
+        sample_n_a = max(2, min(n_a, self.synthetic_fallback_samples))
+        sample_n_b = max(2, min(n_b, self.synthetic_fallback_samples))
+        values = []
+
+        for _ in range(self.bootstrap_resamples):
+            idx_a = rng.integers(0, n_a, size=sample_n_a)
+            idx_b = rng.integers(0, n_b, size=sample_n_b)
+            values.append(float(self.fmd.compute_fmd(emb_a[idx_a], emb_b[idx_b])))
+
+        arr = np.array(values, dtype=float)
+        alpha = max(0.0, min(0.5, (1.0 - self.bootstrap_ci) / 2.0))
+        lower = float(np.quantile(arr, alpha))
+        upper = float(np.quantile(arr, 1.0 - alpha))
+        return {
+            "mean": float(np.mean(arr)),
+            "std": float(np.std(arr)),
+            "ci_lower": lower,
+            "ci_upper": upper,
+        }
+
+    def _extract_dataset_embeddings(self, dataset_name: str, variant: PipelineVariant) -> Dict:
         midi_files = self._list_dataset_midis(dataset_name)
         vectors: List[np.ndarray] = []
+        real_count = 0
 
         for midi_path in midi_files:
             try:
@@ -144,49 +276,189 @@ class PaperExperimentRunner:
                     continue
                 vec = self.embeddings.extract_embeddings([tokens], variant.model)[0]
                 vectors.append(vec)
+                real_count += 1
             except Exception as exc:
                 logger.warning(f"Skipping {midi_path} for {variant.name}: {exc}")
 
         if not vectors:
+            if self.fallback_mode == "strict":
+                return {
+                    "embeddings": None,
+                    "source": "missing",
+                    "real_files": 0,
+                    "total_files": len(midi_files),
+                }
+
             logger.warning(
                 f"No embeddings from files for dataset={dataset_name}, variant={variant.name}; "
                 "using deterministic synthetic fallback"
             )
-            return self._synthetic_embeddings(dataset_name, variant)
+            return {
+                "embeddings": self._synthetic_embeddings(dataset_name, variant),
+                "source": "synthetic",
+                "real_files": 0,
+                "total_files": len(midi_files),
+            }
 
-        return np.vstack(vectors)
+        return {
+            "embeddings": np.vstack(vectors),
+            "source": "real",
+            "real_files": real_count,
+            "total_files": len(midi_files),
+        }
 
     def run_pairwise_benchmark(self, variants: Sequence[PipelineVariant]) -> List[Dict]:
         """Compute FMD for configured dataset pairs across all variants."""
-        exp5 = self.config.get("experiments", {}).get("exp5_cross_genre", {})
-        pairs = self._parse_pairs(exp5.get("pairs", []))
-        if not pairs:
-            names = self._dataset_names()
+        names = self._dataset_names()
+        if self.compare_all_pairs:
             pairs = [(names[i], names[j]) for i in range(len(names)) for j in range(i + 1, len(names))]
+        else:
+            exp5 = self.config.get("experiments", {}).get("exp5_cross_genre", {})
+            pairs = self._parse_pairs(exp5.get("pairs", []))
+            if not pairs:
+                pairs = [(names[i], names[j]) for i in range(len(names)) for j in range(i + 1, len(names))]
 
         rows: List[Dict] = []
-        cache: Dict[Tuple[str, str], np.ndarray] = {}
+        cache: Dict[Tuple[str, str], Dict] = {}
 
         for variant in variants:
             for ds_a, ds_b in pairs:
                 key_a = (ds_a, variant.name)
                 key_b = (ds_b, variant.name)
                 if key_a not in cache:
-                    cache[key_a] = self._extract_dataset_embeddings(ds_a, variant)
+                    payload_a = self._extract_dataset_embeddings(ds_a, variant)
+                    cache[key_a] = self._normalize_embedding_payload(payload_a)
                 if key_b not in cache:
-                    cache[key_b] = self._extract_dataset_embeddings(ds_b, variant)
+                    payload_b = self._extract_dataset_embeddings(ds_b, variant)
+                    cache[key_b] = self._normalize_embedding_payload(payload_b)
 
-                fmd_value = self.fmd.compute_fmd(cache[key_a], cache[key_b])
+                emb_a = cache[key_a]["embeddings"]
+                emb_b = cache[key_b]["embeddings"]
+                is_valid = emb_a is not None and emb_b is not None
+                real_pair = cache[key_a]["source"] == "real" and cache[key_b]["source"] == "real"
+                bootstrap = {
+                    "mean": None,
+                    "std": None,
+                    "ci_lower": None,
+                    "ci_upper": None,
+                }
+                fmd_value = None
+
+                if is_valid:
+                    fmd_value = float(self.fmd.compute_fmd(emb_a, emb_b))
+                    bootstrap = self._bootstrap_ci_for_pair(
+                        emb_a,
+                        emb_b,
+                        key=f"{variant.name}|{ds_a}|{ds_b}",
+                    )
+
                 rows.append(
                     {
                         "variant": variant.name,
+                        "tokenizer": variant.tokenizer,
+                        "model": variant.model,
+                        "remove_velocity": variant.remove_velocity,
+                        "hard_quantization": variant.hard_quantization,
                         "dataset_a": ds_a,
                         "dataset_b": ds_b,
-                        "fmd": float(fmd_value),
+                        "fmd": fmd_value,
+                        "valid": is_valid,
+                        "real_pair": real_pair,
+                        "source_a": cache[key_a]["source"],
+                        "source_b": cache[key_b]["source"],
+                        "real_files_a": cache[key_a]["real_files"],
+                        "real_files_b": cache[key_b]["real_files"],
+                        "bootstrap_mean": bootstrap["mean"],
+                        "bootstrap_std": bootstrap["std"],
+                        "bootstrap_ci_lower": bootstrap["ci_lower"],
+                        "bootstrap_ci_upper": bootstrap["ci_upper"],
                     }
                 )
 
         return rows
+
+    @staticmethod
+    def _split_pairwise_rows(pairwise_rows: List[Dict]) -> Dict[str, List[Dict]]:
+        valid_rows = [row for row in pairwise_rows if row.get("valid") and row.get("fmd") is not None]
+        real_only_rows = [row for row in valid_rows if row.get("real_pair")]
+        return {
+            "all": valid_rows,
+            "real_only": real_only_rows,
+        }
+
+    def compute_variant_effects(self, pairwise_rows: List[Dict]) -> Dict:
+        """Compute per-variant deltas for tokenizer/model under fixed controls."""
+        filtered = [row for row in pairwise_rows if row.get("valid") and row.get("fmd") is not None]
+        if not filtered:
+            return {"tokenizer_deltas": [], "model_deltas": []}
+
+        by_cell: Dict[Tuple[str, str, bool, bool], List[float]] = defaultdict(list)
+        for row in filtered:
+            key = (
+                str(row["tokenizer"]),
+                str(row["model"]),
+                bool(row["remove_velocity"]),
+                bool(row["hard_quantization"]),
+            )
+            by_cell[key].append(float(row["fmd"]))
+
+        cell_mean = {key: float(np.mean(values)) for key, values in by_cell.items()}
+
+        tokenizer_deltas: List[Dict] = []
+        model_deltas: List[Dict] = []
+
+        tokenizers = sorted({key[0] for key in cell_mean})
+        models = sorted({key[1] for key in cell_mean})
+        preprocess = sorted({(key[2], key[3]) for key in cell_mean})
+
+        for model in models:
+            for remove_velocity, hard_quantization in preprocess:
+                for i in range(len(tokenizers)):
+                    for j in range(i + 1, len(tokenizers)):
+                        t1 = tokenizers[i]
+                        t2 = tokenizers[j]
+                        k1 = (t1, model, remove_velocity, hard_quantization)
+                        k2 = (t2, model, remove_velocity, hard_quantization)
+                        if k1 in cell_mean and k2 in cell_mean:
+                            tokenizer_deltas.append(
+                                {
+                                    "model": model,
+                                    "remove_velocity": remove_velocity,
+                                    "hard_quantization": hard_quantization,
+                                    "tokenizer_a": t1,
+                                    "tokenizer_b": t2,
+                                    "mean_fmd_a": cell_mean[k1],
+                                    "mean_fmd_b": cell_mean[k2],
+                                    "delta_fmd": float(cell_mean[k1] - cell_mean[k2]),
+                                }
+                            )
+
+        for tokenizer in tokenizers:
+            for remove_velocity, hard_quantization in preprocess:
+                for i in range(len(models)):
+                    for j in range(i + 1, len(models)):
+                        m1 = models[i]
+                        m2 = models[j]
+                        k1 = (tokenizer, m1, remove_velocity, hard_quantization)
+                        k2 = (tokenizer, m2, remove_velocity, hard_quantization)
+                        if k1 in cell_mean and k2 in cell_mean:
+                            model_deltas.append(
+                                {
+                                    "tokenizer": tokenizer,
+                                    "remove_velocity": remove_velocity,
+                                    "hard_quantization": hard_quantization,
+                                    "model_a": m1,
+                                    "model_b": m2,
+                                    "mean_fmd_a": cell_mean[k1],
+                                    "mean_fmd_b": cell_mean[k2],
+                                    "delta_fmd": float(cell_mean[k1] - cell_mean[k2]),
+                                }
+                            )
+
+        return {
+            "tokenizer_deltas": tokenizer_deltas,
+            "model_deltas": model_deltas,
+        }
 
     def run_ranking_benchmark(self, variants: Sequence[PipelineVariant]) -> Dict:
         """Build rankings and stability across configurations."""
@@ -196,7 +468,14 @@ class PaperExperimentRunner:
         for variant in variants:
             emb_sets = []
             for ds_name in dataset_names:
-                emb = self._extract_dataset_embeddings(ds_name, variant)
+                payload = self._normalize_embedding_payload(self._extract_dataset_embeddings(ds_name, variant))
+                emb = payload["embeddings"]
+                if emb is None:
+                    if self.fallback_mode == "strict":
+                        raise RuntimeError(
+                            f"Missing real embeddings for dataset={ds_name}, variant={variant.name} in strict mode"
+                        )
+                    emb = self._synthetic_embeddings(ds_name, variant)
                 emb_sets.append((ds_name, emb))
 
             matrix_result = self.fmd.compute_batch_fmd(emb_sets)
@@ -266,24 +545,252 @@ class PaperExperimentRunner:
 
         return {"available": True, "details": details}
 
-    def save_outputs(self, pairwise_rows: List[Dict], ranking_results: Dict, expected_eval: Dict) -> Dict:
+    def compute_special_pair_metrics(self, pairwise_rows: List[Dict]) -> Dict:
+        """Aggregate configured special genre pairs for publication-ready analysis."""
+        special_pairs = self._resolve_special_pairs()
+        if not special_pairs:
+            return {"available": False, "rows": [], "summary": [], "top_variants": []}
+
+        usable_rows = [row for row in pairwise_rows if row.get("valid") and row.get("fmd") is not None]
+        if not usable_rows:
+            return {"available": False, "rows": [], "summary": [], "top_variants": []}
+
+        lookup: Dict[Tuple[str, str, str], float] = {}
+        for row in usable_rows:
+            key_direct = (row["variant"], row["dataset_a"], row["dataset_b"])
+            key_reverse = (row["variant"], row["dataset_b"], row["dataset_a"])
+            lookup[key_direct] = float(row["fmd"])
+            lookup[key_reverse] = float(row["fmd"])
+
+        rows: List[Dict] = []
+        for pair in special_pairs:
+            for variant_name in sorted({row["variant"] for row in usable_rows}):
+                value = lookup.get((variant_name, pair["dataset_a"], pair["dataset_b"]))
+                if value is None:
+                    continue
+                rows.append(
+                    {
+                        "variant": variant_name,
+                        "genre_a": pair["genre_a"],
+                        "genre_b": pair["genre_b"],
+                        "pair": f"{pair['genre_a']} vs {pair['genre_b']}",
+                        "dataset_a": pair["dataset_a"],
+                        "dataset_b": pair["dataset_b"],
+                        "fmd": float(value),
+                    }
+                )
+
+        if not rows:
+            return {"available": False, "rows": [], "summary": [], "top_variants": []}
+
+        grouped: Dict[str, List[float]] = defaultdict(list)
+        for row in rows:
+            grouped[row["pair"]].append(float(row["fmd"]))
+
+        global_mean = float(np.mean([row["fmd"] for row in rows]))
+        summary: List[Dict] = []
+        for pair_name, values in grouped.items():
+            arr = np.array(values, dtype=float)
+            summary.append(
+                {
+                    "pair": pair_name,
+                    "count": int(arr.size),
+                    "mean_fmd": float(np.mean(arr)),
+                    "std_fmd": float(np.std(arr)),
+                    "min_fmd": float(np.min(arr)),
+                    "max_fmd": float(np.max(arr)),
+                    # >1.0 means this pair is more separable than average configured pair.
+                    "distinguishability_ratio": float(np.mean(arr) / max(global_mean, 1e-9)),
+                }
+            )
+
+        summary.sort(key=lambda item: item["mean_fmd"], reverse=True)
+
+        top_rows: List[Dict] = []
+        for pair_name in sorted(grouped.keys()):
+            pair_rows = sorted(
+                [row for row in rows if row["pair"] == pair_name],
+                key=lambda item: float(item["fmd"]),
+                reverse=True,
+            )
+            for rank, row in enumerate(pair_rows[: self.top_variants_per_pair], start=1):
+                top_rows.append(
+                    {
+                        "pair": pair_name,
+                        "rank": rank,
+                        "variant": row["variant"],
+                        "fmd": float(row["fmd"]),
+                        "dataset_a": row["dataset_a"],
+                        "dataset_b": row["dataset_b"],
+                    }
+                )
+
+        return {"available": True, "rows": rows, "summary": summary, "top_variants": top_rows}
+
+    def save_outputs(
+        self,
+        pairwise_rows: List[Dict],
+        ranking_results: Dict,
+        expected_eval: Dict,
+        special_metrics: Dict | None = None,
+        variant_effects: Dict | None = None,
+    ) -> Dict:
         """Save JSON, CSV and markdown summary for paper draft."""
         json_path = self.output_dir / "paper_results.json"
         csv_path = self.output_dir / "pairwise_fmd.csv"
+        csv_all_path = self.output_dir / "pairwise_fmd_all.csv"
+        csv_real_only_path = self.output_dir / "pairwise_fmd_real_only.csv"
         md_path = self.output_dir / "paper_summary.md"
+        special_csv_path = self.output_dir / "special_pair_fmd.csv"
+        special_summary_csv_path = self.output_dir / "special_pair_summary.csv"
+        special_top_csv_path = self.output_dir / "special_pair_top_variants.csv"
+        tokenizer_delta_csv_path = self.output_dir / "variant_delta_tokenizer.csv"
+        model_delta_csv_path = self.output_dir / "variant_delta_model.csv"
+
+        if special_metrics is None:
+            special_metrics = {"available": False, "rows": [], "summary": [], "top_variants": []}
+        if variant_effects is None:
+            variant_effects = {
+                "all": {"tokenizer_deltas": [], "model_deltas": []},
+                "real_only": {"tokenizer_deltas": [], "model_deltas": []},
+            }
+
+        split_rows = self._split_pairwise_rows(pairwise_rows)
+        all_rows = split_rows["all"]
+        real_only_rows = split_rows["real_only"]
 
         payload = {
-            "pairwise": pairwise_rows,
+            "pairwise_all": all_rows,
+            "pairwise_real_only": real_only_rows,
             "ranking": ranking_results,
             "expected_eval": expected_eval,
+            "special_pairs": special_metrics,
+            "variant_effects": variant_effects,
         }
         with open(json_path, "w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2)
 
+        pairwise_fields = [
+            "variant",
+            "tokenizer",
+            "model",
+            "remove_velocity",
+            "hard_quantization",
+            "dataset_a",
+            "dataset_b",
+            "fmd",
+            "valid",
+            "real_pair",
+            "source_a",
+            "source_b",
+            "real_files_a",
+            "real_files_b",
+            "bootstrap_mean",
+            "bootstrap_std",
+            "bootstrap_ci_lower",
+            "bootstrap_ci_upper",
+        ]
+
         with open(csv_path, "w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["variant", "dataset_a", "dataset_b", "fmd"])
+            writer = csv.DictWriter(handle, fieldnames=pairwise_fields)
             writer.writeheader()
-            writer.writerows(pairwise_rows)
+            writer.writerows(all_rows)
+
+        with open(csv_all_path, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=pairwise_fields)
+            writer.writeheader()
+            writer.writerows(all_rows)
+
+        with open(csv_real_only_path, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=pairwise_fields)
+            writer.writeheader()
+            writer.writerows(real_only_rows)
+
+        with open(special_csv_path, "w", newline="", encoding="utf-8") as handle:
+            fieldnames = ["variant", "genre_a", "genre_b", "pair", "dataset_a", "dataset_b", "fmd"]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(special_metrics.get("rows", []))
+
+        with open(special_summary_csv_path, "w", newline="", encoding="utf-8") as handle:
+            fieldnames = [
+                "pair",
+                "count",
+                "mean_fmd",
+                "std_fmd",
+                "min_fmd",
+                "max_fmd",
+                "distinguishability_ratio",
+            ]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(special_metrics.get("summary", []))
+
+        with open(special_top_csv_path, "w", newline="", encoding="utf-8") as handle:
+            fieldnames = ["pair", "rank", "variant", "fmd", "dataset_a", "dataset_b"]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(special_metrics.get("top_variants", []))
+
+        with open(tokenizer_delta_csv_path, "w", newline="", encoding="utf-8") as handle:
+            fieldnames = [
+                "model",
+                "remove_velocity",
+                "hard_quantization",
+                "tokenizer_a",
+                "tokenizer_b",
+                "mean_fmd_a",
+                "mean_fmd_b",
+                "delta_fmd",
+            ]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(variant_effects.get("all", {}).get("tokenizer_deltas", []))
+
+        with open(model_delta_csv_path, "w", newline="", encoding="utf-8") as handle:
+            fieldnames = [
+                "tokenizer",
+                "remove_velocity",
+                "hard_quantization",
+                "model_a",
+                "model_b",
+                "mean_fmd_a",
+                "mean_fmd_b",
+                "delta_fmd",
+            ]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(variant_effects.get("all", {}).get("model_deltas", []))
+
+        with open(self.output_dir / "variant_delta_tokenizer_real_only.csv", "w", newline="", encoding="utf-8") as handle:
+            fieldnames = [
+                "model",
+                "remove_velocity",
+                "hard_quantization",
+                "tokenizer_a",
+                "tokenizer_b",
+                "mean_fmd_a",
+                "mean_fmd_b",
+                "delta_fmd",
+            ]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(variant_effects.get("real_only", {}).get("tokenizer_deltas", []))
+
+        with open(self.output_dir / "variant_delta_model_real_only.csv", "w", newline="", encoding="utf-8") as handle:
+            fieldnames = [
+                "tokenizer",
+                "remove_velocity",
+                "hard_quantization",
+                "model_a",
+                "model_b",
+                "mean_fmd_a",
+                "mean_fmd_b",
+                "delta_fmd",
+            ]
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(variant_effects.get("real_only", {}).get("model_deltas", []))
 
         # Simple markdown summary for direct paper drafting.
         lines = [
@@ -291,7 +798,8 @@ class PaperExperimentRunner:
             "",
             "## Pairwise comparisons",
             "",
-            f"Total rows: **{len(pairwise_rows)}**",
+            f"All valid rows: **{len(all_rows)}**",
+            f"Real-only rows: **{len(real_only_rows)}**",
             "",
             "## Ranking stability by reference dataset",
             "",
@@ -314,13 +822,65 @@ class PaperExperimentRunner:
         else:
             lines.append("Not configured. Add `paper.expected_orders` to config for this section.")
 
+        lines.extend(["", "## Special genre-pair separability", ""])
+        if special_metrics.get("available"):
+            for row in special_metrics.get("summary", [])[:10]:
+                lines.append(
+                    "- "
+                    f"`{row['pair']}` -> mean FMD={row['mean_fmd']:.4f}, "
+                    f"std={row['std_fmd']:.4f}, ratio={row['distinguishability_ratio']:.3f}"
+                )
+        else:
+            lines.append("Not configured. Add `paper.special_pairs` and optional `paper.genre_aliases`.")
+
+        lines.extend(["", "## Top separating variants per special pair", ""])
+        if special_metrics.get("available") and special_metrics.get("top_variants"):
+            for row in special_metrics.get("top_variants", [])[:30]:
+                lines.append(
+                    "- "
+                    f"`{row['pair']}` rank {row['rank']}: `{row['variant']}` (FMD={row['fmd']:.4f})"
+                )
+        else:
+            lines.append("No top-variant entries available.")
+
+        lines.extend(["", "## Variant effects (delta FMD)", ""])
+        tok_rows = variant_effects.get("all", {}).get("tokenizer_deltas", [])
+        mod_rows = variant_effects.get("all", {}).get("model_deltas", [])
+        tok_real_rows = variant_effects.get("real_only", {}).get("tokenizer_deltas", [])
+        mod_real_rows = variant_effects.get("real_only", {}).get("model_deltas", [])
+        lines.append(f"Tokenizer deltas rows (all): **{len(tok_rows)}**")
+        lines.append(f"Model deltas rows (all): **{len(mod_rows)}**")
+        lines.append(f"Tokenizer deltas rows (real-only): **{len(tok_real_rows)}**")
+        lines.append(f"Model deltas rows (real-only): **{len(mod_real_rows)}**")
+        for row in tok_rows[:8]:
+            lines.append(
+                "- "
+                f"model `{row['model']}` ({row['remove_velocity']}/{row['hard_quantization']}): "
+                f"`{row['tokenizer_a']}` - `{row['tokenizer_b']}` = {row['delta_fmd']:.4f}"
+            )
+        for row in mod_rows[:8]:
+            lines.append(
+                "- "
+                f"tokenizer `{row['tokenizer']}` ({row['remove_velocity']}/{row['hard_quantization']}): "
+                f"`{row['model_a']}` - `{row['model_b']}` = {row['delta_fmd']:.4f}"
+            )
+
         with open(md_path, "w", encoding="utf-8") as handle:
             handle.write("\n".join(lines) + "\n")
 
         return {
             "json": str(json_path),
             "csv": str(csv_path),
+            "csv_all": str(csv_all_path),
+            "csv_real_only": str(csv_real_only_path),
             "markdown": str(md_path),
+            "special_csv": str(special_csv_path),
+            "special_summary_csv": str(special_summary_csv_path),
+            "special_top_variants_csv": str(special_top_csv_path),
+            "variant_delta_tokenizer_csv": str(tokenizer_delta_csv_path),
+            "variant_delta_model_csv": str(model_delta_csv_path),
+            "variant_delta_tokenizer_real_only_csv": str(self.output_dir / "variant_delta_tokenizer_real_only.csv"),
+            "variant_delta_model_real_only_csv": str(self.output_dir / "variant_delta_model_real_only.csv"),
         }
 
     def run_full(self) -> Dict:
@@ -333,7 +893,13 @@ class PaperExperimentRunner:
         pairwise_rows = self.run_pairwise_benchmark(variants)
         ranking_results = self.run_ranking_benchmark(variants)
         expected_eval = self.evaluate_expected_order(ranking_results)
-        files = self.save_outputs(pairwise_rows, ranking_results, expected_eval)
+        split_rows = self._split_pairwise_rows(pairwise_rows)
+        special_metrics = self.compute_special_pair_metrics(split_rows["all"])
+        variant_effects = {
+            "all": self.compute_variant_effects(split_rows["all"]),
+            "real_only": self.compute_variant_effects(split_rows["real_only"]),
+        }
+        files = self.save_outputs(pairwise_rows, ranking_results, expected_eval, special_metrics, variant_effects)
 
         logger.info(f"Paper benchmark completed. Outputs: {files}")
         return {
@@ -355,7 +921,13 @@ class PaperExperimentRunner:
         pairwise_rows = self.run_pairwise_benchmark(variants)
         ranking_results = self.run_ranking_benchmark(variants)
         expected_eval = self.evaluate_expected_order(ranking_results)
-        files = self.save_outputs(pairwise_rows, ranking_results, expected_eval)
+        split_rows = self._split_pairwise_rows(pairwise_rows)
+        special_metrics = self.compute_special_pair_metrics(split_rows["all"])
+        variant_effects = {
+            "all": self.compute_variant_effects(split_rows["all"]),
+            "real_only": self.compute_variant_effects(split_rows["real_only"]),
+        }
+        files = self.save_outputs(pairwise_rows, ranking_results, expected_eval, special_metrics, variant_effects)
         return {
             "variants": [v.name for v in variants],
             "pairwise_rows": len(pairwise_rows),

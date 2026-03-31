@@ -79,6 +79,9 @@ def light_config(tmp_path: Path):
             "seed": 42,
             "max_files_per_dataset": 2,
             "synthetic_fallback_samples": 4,
+            "top_variants_per_pair": 2,
+            "genre_aliases": {"jazz": "maestro", "rock": "midicaps"},
+            "special_pairs": [("jazz", "rock")],
             "expected_orders": [
                 {"reference": "maestro", "order": ["maestro", "midicaps", "pop909"]}
             ],
@@ -132,14 +135,76 @@ def test_run_pairwise_and_outputs(runner):
     assert "maestro" in ranking["stability"]
 
     expected = runner.evaluate_expected_order(ranking)
-    files = runner.save_outputs(rows, ranking, expected)
+    special = runner.compute_special_pair_metrics(rows)
+    assert special["available"] is True
+    assert len(special["rows"]) == 1
+    assert len(special["top_variants"]) == 1
+    assert special["top_variants"][0]["rank"] == 1
+
+    files = runner.save_outputs(rows, ranking, expected, special)
     assert Path(files["json"]).exists()
     assert Path(files["csv"]).exists()
     assert Path(files["markdown"]).exists()
+    assert Path(files["special_csv"]).exists()
+    assert Path(files["special_summary_csv"]).exists()
+    assert Path(files["special_top_variants_csv"]).exists()
 
 
 def test_quick_mode_runs(runner):
     result = runner.run_quick()
     assert result["pairwise_rows"] >= 1
     assert "outputs" in result
+
+
+def test_pairwise_all_combinations(monkeypatch, light_config):
+    monkeypatch.setattr(pipeline_mod, "DatasetManager", _FakeDatasetManager)
+    monkeypatch.setattr(pipeline_mod, "MIDIPreprocessor", _FakePreprocessor)
+    monkeypatch.setattr(pipeline_mod, "TokenizationPipeline", _FakeTokenizerPipeline)
+    monkeypatch.setattr(pipeline_mod, "EmbeddingExtractor", _FakeEmbeddings)
+    monkeypatch.setattr(pipeline_mod, "FrechetMusicDistance", _FakeFMD)
+
+    light_config["paper"]["compare_all_pairs"] = True
+    local_runner = pipeline_mod.PaperExperimentRunner(light_config)
+    local_runner._extract_dataset_embeddings = lambda dataset_name, variant: np.zeros((5, 8), dtype=np.float32)
+
+    variants = local_runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    rows = local_runner.run_pairwise_benchmark(variants)
+    # 3 datasets => C(3,2) = 3 pairs.
+    assert len(rows) == 3
+
+
+def test_strict_mode_marks_invalid_pair(monkeypatch, light_config):
+    monkeypatch.setattr(pipeline_mod, "DatasetManager", _FakeDatasetManager)
+    monkeypatch.setattr(pipeline_mod, "MIDIPreprocessor", _FakePreprocessor)
+    monkeypatch.setattr(pipeline_mod, "TokenizationPipeline", _FakeTokenizerPipeline)
+    monkeypatch.setattr(pipeline_mod, "EmbeddingExtractor", _FakeEmbeddings)
+    monkeypatch.setattr(pipeline_mod, "FrechetMusicDistance", _FakeFMD)
+
+    light_config["paper"]["fallback_mode"] = "strict"
+    local_runner = pipeline_mod.PaperExperimentRunner(light_config)
+
+    def _fake_extract(dataset_name, variant):
+        if dataset_name == "midicaps":
+            return {"embeddings": None, "source": "missing", "real_files": 0, "total_files": 0}
+        return np.zeros((5, 8), dtype=np.float32)
+
+    local_runner._extract_dataset_embeddings = _fake_extract  # type: ignore[attr-defined]
+    variants = local_runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    rows = local_runner.run_pairwise_benchmark(variants)
+    assert len(rows) == 1
+    assert rows[0]["valid"] is False
+    assert rows[0]["fmd"] is None
+
+
+def test_split_rows_and_effects(runner):
+    variants = runner.build_variants(tokenizers=["REMI", "Octuple"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    rows = runner.run_pairwise_benchmark(variants)
+    split = runner._split_pairwise_rows(rows)
+    assert len(split["all"]) == len(rows)
+    assert isinstance(split["real_only"], list)
+
+    effects = runner.compute_variant_effects(split["all"])
+    assert "tokenizer_deltas" in effects
+    assert "model_deltas" in effects
+
 

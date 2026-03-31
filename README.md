@@ -59,9 +59,32 @@ Mozesz tez uruchomic tryby z CLI:
 python main.py --mode quick
 python main.py --mode paper
 python main.py --mode paper-full
+python main.py --mode paper-plots
 python main.py --mode tests
 python main.py --mode full
 ```
+
+### Starter dane i specjalne porownania gatunkow
+Do materialu artykulowego mozesz wygenerowac duze, zbalansowane i bardziej zroznicowane zbiory MIDI (proceduralnie, lokalnie):
+
+```bash
+python scripts/generate_starter_midis.py --count-per-dataset 120 --bars 16
+```
+
+Zrodlo tych plikow: **syntetyczna generacja wlasna** z `scripts/generate_starter_midis.py` (nie pobierane z zewnetrznych repozytoriow audio/MIDI).
+
+Po `paper-full` automatycznie tworza sie raporty dla par specjalnych (np. `jazz vs rock`, `classical vs pop`, `rap vs pop`) oraz wykresy publikacyjne. Sam krok wykresow mozna uruchomic osobno:
+
+```bash
+python scripts/generate_publication_plots.py
+```
+
+Mapowanie aliasow gatunkow do datasetow jest trzymane w osobnym pliku `configs/genre_mapping.yaml`.
+
+W pipeline `paper` sa dodatkowo:
+- `fallback_mode: synthetic|strict` (strict = brak fallbacku, brak realnych embeddingow daje invalid),
+- podzial raportow na `all` i `real-only`,
+- `bootstrap_ci` dla FMD (mean/std/CI).
 
 ### Uruchomienie testow
 ```bash
@@ -112,7 +135,24 @@ python run_ablation_study.py
 ✅ **Paper outputs generated automatically**:
 - `results/reports/paper/paper_results.json`
 - `results/reports/paper/pairwise_fmd.csv`
+- `results/reports/paper/special_pair_fmd.csv`
+- `results/reports/paper/special_pair_summary.csv`
+- `results/reports/paper/special_pair_top_variants.csv`
+- `results/reports/paper/pairwise_fmd_all.csv`
+- `results/reports/paper/pairwise_fmd_real_only.csv`
+- `results/reports/paper/variant_delta_tokenizer.csv`
+- `results/reports/paper/variant_delta_model.csv`
+- `results/reports/paper/variant_delta_tokenizer_real_only.csv`
+- `results/reports/paper/variant_delta_model_real_only.csv`
 - `results/reports/paper/paper_summary.md`
+
+✅ **Publication plots** (`results/plots/paper/`):
+- `fig_pairwise_heatmap.png`
+- `fig_special_pairs_boxplot.png`
+- `fig_special_pairs_distinguishability.png`
+- `fig_top_variants_per_pair.png`
+- `fig_ranking_stability.png`
+- `fig_rank_consistency.png`
 
 ## 🎓 Academic Context
 

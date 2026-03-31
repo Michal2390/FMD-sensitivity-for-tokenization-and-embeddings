@@ -9,6 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from experiments.paper_pipeline import PaperExperimentRunner
+from experiments.publication_plots import generate_publication_plots
 from run_experiment import ExperimentRunner
 from utils.config import get_logger, load_config, setup_logging
 
@@ -95,7 +96,23 @@ class FMDSensitivityAnalysis:
         self.logger.info(f"Paper benchmark done. Rows: {result.get('pairwise_rows')}")
         for label, path in result.get("outputs", {}).items():
             self.logger.info(f"Output {label}: {path}")
+
+        plots_cfg = self.config.get("paper", {}).get("publication_plots", {})
+        if plots_cfg.get("enabled", True):
+            self.run_publication_plots()
         return result
+
+    def run_publication_plots(self):
+        """Generate publication-ready plots from latest paper outputs."""
+        self.logger.info("Generating publication plots")
+        outputs = generate_publication_plots(self.config)
+        if not outputs:
+            self.logger.warning("No publication plots generated")
+            return outputs
+
+        for label, path in outputs.items():
+            self.logger.info(f"Plot {label}: {path}")
+        return outputs
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -103,12 +120,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="FMD sensitivity analysis runner")
     parser.add_argument(
         "--mode",
-        choices=["quick", "full", "paper", "paper-full", "tests", "demo", "lint"],
+        choices=["quick", "full", "paper", "paper-full", "paper-plots", "tests", "demo", "lint"],
         default="quick",
         help=(
             "quick: one-click default (demo + quick paper benchmark), "
             "full: tests + all experiments + full paper benchmark, "
-            "paper: quick paper benchmark, paper-full: full benchmark"
+            "paper: quick paper benchmark, paper-full: full benchmark, "
+            "paper-plots: only generate plots from existing paper outputs"
         ),
     )
     parser.add_argument(
@@ -142,6 +160,10 @@ def main():
 
     if args.mode == "paper-full":
         analysis.run_paper_benchmark(full=True)
+        return
+
+    if args.mode == "paper-plots":
+        analysis.run_publication_plots()
         return
 
     if args.mode == "tests":
