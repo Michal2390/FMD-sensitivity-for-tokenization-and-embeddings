@@ -1,0 +1,76 @@
+name: Auto-merge
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge PR
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Merge PR if CI passed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const headBranch = context.payload.workflow_run.head_branch;
+            const headSha = context.payload.workflow_run.head_sha;
+
+            console.log(`CI passed for branch: ${headBranch}, sha: ${headSha}`);
+
+            // Find open PRs for this branch
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${headBranch}`,
+            });
+
+            if (pulls.length === 0) {
+              console.log('No open PRs found for this branch');
+              return;
+            }
+
+            for (const pull of pulls) {
+              console.log(`Found PR #${pull.number}: ${pull.title}`);
+
+              // Try to enable auto-merge via GraphQL
+              try {
+                await github.graphql(`
+                  mutation($pullRequestId: ID!) {
+                    enablePullRequestAutoMerge(input: {
+                      pullRequestId: $pullRequestId,
+                      mergeMethod: SQUASH
+                    }) {
+                      pullRequest {
+                        autoMergeRequest {
+                          enabledAt
+                        }
+                      }
+                    }
+                  }
+                `, { pullRequestId: pull.node_id });
+                console.log(`Auto-merge enabled for PR #${pull.number}`);
+              } catch (e) {
+                console.log(`Could not enable auto-merge: ${e.message}`);
+                console.log('Attempting direct merge as fallback...');
+
+                try {
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pull.number,
+                    merge_method: 'squash',
+                  });
+                  console.log(`PR #${pull.number} merged successfully!`);
+                } catch (mergeErr) {
+                  console.log(`Could not merge PR #${pull.number}: ${mergeErr.message}`);
+                }
+              }
+            }
