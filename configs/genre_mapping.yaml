@@ -1,13 +1,8 @@
-# External genre aliases used by paper pipeline (option B).
-aliases:
-  classical: "classical"
-  pop: "pop"
-  jazz: "jazz"
-  rock: "rock"
-  rap: "rap"
-  maestro: "maestro"
-  midicaps: "midicaps"
-  pop909: "pop909"
-  hiphop: "rap"
-  edm: "pop"
-
+classical: maestro
+jazz: jazz
+rock: rock
+rap: rap
+pop: pop
+maestro: maestro
+midicaps: midicaps
+pop909: pop909

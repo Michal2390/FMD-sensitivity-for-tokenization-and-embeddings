@@ -1,11 +1,5 @@
 """Data management module for MIDI datasets."""
 
-import shutil
-import subprocess
-import tarfile
-import tempfile
-import urllib.request
-import zipfile
 from pathlib import Path
 from typing import List, Dict, Optional
 from loguru import logger
@@ -111,76 +105,86 @@ class DatasetManager:
             return True
 
         if download:
-            info = self.get_dataset_info(dataset_name)
-            url = str(info.get("url", "")).strip()
-            if not url:
-                logger.error(f"Dataset '{dataset_name}' has no URL configured")
-                return False
-
-            logger.info(f"Dataset '{dataset_name}' not found. Downloading from: {url}")
-            ok = self._download_dataset(url=url, dataset_path=dataset_path)
-            if not ok:
-                return False
-
-            midi_count = len(list(dataset_path.rglob("*.mid"))) + len(list(dataset_path.rglob("*.midi")))
-            logger.info(f"Download completed for '{dataset_name}'. MIDI files found: {midi_count}")
-            return midi_count > 0
+            logger.warning(f"Dataset '{dataset_name}' not found. Would download from source.")
+            logger.info(
+                "Download functionality needs to be implemented based on specific dataset requirements."
+            )
+            # Actual download logic would be implemented here for each dataset
+            return False
 
         return False
 
-    def _download_dataset(self, url: str, dataset_path: Path) -> bool:
-        dataset_path.mkdir(parents=True, exist_ok=True)
+    def load_genre_metadata(self, dataset_name: str) -> Dict[str, str]:
+        """
+        Load genre metadata for a dataset if available.
 
-        # Archive URLs can be downloaded and extracted directly.
-        if url.endswith(".zip") or url.endswith(".tar") or url.endswith(".tar.gz") or url.endswith(".tgz"):
-            return self._download_and_extract_archive(url, dataset_path)
+        Args:
+            dataset_name: Name of the dataset
 
-        # For GitHub repositories (e.g., MidiCaps/POP909), shallow clone is usually enough.
-        if "github.com" in url:
-            return self._clone_repository(url, dataset_path)
+        Returns:
+            Dictionary mapping file paths to genres
+        """
+        dataset_path = self.get_dataset_path(dataset_name, processed=False)
+        metadata_file = dataset_path / "metadata.csv"
+        genre_map = {}
 
-        # Best effort: attempt archive download even if extension is unknown.
-        return self._download_and_extract_archive(url, dataset_path)
+        if metadata_file.exists():
+            import csv
 
-    def _download_and_extract_archive(self, url: str, dataset_path: Path) -> bool:
-        try:
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_dir_path = Path(tmp_dir)
-                archive_path = tmp_dir_path / "dataset_archive"
-                logger.info(f"Downloading archive: {url}")
-                urllib.request.urlretrieve(url, str(archive_path))
+            with open(metadata_file, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if "file" in row and "genre" in row:
+                        genre_map[row["file"]] = row["genre"].lower()
+            logger.info(f"Loaded genre metadata for {len(genre_map)} files in {dataset_name}")
+        else:
+            logger.warning(f"No metadata.csv found for {dataset_name}, using default genre mapping")
 
-                if zipfile.is_zipfile(archive_path):
-                    with zipfile.ZipFile(archive_path, "r") as zip_ref:
-                        zip_ref.extractall(dataset_path)
-                    return True
+        return genre_map
 
-                if tarfile.is_tarfile(archive_path):
-                    with tarfile.open(archive_path, "r:*") as tar_ref:
-                        tar_ref.extractall(dataset_path)
-                    return True
+    def list_midi_files_by_genre(
+        self, genre: str, processed: bool = False, limit: Optional[int] = None
+    ) -> List[Path]:
+        """
+        List MIDI files filtered by genre using metadata.
 
-                logger.error(f"Unsupported archive format from URL: {url}")
-                return False
-        except Exception as exc:
-            logger.error(f"Archive download/extract failed for {url}: {exc}")
-            return False
+        Args:
+            genre: Genre to filter by
+            processed: If True, list from processed data
+            limit: Maximum number of files to return
 
-    def _clone_repository(self, url: str, dataset_path: Path) -> bool:
-        try:
-            # Clean empty target to avoid clone failure on existing directory.
-            if dataset_path.exists() and not any(dataset_path.iterdir()):
-                shutil.rmtree(dataset_path)
+        Returns:
+            List of Path objects pointing to MIDI files of the specified genre
+        """
+        # For LAKH, use metadata; for others, use genre_mapping.yaml
+        import yaml
 
-            cmd = ["git", "clone", "--depth", "1", url, str(dataset_path)]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                logger.error(f"Git clone failed: {result.stderr.strip()}")
-                return False
-            return True
-        except Exception as exc:
-            logger.error(f"Git clone exception for {url}: {exc}")
-            return False
+        genre_mapping_path = (
+            Path(self.config.get("data", {}).get("raw_data_dir", "data/raw"))
+            / ".."
+            / "configs"
+            / "genre_mapping.yaml"
+        )
+        with open(genre_mapping_path, "r") as f:
+            genre_mapping = yaml.safe_load(f)
+
+        dataset_name = genre_mapping.get(genre, genre)
+        midi_files = self.list_midi_files(dataset_name, processed, limit=None)
+
+        if dataset_name == "lakh":
+            metadata = self.load_genre_metadata(dataset_name)
+            midi_files = [
+                f
+                for f in midi_files
+                if metadata.get(str(f.relative_to(self.get_dataset_path(dataset_name))), "").lower()
+                == genre.lower()
+            ]
+
+        if limit:
+            midi_files = midi_files[:limit]
+
+        logger.info(f"Found {len(midi_files)} MIDI files for genre '{genre}'")
+        return midi_files
 
 
 class DataProcessor:

@@ -12,14 +12,6 @@ from transformers import AutoModel, AutoTokenizer
 from tqdm import tqdm
 
 
-def _resolve_hf_model_id(config: Dict, logical_name: str, default_model_id: str) -> str:
-    """Resolve HuggingFace model id for a logical embedding model name."""
-    for model_cfg in config.get("embeddings", {}).get("models", []):
-        if model_cfg.get("name") == logical_name:
-            return model_cfg.get("hf_model_name", default_model_id)
-    return default_model_id
-
-
 class EmbeddingModel(ABC):
     """Base class for embedding models."""
 
@@ -33,21 +25,8 @@ class EmbeddingModel(ABC):
         """
         self.config = config
         self.model_name = model_name
-        requested_device = str(config["embeddings"].get("device", "cpu")).lower()
-        if requested_device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        elif requested_device == "cuda" and not torch.cuda.is_available():
-            logger.warning("CUDA requested but not available; falling back to CPU")
-            self.device = "cpu"
-        else:
-            self.device = requested_device
-
-        if self.device == "cuda":
-            gpu_name = torch.cuda.get_device_name(0)
-            logger.info(f"Initialized {model_name} on CUDA GPU: {gpu_name}")
-        else:
-            logger.info(f"Initialized {model_name} on device: {self.device}")
-        logger.info("Embedding stage runs inference only (no neural network training)")
+        self.device = config["embeddings"].get("device", "cpu")
+        logger.info(f"Initialized {model_name} embedding model")
 
     @abstractmethod
     def encode(self, tokens: List[int]) -> np.ndarray:
@@ -101,9 +80,7 @@ class CLaMP1Model(EmbeddingModel):
             self.model.to(self.device)
             self.model.eval()
             
-            # Get embedding dimension from model
-            self.embedding_dim = self.model.config.hidden_size
-            logger.info(f"CLaMP-1 loaded successfully (dim={self.embedding_dim})")
+            model_name = "chrisdonahue/clamp"  # Official CLaMP model
         except Exception as e:
             logger.warning(f"Failed to load CLaMP-1 from HuggingFace: {e}")
             logger.warning("Using dummy model for testing purposes")
@@ -221,9 +198,7 @@ class CLaMP2Model(EmbeddingModel):
             
             # Get embedding dimension from model
             self.embedding_dim = self.model.config.hidden_size
-            logger.info(f"CLaMP-2 loaded successfully (dim={self.embedding_dim})")
-        except Exception as e:
-            logger.warning(f"Failed to load CLaMP-2 from HuggingFace: {e}")
+            model_name = "chrisdonahue/clamp"  # Using same base model (CLaMP-2 is variant)
             logger.warning("Using dummy model for testing purposes")
             self.model = None
             self.tokenizer = None

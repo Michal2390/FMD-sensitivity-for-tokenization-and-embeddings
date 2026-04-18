@@ -15,21 +15,9 @@ data:
     - name: "pop909"
       url: "https://github.com/music-x-lab/POP909-Dataset"
       version: "1.0"
-    - name: "jazz"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "rock"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "classical"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "pop"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "rap"
-      url: "local-generated"
-      version: "starter-v1"
+    - name: "lakh"
+      url: "https://colinraffel.com/projects/lakh/lakh_midi_dataset_v0.1.zip"
+      version: "v0.1"
 
 # Preprocessing Configuration
 preprocessing:
@@ -76,14 +64,12 @@ embeddings:
       format_type: "midi"  # Direct MIDI structure
   # Embedding extraction settings
   batch_size: 32
-  device: "auto"  # auto -> CUDA when available, otherwise CPU
-  cache_embeddings: true
+  device: "cpu"  # Safe default for local runs
   cache_dir: "data/embeddings/cache"  # Directory for caching extracted embeddings
 
 # FMD Metric Configuration
 fmd_metric:
   metric_name: "Frechet Music Distance"
-  # Statistical parameters
   use_mean: true
   use_std: true
   # Correlation method
@@ -92,7 +78,7 @@ fmd_metric:
 # Experiments Configuration
 experiments:
   exp1_tokenization_sensitivity:
-    name: "Tokenization Sensitivity"
+  device: "cuda"  # or "cpu" if CUDA not available
     description: "Study FMD sensitivity to tokenization choice"
     enabled: true
     variants:
@@ -154,19 +140,12 @@ experiments:
     description: "Test FMD consistency across different music genres"
     enabled: true
     pairs:
-      - ("jazz", "rock")
-      - ("jazz", "classical")
-      - ("jazz", "pop")
-      - ("jazz", "rap")
-      - ("rock", "classical")
-      - ("rock", "pop")
-      - ("rock", "rap")
-      - ("classical", "pop")
-      - ("classical", "rap")
-      - ("rap", "pop")
       - ("maestro", "pop909")
       - ("maestro", "midicaps")
       - ("pop909", "midicaps")
+      - ("jazz", "rock")
+      - ("classical", "pop")
+      - ("rap", "pop")
     tokenizer: "REMI"
     model: "CLaMP-2"
 
@@ -183,10 +162,6 @@ evaluation:
 # Logging Configuration
 logging:
   level: "INFO"
-  log_file: "logs/experiment.log"
-  console_output: true
-
-# Results Configuration
 results:
   plots_dir: "results/plots"
   reports_dir: "results/reports"
@@ -198,12 +173,8 @@ results:
 # Paper-oriented benchmark configuration
 paper:
   seed: 42
-  max_files_per_dataset: 120
+  max_files_per_dataset: 8
   synthetic_fallback_samples: 12
-  compare_all_pairs: true
-  # synthetic | strict (invalid rows) | hard_strict (immediate exception)
-  fallback_mode: "hard_strict"
-  progress_log_every: 20
   # Leave empty to use all tokenizers/models from config sections above
   tokenizers: []
   models: []
@@ -213,25 +184,18 @@ paper:
       order: ["maestro", "midicaps", "pop909"]
     - reference: "pop909"
       order: ["pop909", "midicaps", "maestro"]
-  # Option B: standalone alias mapping file.
-  genre_mapping_file: "configs/genre_mapping.yaml"
+  genre_aliases:
+    classical: "classical"
+    pop: "pop"
+    jazz: "jazz"
+    rock: "rock"
+    rap: "rap"
+    maestro: "maestro"
+    midicaps: "midicaps"
+    pop909: "pop909"
   special_pairs:
-    - ("jazz", "rock")
-    - ("jazz", "classical")
-    - ("jazz", "pop")
+    - ("classical", "rock")
     - ("jazz", "rap")
-    - ("rock", "classical")
-    - ("rock", "pop")
-    - ("rock", "rap")
-    - ("classical", "pop")
-    - ("classical", "rap")
-    - ("rap", "pop")
-  top_variants_per_pair: 5
-  bootstrap_ci:
-    enabled: true
-    n_resamples: 80
-    confidence: 0.95
-    seed: 42
   publication_plots:
     enabled: true
     top_variants: 8

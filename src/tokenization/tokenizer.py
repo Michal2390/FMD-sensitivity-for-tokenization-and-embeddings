@@ -68,24 +68,6 @@ class TokenizerBase(ABC):
         """
         pass
 
-    @staticmethod
-    def _normalize_token_ids(token_ids) -> List[int]:
-        """Normalize MidiTok token IDs to a flat list of ints."""
-        if token_ids is None:
-            return []
-
-        # Multi-vocabulary tokenizers (e.g. Octuple) can return nested ids.
-        if isinstance(token_ids, list) and token_ids and isinstance(token_ids[0], (list, tuple)):
-            flat_ids: List[int] = []
-            for event in token_ids:
-                flat_ids.extend(int(value) for value in event)
-            return flat_ids
-
-        if isinstance(token_ids, list):
-            return [int(value) for value in token_ids]
-
-        return []
-
     def encode(self, midi_path: Path) -> List[int]:
         """
         Encode MIDI file to token sequence.
@@ -101,12 +83,12 @@ class TokenizerBase(ABC):
 
         try:
             tokens = self.miditok_tokenizer(midi_path)
-            if hasattr(tokens, "ids"):
-                return self._normalize_token_ids(tokens.ids)
-            if isinstance(tokens, list) and len(tokens) > 0:
-                if hasattr(tokens[0], "ids"):
-                    return self._normalize_token_ids(tokens[0].ids)
-                return self._normalize_token_ids(tokens[0])
+            # Return first track's tokens (tokens is TokSequence object)
+            if hasattr(tokens, 'ids'):
+                return tokens.ids
+            elif isinstance(tokens, list) and len(tokens) > 0:
+                # Multi-track case - return first track
+                return tokens[0].ids if hasattr(tokens[0], 'ids') else tokens[0]
             return []
         except Exception as e:
             logger.error(f"Error encoding MIDI {midi_path}: {e}")
@@ -197,20 +179,7 @@ class TokenizerBase(ABC):
         """
         if self.miditok_tokenizer is None:
             return 0
-
-        vocab = self.miditok_tokenizer.vocab
-
-        # Multi-vocabulary tokenizers can expose a list/dict of vocabularies.
-        if isinstance(vocab, list):
-            return int(sum(len(v) for v in vocab))
-
-        if isinstance(vocab, dict):
-            first_value = next(iter(vocab.values()), None)
-            if isinstance(first_value, dict):
-                return int(sum(len(v) for v in vocab.values()))
-            return int(len(vocab))
-
-        return int(len(vocab))
+        return len(self.miditok_tokenizer.vocab)
 
 
 class REMITokenizer(TokenizerBase):
@@ -420,8 +389,8 @@ class TokenizationPipeline:
             f"Tokenization complete: {stats['successful']} successful, {stats['failed']} failed"
         )
 
-        # Save statistics to a filename that does not collide with token files glob pattern.
-        stats_file = output_dir / f"tokenization_stats_{tokenizer_type}_summary.json"
+        # Save statistics
+        stats_file = output_dir / f"tokenization_stats_{tokenizer_type}.json"
         with open(stats_file, "w") as f:
             json.dump(stats, f, indent=2)
 
