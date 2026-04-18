@@ -1,8 +1,0 @@
-maestro=12
-midicaps=12
-pop909=12
-jazz=2
-rock=2
-classical=2
-pop=2
-rap=2

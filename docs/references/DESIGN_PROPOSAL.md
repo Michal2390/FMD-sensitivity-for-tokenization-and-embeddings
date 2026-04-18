@@ -142,17 +142,3 @@ Po ukończeniu projektu będziemy dysponować:
 - Dokumentacja musi zawierać instrukcje powtórzenia eksperymentów
 - Projekt musi działać bez błędów na domyślnej konfiguracji
 
-## 8. Wnioski z walidacji na LAKH dataset
-
-Na podstawie eksperymentów z datasetem LAKH potwierdzono hipotezę wrażliwości FMD na wybór tokenizacji i modelu embeddingów. Analiza statystyczna (średnie FMD, wariancje, bootstrap CI) wykazała znaczące różnice między wariantami.
-
-### Kluczowe odkrycia:
-- **Tokenizacja**: REMI i TSD dają niższe FMD dla podobnych gatunków (classical vs. rock), podczas gdy Octuple i MIDI-Like zwiększają odległość, prawdopodobnie ze względu na różnice w reprezentacji rytmicznej.
-- **Modele embeddingów**: CLaMP-2 lepiej separuje gatunki z dużą różnicą (jazz vs. rap), ale z wyższą wariancją, co wskazuje na wrażliwość na strukturę MIDI.
-- **Statystyka**: Bootstrap CI pokazuje, że różnice są statystycznie znaczące (p < 0.05), z wariancjami FMD od 0.1 do 0.5 w zależności od pary gatunków.
-- **Przyczyny różnic**: Wrażliwość wynika z tego, jak tokenizacja koduje ekspresję i rytm - np. usunięcie velocity zmniejsza FMD dla gatunków melodycznych jak classical.
-
-### Rekomendacje:
-- Dla badań nad gatunkami używać REMI + CLaMP-2 dla stabilnych wyników.
-- Rozszerzyć na więcej gatunków po wstępnych wynikach, dodając ANOVA dla porównań wielokrotnych.
-- Dalsze badania: Zbadanie wpływu preprocessingu na wrażliwość.

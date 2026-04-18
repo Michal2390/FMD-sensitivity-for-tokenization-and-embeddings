@@ -1,12 +1,3 @@
-
-
-# Private files (not for public repo)
-
-PUBLIKACJA_OPINIA.md
-
-docs/private/**
-
-
 *.pyc
 __pycache__/
 *.egg-info/
@@ -24,6 +15,7 @@ venv/
 *.log
 logs/
 results/tmp*
+results/reports/paper/**
 data/raw/**
 data/processed/**
 data/embeddings/**
@@ -33,6 +25,11 @@ data/embeddings/**
 *.code-workspace
 .vscode/
 extract_pdf.py
+
+# Temporary helper files
+.gen_*.txt
+.last_*.txt
+.pytest_status.txt
 
 # Private files (not for public repo)
 PUBLIKACJA_OPINIA.md

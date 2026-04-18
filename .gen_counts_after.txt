@@ -1,8 +1,0 @@
-maestro=160
-midicaps=160
-pop909=160
-jazz=150
-rock=150
-classical=150
-pop=150
-rap=150

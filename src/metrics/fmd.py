@@ -1,9 +1,11 @@
 """Frechet Music Distance metric implementation."""
 
-from typing import Dict
+from typing import Dict, List, Tuple, Optional
 from loguru import logger
 import numpy as np
 from scipy.spatial.distance import cdist
+from pathlib import Path
+import json
 
 
 class FrechetMusicDistance:
@@ -30,6 +32,9 @@ class FrechetMusicDistance:
         """
         Compute Frechet Music Distance between two sets of embeddings.
 
+        This implements the Frechet Distance metric adapted for music analysis:
+        FMD = sqrt(max(mean_distance^2 + std_distance^2, covariance_trace_diff))
+
         Args:
             embeddings1: First set of embeddings (N x D)
             embeddings2: Second set of embeddings (M x D)
@@ -42,21 +47,66 @@ class FrechetMusicDistance:
         if embeddings2.ndim == 1:
             embeddings2 = embeddings2.reshape(1, -1)
 
-        # Compute statistics
+        # Ensure same dimensionality
+        if embeddings1.shape[1] != embeddings2.shape[1]:
+            raise ValueError(
+                f"Embedding dimensions must match: {embeddings1.shape[1]} vs {embeddings2.shape[1]}"
+            )
+
+        # Compute statistics for both distributions
         mean1 = np.mean(embeddings1, axis=0)
         mean2 = np.mean(embeddings2, axis=0)
+        
+        # Compute covariance matrices
+        if embeddings1.shape[0] > 1:
+            cov1 = np.cov(embeddings1.T)
+        else:
+            cov1 = np.zeros((embeddings1.shape[1], embeddings1.shape[1]))
+        
+        if embeddings2.shape[0] > 1:
+            cov2 = np.cov(embeddings2.T)
+        else:
+            cov2 = np.zeros((embeddings2.shape[1], embeddings2.shape[1]))
 
-        # Component 1: Distance between means
-        mean_distance = np.linalg.norm(mean1 - mean2)
+        # Handle 1D case where cov returns a scalar
+        if embeddings1.shape[1] == 1:
+            cov1 = np.array([[cov1]])
+            cov2 = np.array([[cov2]])
 
-        fmd = mean_distance
+        # Component 1: L2 distance between means (Wasserstein part)
+        mean_distance = np.linalg.norm(mean1 - mean2) ** 2
 
-        # Component 2: Difference in standard deviations (if enabled)
+        # Component 2: Difference in covariance matrices (Frechet part)
+        # Using Frobenius norm: ||sqrt(cov1) - sqrt(cov2)||_F^2
+        try:
+            # Compute matrix square roots
+            eigvals1, eigvecs1 = np.linalg.eigh(cov1)
+            eigvals2, eigvecs2 = np.linalg.eigh(cov2)
+            
+            # Ensure non-negative eigenvalues
+            eigvals1 = np.maximum(eigvals1, 0)
+            eigvals2 = np.maximum(eigvals2, 0)
+            
+            sqrt_cov1 = eigvecs1 @ np.diag(np.sqrt(eigvals1)) @ eigvecs1.T
+            sqrt_cov2 = eigvecs2 @ np.diag(np.sqrt(eigvals2)) @ eigvecs2.T
+            
+            cov_distance = np.linalg.norm(sqrt_cov1 - sqrt_cov2, "fro") ** 2
+        except Exception as e:
+            logger.warning(f"Failed to compute covariance distance: {e}. Using trace difference.")
+            # Fallback: use trace difference
+            cov_distance = (np.trace(cov1) - np.trace(cov2)) ** 2
+
+        # Component 3: Optional standard deviation difference
+        std_distance = 0.0
         if self.use_std:
             std1 = np.std(embeddings1, axis=0)
             std2 = np.std(embeddings2, axis=0)
-            std_distance = np.linalg.norm(std1 - std2)
-            fmd += std_distance
+            std_distance = np.linalg.norm(std1 - std2) ** 2
+
+        # Combine components: FMD = sqrt(mean_dist^2 + cov_dist + std_dist)
+        fmd = np.sqrt(mean_distance + cov_distance + std_distance)
+
+        logger.debug(f"FMD components: mean={np.sqrt(mean_distance):.4f}, cov={np.sqrt(cov_distance):.4f}, std={np.sqrt(std_distance):.4f}, total={fmd:.4f}")
 
         return float(fmd)
 
@@ -102,67 +152,38 @@ class FrechetMusicDistance:
         fmd_matrix = np.zeros((n, n))
         names = []
 
+        logger.info(f"Computing pairwise FMD for {n} embedding sets")
+
         for i, (name1, emb1) in enumerate(embeddings_list):
             names.append(name1)
             for j, (name2, emb2) in enumerate(embeddings_list):
                 if i <= j:
-                    fmd = self.compute_fmd(emb1, emb2)
-                    fmd_matrix[i, j] = fmd
-                    fmd_matrix[j, i] = fmd
+                    try:
+                        fmd = self.compute_fmd(emb1, emb2)
+                        fmd_matrix[i, j] = fmd
+                        fmd_matrix[j, i] = fmd
+                    except Exception as e:
+                        logger.error(f"Failed to compute FMD between {name1} and {name2}: {e}")
+                        fmd_matrix[i, j] = np.nan
+                        fmd_matrix[j, i] = np.nan
+
+        # Get upper triangle values (excluding diagonal)
+        upper_triangle = fmd_matrix[np.triu_indices_from(fmd_matrix, k=1)]
+        upper_triangle = upper_triangle[~np.isnan(upper_triangle)]
 
         result = {
             "fmd_matrix": fmd_matrix,
             "names": names,
-            "mean_fmd": np.mean(fmd_matrix[np.triu_indices_from(fmd_matrix, k=1)]),
-            "max_fmd": np.max(fmd_matrix[np.triu_indices_from(fmd_matrix, k=1)]),
-            "min_fmd": np.min(fmd_matrix[np.triu_indices_from(fmd_matrix, k=1)]),
+            "mean_fmd": float(np.mean(upper_triangle)) if len(upper_triangle) > 0 else np.nan,
+            "median_fmd": float(np.median(upper_triangle)) if len(upper_triangle) > 0 else np.nan,
+            "std_fmd": float(np.std(upper_triangle)) if len(upper_triangle) > 0 else np.nan,
+            "max_fmd": float(np.max(upper_triangle)) if len(upper_triangle) > 0 else np.nan,
+            "min_fmd": float(np.min(upper_triangle)) if len(upper_triangle) > 0 else np.nan,
         }
+
+        logger.info(f"Batch FMD computation complete: mean={result['mean_fmd']:.4f}, std={result['std_fmd']:.4f}")
 
         return result
-
-    def compute_fmd_with_ci(
-        self, embeddings1: np.ndarray, embeddings2: np.ndarray, n_boot: int = 1000, ci: float = 0.95
-    ) -> Dict:
-        """
-        Compute FMD with bootstrap confidence intervals.
-
-        Args:
-            embeddings1: First set of embeddings (N x D)
-            embeddings2: Second set of embeddings (M x D)
-            n_boot: Number of bootstrap samples
-            ci: Confidence interval level
-
-        Returns:
-            Dictionary with FMD value and CI
-        """
-        from scipy.stats import bootstrap
-
-        def fmd_statistic(data1, data2):
-            return self.compute_fmd(data1, data2)
-
-        # Bootstrap for embeddings1
-        boot1 = bootstrap((embeddings1,), lambda x: x, n_resamples=n_boot, method='basic')
-        # Bootstrap for embeddings2
-        boot2 = bootstrap((embeddings2,), lambda x: x, n_resamples=n_boot, method='basic')
-
-        # Compute FMD for each bootstrap sample
-        fmd_values = []
-        for i in range(n_boot):
-            emb1_boot = boot1.bootstrap_distribution[i]
-            emb2_boot = boot2.bootstrap_distribution[i]
-            fmd_values.append(fmd_statistic(emb1_boot, emb2_boot))
-
-        fmd_values = np.array(fmd_values)
-        mean_fmd = np.mean(fmd_values)
-        ci_lower = np.percentile(fmd_values, (1 - ci) / 2 * 100)
-        ci_upper = np.percentile(fmd_values, (1 + ci) / 2 * 100)
-
-        return {
-            "fmd": mean_fmd,
-            "ci_lower": ci_lower,
-            "ci_upper": ci_upper,
-            "ci_level": ci,
-        }
 
 
 class FMDRanking:
