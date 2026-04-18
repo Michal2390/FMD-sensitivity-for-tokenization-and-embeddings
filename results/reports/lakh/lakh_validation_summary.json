@@ -6,13 +6,13 @@
   "n_variants": 32,
   "n_valid": 32,
   "fmd_range": {
-    "min": 0.0838069654122375,
-    "max": 0.5406873898358182
+    "min": 0.0535790473222732,
+    "max": 0.2696066200733185
   },
   "eta_squared": {
-    "tokenizer": 0.010276451155834483,
-    "model": 0.9621359882771878,
-    "preprocess": 0.005072765497378342
+    "tokenizer": 0.21326361904010263,
+    "model": 0.018288070181743356,
+    "preprocess": 0.0524233808907672
   },
   "diagnostics_outputs": {
     "cosine_csv": "results/reports/lakh/cosine_similarity.csv",
@@ -21,5 +21,15 @@
     "top_dims_json": "results/reports/lakh/top_varying_dimensions.json",
     "token_stats_csv": "results/reports/lakh/token_statistics.csv",
     "fmd_token_corr_json": "results/reports/lakh/fmd_token_correlations.json"
+  },
+  "partial_eta_squared": {
+    "tokenizer": 0.2132636190401026,
+    "model": 0.01828807018174336,
+    "preprocess": 0.05242338089076721
+  },
+  "fmd_stats": {
+    "mean": 0.1560403448529541,
+    "std": 0.060473278539394625,
+    "median": 0.15027626603841776
   }
 }

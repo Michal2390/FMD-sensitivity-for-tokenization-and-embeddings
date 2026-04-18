@@ -1,25 +1,47 @@
 {
   "eta_squared": {
-    "tokenizer": 0.010276451155834483,
-    "model": 0.9621359882771878,
-    "preprocess": 0.005072765497378342
+    "tokenizer": 0.21326361904010263,
+    "model": 0.018288070181743356,
+    "preprocess": 0.0524233808907672
+  },
+  "partial_eta_squared": {
+    "tokenizer": 0.2132636190401026,
+    "model": 0.01828807018174336,
+    "preprocess": 0.05242338089076721
   },
   "kruskal_wallis_tokenizer": {
-    "H": 0.41029411764705626,
-    "p": 0.9381078571920923
+    "H": 4.558823529411766,
+    "p": 0.2071029946283659
   },
   "kruskal_wallis_model": {
-    "H": 23.341176470588245,
-    "p": 1.356644083432329e-06
+    "H": 0.8205882352941267,
+    "p": 0.3650082357961647
   },
   "cohens_d": {
-    "tok_MIDI-Like vs Octuple": 0.11622343554244613,
-    "tok_MIDI-Like vs REMI": -0.08028806848590392,
-    "tok_MIDI-Like vs TSD": -0.1510872302909824,
-    "tok_Octuple vs REMI": -0.1863879895533218,
-    "tok_Octuple vs TSD": -0.25285185309247843,
-    "tok_REMI vs TSD": -0.06925072677397147,
-    "mod_CLaMP-1 vs CLaMP-2": -9.761589728729023
+    "tok_MIDI-Like vs Octuple": -0.8632735015759877,
+    "tok_MIDI-Like vs REMI": 0.6480511003952134,
+    "tok_MIDI-Like vs TSD": -0.09510432051705117,
+    "tok_Octuple vs REMI": 1.1191992782499316,
+    "tok_Octuple vs TSD": 0.6613446671733484,
+    "tok_REMI vs TSD": -0.6098212109763502,
+    "mod_CLaMP-1 vs CLaMP-2": 0.26430631480072897
+  },
+  "permutation_tests": {
+    "tokenizer": {
+      "observed_F": 2.5300221173777797,
+      "permutation_p": 0.07378524295140972,
+      "n_permutations": 5000
+    },
+    "model": {
+      "observed_F": 0.5588626243483363,
+      "permutation_p": 0.45930813837232554,
+      "n_permutations": 5000
+    },
+    "preprocess": {
+      "observed_F": 0.5163539057915743,
+      "permutation_p": 0.6664667066586683,
+      "n_permutations": 5000
+    }
   },
   "n_variants": 32,
   "n_rows": 32

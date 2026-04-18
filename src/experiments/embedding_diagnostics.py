@@ -171,8 +171,17 @@ def per_dimension_variance(
     Returns
     -------
     array of shape (D,) – variance of each dimension's mean across variants.
+    Only considers variants sharing the most common dimensionality.
     """
-    means = np.array([emb.mean(axis=0) for emb in embeddings_by_variant.values()])
+    # Group by dimension to avoid inhomogeneous array
+    dim_groups: Dict[int, List[np.ndarray]] = {}
+    for emb in embeddings_by_variant.values():
+        d = emb.shape[1]
+        dim_groups.setdefault(d, []).append(emb.mean(axis=0))
+
+    # Pick the dimension group with most variants
+    best_dim = max(dim_groups, key=lambda d: len(dim_groups[d]))
+    means = np.array(dim_groups[best_dim])
     return means.var(axis=0)
 
 
@@ -257,7 +266,7 @@ def run_embedding_diagnostics(
         logger.info(f"Cosine similarity: {len(cosine_rows)} variants → {path}")
 
     # ------------------------------------------------------------------
-    # 2. PCA / t-SNE
+    # 2. PCA / t-SNE (per variant — safe since emb_a, emb_b share dim)
     # ------------------------------------------------------------------
     if _HAS_SKLEARN:
         tsne_records: List[Dict] = []
@@ -267,6 +276,10 @@ def run_embedding_diagnostics(
             emb_a = genre_embs.get(genre_a)
             emb_b = genre_embs.get(genre_b)
             if emb_a is None or emb_b is None:
+                continue
+            # Skip if dimensions mismatch within a variant (shouldn't happen)
+            if emb_a.shape[1] != emb_b.shape[1]:
+                logger.warning(f"Dim mismatch in {variant_name}: {emb_a.shape[1]} vs {emb_b.shape[1]}")
                 continue
 
             combined = np.vstack([emb_a, emb_b])
@@ -317,23 +330,35 @@ def run_embedding_diagnostics(
 
     # ------------------------------------------------------------------
     # 3. Feature importance (per-dimension variance across variants)
+    #    Group by embedding dimension to avoid inhomogeneous arrays.
     # ------------------------------------------------------------------
     flat_embs: Dict[str, np.ndarray] = {}
     for variant_name, genre_embs in embeddings_by_variant.items():
         parts = [v for v in genre_embs.values() if v is not None]
         if parts:
+            # All parts within a variant share the same dim
             flat_embs[variant_name] = np.vstack(parts)
 
     if len(flat_embs) >= 2:
-        top_dims = top_varying_dimensions(flat_embs, top_k=20)
-        path = output_dir / "top_varying_dimensions.json"
-        with open(path, "w", encoding="utf-8") as fh:
-            json.dump(
-                [{"dim": d, "variance": v} for d, v in top_dims],
-                fh,
-                indent=2,
-            )
-        outputs["top_dims_json"] = str(path)
+        # Group variants by dimension
+        dim_groups: Dict[int, Dict[str, np.ndarray]] = {}
+        for vname, emb in flat_embs.items():
+            d = emb.shape[1]
+            dim_groups.setdefault(d, {})[vname] = emb
+
+        all_top_dims = []
+        for dim, group in dim_groups.items():
+            if len(group) >= 2:
+                top_dims = top_varying_dimensions(group, top_k=20)
+                all_top_dims.extend(
+                    [{"dim": d, "variance": v, "embedding_size": dim} for d, v in top_dims]
+                )
+
+        if all_top_dims:
+            path = output_dir / "top_varying_dimensions.json"
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(all_top_dims, fh, indent=2)
+            outputs["top_dims_json"] = str(path)
 
     # ------------------------------------------------------------------
     # 4. Token statistics
@@ -376,5 +401,8 @@ def run_embedding_diagnostics(
 
     logger.info(f"Embedding diagnostics complete → {len(outputs)} artefacts in {output_dir}")
     return outputs
+
+
+
 
 
