@@ -30,6 +30,12 @@ data:
     - name: "rap"
       url: "local-generated"
       version: "starter-v1"
+    - name: "lakh_rock"
+      url: "lakh-genre-subset"
+      version: "lmd_matched"
+    - name: "lakh_jazz"
+      url: "lakh-genre-subset"
+      version: "lmd_matched"
 
 # Preprocessing Configuration
 preprocessing:
@@ -235,3 +241,27 @@ paper:
   publication_plots:
     enabled: true
     top_variants: 8
+
+# Lakh MIDI validation configuration
+lakh:
+  # URL to Lakh MIDI Clean (matched subset)
+  lmd_matched_url: "http://hog.ee.columbia.edu/craffel/lmd/lmd_matched.tar.gz"
+  # Tagtraum genre annotations for Million Song Dataset
+  tagtraum_url: "https://www.tagtraum.com/genres/msd_tagtraum_cd2.cls.zip"
+  tagtraum_file: "data/raw/lakh/msd_tagtraum_cd2.cls"
+  lmd_matched_dir: "data/raw/lakh/lmd_matched"
+  genres:
+    - "rock"
+    - "jazz"
+  max_per_genre: 500
+  seed: 42
+  # Bootstrap settings for Lakh validation (higher precision for publication)
+  bootstrap:
+    enabled: true
+    n_resamples: 200
+    confidence: 0.95
+    seed: 42
+  # Output directory for Lakh validation reports
+  output_dir: "results/reports/lakh"
+  plots_dir: "results/plots/paper"
+

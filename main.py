@@ -1,5 +1,7 @@
 """Main entry point with one-click modes for research workflow."""
 
+from __future__ import annotations
+
 import argparse
 import subprocess
 import sys
@@ -142,6 +144,33 @@ class FMDSensitivityAnalysis:
             ok_all = ok_all and ok
         return ok_all
 
+    def run_lakh_validation(self):
+        """Run Lakh MIDI 32-variant sensitivity validation (rock vs classical)."""
+        self.logger.info("Running Lakh MIDI validation pipeline")
+        runner = PaperExperimentRunner(self.config)
+        result = runner.run_lakh_validation()
+
+        self.logger.info(f"Lakh validation done. Valid rows: {result.get('valid_rows')}")
+        for label, path in result.get("outputs", {}).items():
+            self.logger.info(f"Output {label}: {path}")
+
+        # Generate Lakh-specific plots
+        self.run_lakh_plots()
+        return result
+
+    def run_lakh_plots(self):
+        """Generate publication plots for Lakh validation outputs."""
+        from experiments.lakh_plots import generate_lakh_plots
+
+        self.logger.info("Generating Lakh validation plots")
+        outputs = generate_lakh_plots(self.config)
+        if not outputs:
+            self.logger.warning("No Lakh plots generated")
+            return outputs
+        for label, path in outputs.items():
+            self.logger.info(f"Lakh plot {label}: {path}")
+        return outputs
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     """Create CLI parser."""
@@ -154,6 +183,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "paper",
             "paper-full",
             "paper-plots",
+            "lakh",
+            "lakh-plots",
             "fetch-data",
             "tests",
             "demo",
@@ -165,6 +196,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "full: tests + all experiments + full paper benchmark, "
             "paper: quick paper benchmark, paper-full: full benchmark, "
             "paper-plots: only generate plots from existing paper outputs, "
+            "lakh: Lakh MIDI validation (32 variants, rock vs classical), "
+            "lakh-plots: generate Lakh validation plots from existing outputs, "
             "fetch-data: download datasets from configured external sources"
         ),
     )
@@ -240,6 +273,18 @@ def main():
             if not ok:
                 _done(False)
                 raise SystemExit(1)
+            _done(True)
+            return
+
+        if args.mode == "lakh":
+            analysis.logger.info("[Progress] 100.0% -> lakh")
+            analysis.run_lakh_validation()
+            _done(True)
+            return
+
+        if args.mode == "lakh-plots":
+            analysis.logger.info("[Progress] 100.0% -> lakh-plots")
+            analysis.run_lakh_plots()
             _done(True)
             return
 

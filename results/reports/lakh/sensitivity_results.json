@@ -1,0 +1,26 @@
+{
+  "eta_squared": {
+    "tokenizer": 0.010276451155834483,
+    "model": 0.9621359882771878,
+    "preprocess": 0.005072765497378342
+  },
+  "kruskal_wallis_tokenizer": {
+    "H": 0.41029411764705626,
+    "p": 0.9381078571920923
+  },
+  "kruskal_wallis_model": {
+    "H": 23.341176470588245,
+    "p": 1.356644083432329e-06
+  },
+  "cohens_d": {
+    "tok_MIDI-Like vs Octuple": 0.11622343554244613,
+    "tok_MIDI-Like vs REMI": -0.08028806848590392,
+    "tok_MIDI-Like vs TSD": -0.1510872302909824,
+    "tok_Octuple vs REMI": -0.1863879895533218,
+    "tok_Octuple vs TSD": -0.25285185309247843,
+    "tok_REMI vs TSD": -0.06925072677397147,
+    "mod_CLaMP-1 vs CLaMP-2": -9.761589728729023
+  },
+  "n_variants": 32,
+  "n_rows": 32
+}

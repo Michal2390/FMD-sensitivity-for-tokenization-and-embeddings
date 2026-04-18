@@ -17,6 +17,7 @@ from loguru import logger
 from scipy.stats import kendalltau, spearmanr
 
 from data.manager import DatasetManager
+from data.lakh_genre_loader import LakhGenreLoader
 from embeddings.extractor import EmbeddingExtractor
 from metrics.fmd import FMDRanking, FrechetMusicDistance
 from preprocessing.processor import MIDIPreprocessor
@@ -955,3 +956,211 @@ class PaperExperimentRunner:
             "outputs": files,
         }
 
+    # ------------------------------------------------------------------
+    # Lakh MIDI validation pipeline
+    # ------------------------------------------------------------------
+
+    def run_lakh_validation(self) -> Dict:
+        """Run full 32-variant FMD sensitivity validation on Lakh MIDI.
+
+        Workflow:
+        1. Ensure Lakh data + Tagtraum annotations are available.
+        2. Populate ``data/raw/lakh_rock/`` and ``data/raw/lakh_classical/``.
+        3. Build 32 variants (4 tok × 2 model × 4 preprocess).
+        4. For each variant: preprocess → tokenize → embed → cache.
+        5. Compute FMD(rock, classical) per variant with bootstrap CI.
+        6. Run sensitivity analysis (ANOVA, Tukey, η², Cohen's d).
+        7. Run embedding diagnostics (cosine, PCA/t-SNE, token stats).
+        8. Save all artefacts and return summary dict.
+        """
+        from experiments.sensitivity_analysis import run_sensitivity_analysis
+        from experiments.embedding_diagnostics import run_embedding_diagnostics
+
+        lakh_cfg = self.config.get("lakh", {})
+        genre_a = lakh_cfg.get("genres", ["rock", "classical"])[0]
+        genre_b = lakh_cfg.get("genres", ["rock", "classical"])[1]
+        ds_a = f"lakh_{genre_a}"
+        ds_b = f"lakh_{genre_b}"
+
+        output_dir = Path(lakh_cfg.get("output_dir", "results/reports/lakh"))
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        bootstrap_cfg = lakh_cfg.get("bootstrap", {})
+        n_resamples = int(bootstrap_cfg.get("n_resamples", 200))
+        confidence = float(bootstrap_cfg.get("confidence", 0.95))
+        boot_seed = int(bootstrap_cfg.get("seed", self.seed))
+
+        # Step 1 & 2: data
+        logger.info("=== Lakh Validation: ensuring data ===")
+        loader = LakhGenreLoader(self.config)
+        loader.ensure_data()
+        counts = loader.populate_raw_datasets()
+        logger.info(f"Dataset counts: {counts}")
+
+        # Step 3: build 32 variants
+        variants = self.build_variants()  # default: full 4×2×4 grid
+        logger.info(f"Lakh validation: {len(variants)} variants")
+
+        # Step 4 & 5: extract embeddings + FMD per variant
+        pairwise_rows: List[Dict] = []
+        embeddings_cache: Dict[str, Dict[str, np.ndarray]] = {}  # variant → {genre: emb}
+        token_seqs_cache: Dict[str, Dict[str, List[List[int]]]] = {}  # variant → {genre: [[int]]}
+        fmd_per_variant: Dict[str, float] = {}
+
+        total_steps = len(variants)
+        for step_idx, variant in enumerate(variants, 1):
+            pct = 100.0 * step_idx / total_steps
+            logger.info(f"[Lakh {step_idx}/{total_steps} ({pct:.0f}%)] {variant.name}")
+
+            variant_embs: Dict[str, np.ndarray] = {}
+            variant_tokens: Dict[str, List[List[int]]] = {}
+
+            for ds_name, genre_label in [(ds_a, genre_a), (ds_b, genre_b)]:
+                midi_files = self._list_dataset_midis(ds_name)
+                vectors: List[np.ndarray] = []
+                seqs: List[List[int]] = []
+                for midi_path in midi_files:
+                    try:
+                        midi_data = self._preprocess_midi_file(midi_path, variant)
+                        if midi_data is None:
+                            continue
+                        tokenizer = self.tokenization.tokenizers[variant.tokenizer]
+                        tokens = tokenizer.encode_midi_object(midi_data)
+                        if not tokens:
+                            continue
+                        seqs.append(tokens)
+                        vec = self.embeddings.extract_embeddings([tokens], variant.model)[0]
+                        vectors.append(vec)
+                    except Exception as exc:
+                        logger.warning(f"Skip {midi_path}: {exc}")
+
+                if vectors:
+                    variant_embs[genre_label] = np.vstack(vectors)
+                    variant_tokens[genre_label] = seqs
+                    logger.info(f"  {genre_label}: {len(vectors)} embeddings")
+                else:
+                    logger.warning(f"  {genre_label}: 0 embeddings!")
+
+            embeddings_cache[variant.name] = variant_embs
+            token_seqs_cache[variant.name] = variant_tokens
+
+            emb_a = variant_embs.get(genre_a)
+            emb_b = variant_embs.get(genre_b)
+            if emb_a is not None and emb_b is not None and emb_a.shape[0] > 0 and emb_b.shape[0] > 0:
+                fmd_value = float(self.fmd.compute_fmd(emb_a, emb_b))
+                fmd_per_variant[variant.name] = fmd_value
+
+                # Bootstrap CI
+                from hashlib import md5
+                local_seed = int(md5(f"{variant.name}|{boot_seed}".encode()).hexdigest()[:8], 16)
+                rng = np.random.default_rng(local_seed)
+                boot_values = []
+                sample_n_a = max(2, min(emb_a.shape[0], emb_a.shape[0]))
+                sample_n_b = max(2, min(emb_b.shape[0], emb_b.shape[0]))
+                for _ in range(n_resamples):
+                    idx_a = rng.integers(0, emb_a.shape[0], size=sample_n_a)
+                    idx_b = rng.integers(0, emb_b.shape[0], size=sample_n_b)
+                    boot_values.append(float(self.fmd.compute_fmd(emb_a[idx_a], emb_b[idx_b])))
+
+                arr = np.array(boot_values)
+                alpha = (1.0 - confidence) / 2.0
+
+                pairwise_rows.append({
+                    "variant": variant.name,
+                    "tokenizer": variant.tokenizer,
+                    "model": variant.model,
+                    "remove_velocity": variant.remove_velocity,
+                    "hard_quantization": variant.hard_quantization,
+                    "dataset_a": ds_a,
+                    "dataset_b": ds_b,
+                    "fmd": fmd_value,
+                    "valid": True,
+                    "real_pair": True,
+                    "source_a": "real",
+                    "source_b": "real",
+                    "real_files_a": int(emb_a.shape[0]),
+                    "real_files_b": int(emb_b.shape[0]),
+                    "bootstrap_mean": float(np.mean(arr)),
+                    "bootstrap_std": float(np.std(arr)),
+                    "bootstrap_ci_lower": float(np.quantile(arr, alpha)),
+                    "bootstrap_ci_upper": float(np.quantile(arr, 1.0 - alpha)),
+                })
+            else:
+                pairwise_rows.append({
+                    "variant": variant.name,
+                    "tokenizer": variant.tokenizer,
+                    "model": variant.model,
+                    "remove_velocity": variant.remove_velocity,
+                    "hard_quantization": variant.hard_quantization,
+                    "dataset_a": ds_a,
+                    "dataset_b": ds_b,
+                    "fmd": None,
+                    "valid": False,
+                    "real_pair": False,
+                    "source_a": "missing",
+                    "source_b": "missing",
+                    "real_files_a": 0,
+                    "real_files_b": 0,
+                    "bootstrap_mean": None,
+                    "bootstrap_std": None,
+                    "bootstrap_ci_lower": None,
+                    "bootstrap_ci_upper": None,
+                })
+
+        # Save pairwise CSV
+        import csv
+        csv_path = output_dir / "lakh_pairwise_fmd.csv"
+        if pairwise_rows:
+            fields = list(pairwise_rows[0].keys())
+            with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+                writer = csv.DictWriter(fh, fieldnames=fields)
+                writer.writeheader()
+                writer.writerows(pairwise_rows)
+            logger.info(f"Lakh pairwise FMD saved: {csv_path}")
+
+        # Step 6: Sensitivity analysis
+        logger.info("=== Lakh Validation: sensitivity analysis ===")
+        sensitivity_result = run_sensitivity_analysis(
+            bootstrap_rows=pairwise_rows,
+            output_dir=output_dir,
+        )
+
+        # Step 7: Embedding diagnostics
+        logger.info("=== Lakh Validation: embedding diagnostics ===")
+        diag_outputs = run_embedding_diagnostics(
+            embeddings_by_variant=embeddings_cache,
+            token_sequences_by_variant=token_seqs_cache,
+            fmd_per_variant=fmd_per_variant,
+            genre_a=genre_a,
+            genre_b=genre_b,
+            output_dir=output_dir,
+            seed=self.seed,
+        )
+
+        # Summary JSON
+        summary = {
+            "genres": [genre_a, genre_b],
+            "n_variants": len(variants),
+            "n_valid": sum(1 for r in pairwise_rows if r.get("valid")),
+            "fmd_range": {
+                "min": min((r["fmd"] for r in pairwise_rows if r.get("fmd") is not None), default=None),
+                "max": max((r["fmd"] for r in pairwise_rows if r.get("fmd") is not None), default=None),
+            },
+            "eta_squared": sensitivity_result.eta_squared,
+            "diagnostics_outputs": diag_outputs,
+        }
+        with open(output_dir / "lakh_validation_summary.json", "w", encoding="utf-8") as fh:
+            json.dump(summary, fh, indent=2, default=str)
+
+        logger.info(f"=== Lakh Validation complete: {len(pairwise_rows)} rows ===")
+        return {
+            "pairwise_rows": len(pairwise_rows),
+            "valid_rows": summary["n_valid"],
+            "output_dir": str(output_dir),
+            "fmd_range": summary["fmd_range"],
+            "outputs": {
+                "csv": str(csv_path),
+                "summary_json": str(output_dir / "lakh_validation_summary.json"),
+                **{k: v for k, v in diag_outputs.items()},
+            },
+        }

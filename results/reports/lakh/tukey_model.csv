@@ -1,0 +1,2 @@
+group1,group2,meandiff,p-adj,lower,upper,reject
+CLaMP-1,CLaMP-2,0.3674,0.0,0.3402,0.3945,True
