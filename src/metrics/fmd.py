@@ -1,8 +1,16 @@
-"""Frechet Music Distance metric implementation."""
+"""Frechet Music Distance metric implementation.
+
+Uses the standard Fréchet distance formula:
+    FMD = ||μ₁ - μ₂||² + Tr(Σ₁ + Σ₂ - 2·(Σ₁·Σ₂)^½)
+
+Reference: Dowson & Landau (1982), adapted for music embeddings
+following Heusel et al. (2017) FID formulation.
+"""
 
 from typing import Dict, List, Tuple, Optional
 from loguru import logger
 import numpy as np
+from scipy.linalg import sqrtm
 from scipy.spatial.distance import cdist
 from pathlib import Path
 import json
@@ -12,8 +20,13 @@ class FrechetMusicDistance:
     """
     Frechet Music Distance metric for comparing music embeddings.
 
-    Based on the Frechet Distance concept adapted for music analysis,
-    comparing the geometric similarity of embedding distributions.
+    Implements the standard Fréchet distance between two multivariate
+    Gaussians fitted to embedding distributions:
+
+        FMD = ||μ₁ - μ₂||² + Tr(Σ₁ + Σ₂ - 2·(Σ₁·Σ₂)^½)
+
+    This is mathematically equivalent to the Wasserstein-2 distance
+    between two Gaussians, and is the same formula used in FID/FAD.
     """
 
     def __init__(self, config: Dict):
@@ -26,14 +39,15 @@ class FrechetMusicDistance:
         self.config = config
         self.use_mean = config["fmd_metric"].get("use_mean", True)
         self.use_std = config["fmd_metric"].get("use_std", True)
-        logger.info("FrechetMusicDistance initialized")
+        self.epsilon = float(config["fmd_metric"].get("regularization_eps", 1e-6))
+        logger.info("FrechetMusicDistance initialized (standard Fréchet formula)")
 
     def compute_fmd(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> float:
         """
         Compute Frechet Music Distance between two sets of embeddings.
 
-        This implements the Frechet Distance metric adapted for music analysis:
-        FMD = sqrt(max(mean_distance^2 + std_distance^2, covariance_trace_diff))
+        Uses the standard Fréchet distance formula:
+            FMD = ||μ₁ - μ₂||² + Tr(Σ₁ + Σ₂ - 2·(Σ₁·Σ₂)^½)
 
         Args:
             embeddings1: First set of embeddings (N x D)
@@ -53,62 +67,93 @@ class FrechetMusicDistance:
                 f"Embedding dimensions must match: {embeddings1.shape[1]} vs {embeddings2.shape[1]}"
             )
 
+        d = embeddings1.shape[1]
+
         # Compute statistics for both distributions
         mean1 = np.mean(embeddings1, axis=0)
         mean2 = np.mean(embeddings2, axis=0)
-        
+
         # Compute covariance matrices
         if embeddings1.shape[0] > 1:
             cov1 = np.cov(embeddings1.T)
         else:
-            cov1 = np.zeros((embeddings1.shape[1], embeddings1.shape[1]))
-        
+            cov1 = np.zeros((d, d))
+
         if embeddings2.shape[0] > 1:
             cov2 = np.cov(embeddings2.T)
         else:
-            cov2 = np.zeros((embeddings2.shape[1], embeddings2.shape[1]))
+            cov2 = np.zeros((d, d))
 
         # Handle 1D case where cov returns a scalar
-        if embeddings1.shape[1] == 1:
-            cov1 = np.array([[cov1]])
-            cov2 = np.array([[cov2]])
+        if d == 1:
+            cov1 = np.array([[float(cov1)]])
+            cov2 = np.array([[float(cov2)]])
 
-        # Component 1: L2 distance between means (Wasserstein part)
-        mean_distance = np.linalg.norm(mean1 - mean2) ** 2
+        # Component 1: Squared L2 distance between means
+        mean_diff_sq = np.sum((mean1 - mean2) ** 2)
 
-        # Component 2: Difference in covariance matrices (Frechet part)
-        # Using Frobenius norm: ||sqrt(cov1) - sqrt(cov2)||_F^2
+        # Component 2: Covariance trace term
+        # Tr(Σ₁ + Σ₂ - 2·(Σ₁·Σ₂)^½)
+        # Add small regularization for numerical stability
+        cov1_reg = cov1 + self.epsilon * np.eye(d)
+        cov2_reg = cov2 + self.epsilon * np.eye(d)
+
         try:
-            # Compute matrix square roots
-            eigvals1, eigvecs1 = np.linalg.eigh(cov1)
-            eigvals2, eigvecs2 = np.linalg.eigh(cov2)
-            
-            # Ensure non-negative eigenvalues
-            eigvals1 = np.maximum(eigvals1, 0)
-            eigvals2 = np.maximum(eigvals2, 0)
-            
-            sqrt_cov1 = eigvecs1 @ np.diag(np.sqrt(eigvals1)) @ eigvecs1.T
-            sqrt_cov2 = eigvecs2 @ np.diag(np.sqrt(eigvals2)) @ eigvecs2.T
-            
-            cov_distance = np.linalg.norm(sqrt_cov1 - sqrt_cov2, "fro") ** 2
+            # Compute (Σ₁ · Σ₂)^½ using scipy matrix square root
+            product = cov1_reg @ cov2_reg
+            sqrt_product = sqrtm(product)
+
+            # sqrtm may return complex values due to numerical issues
+            # Take real part if imaginary components are negligible
+            if np.iscomplexobj(sqrt_product):
+                imag_norm = np.linalg.norm(sqrt_product.imag)
+                real_norm = np.linalg.norm(sqrt_product.real)
+                if imag_norm / max(real_norm, 1e-10) > 0.01:
+                    logger.warning(
+                        f"sqrtm has non-negligible imaginary part "
+                        f"(imag/real ratio: {imag_norm/max(real_norm, 1e-10):.4f}). "
+                        f"Falling back to eigenvalue decomposition."
+                    )
+                    # Fallback: eigenvalue-based computation
+                    cov_trace = self._cov_trace_eigenvalue(cov1_reg, cov2_reg)
+                else:
+                    sqrt_product = sqrt_product.real
+                    cov_trace = float(
+                        np.trace(cov1_reg) + np.trace(cov2_reg) - 2.0 * np.trace(sqrt_product)
+                    )
+            else:
+                cov_trace = float(
+                    np.trace(cov1_reg) + np.trace(cov2_reg) - 2.0 * np.trace(sqrt_product)
+                )
         except Exception as e:
-            logger.warning(f"Failed to compute covariance distance: {e}. Using trace difference.")
-            # Fallback: use trace difference
-            cov_distance = (np.trace(cov1) - np.trace(cov2)) ** 2
+            logger.warning(f"sqrtm failed: {e}. Using eigenvalue fallback.")
+            cov_trace = self._cov_trace_eigenvalue(cov1_reg, cov2_reg)
 
-        # Component 3: Optional standard deviation difference
-        std_distance = 0.0
-        if self.use_std:
-            std1 = np.std(embeddings1, axis=0)
-            std2 = np.std(embeddings2, axis=0)
-            std_distance = np.linalg.norm(std1 - std2) ** 2
+        # Ensure non-negative (can be slightly negative due to numerics)
+        cov_trace = max(0.0, cov_trace)
 
-        # Combine components: FMD = sqrt(mean_dist^2 + cov_dist + std_dist)
-        fmd = np.sqrt(mean_distance + cov_distance + std_distance)
+        fmd = float(mean_diff_sq + cov_trace)
 
-        logger.debug(f"FMD components: mean={np.sqrt(mean_distance):.4f}, cov={np.sqrt(cov_distance):.4f}, std={np.sqrt(std_distance):.4f}, total={fmd:.4f}")
+        logger.debug(
+            f"FMD components: mean_diff²={mean_diff_sq:.6f}, "
+            f"cov_trace={cov_trace:.6f}, total={fmd:.6f}"
+        )
 
-        return float(fmd)
+        return fmd
+
+    @staticmethod
+    def _cov_trace_eigenvalue(cov1: np.ndarray, cov2: np.ndarray) -> float:
+        """Fallback: compute Tr(Σ₁+Σ₂-2·(Σ₁Σ₂)^½) via eigenvalue decomposition.
+
+        Uses: Tr((Σ₁Σ₂)^½) = Σᵢ √(λᵢ) where λᵢ are eigenvalues of Σ₁Σ₂.
+        """
+        product = cov1 @ cov2
+        eigvals = np.linalg.eigvals(product)
+        # Eigenvalues should be non-negative for PSD matrices
+        eigvals = np.real(eigvals)
+        eigvals = np.maximum(eigvals, 0.0)
+        trace_sqrt = float(np.sum(np.sqrt(eigvals)))
+        return float(np.trace(cov1) + np.trace(cov2) - 2.0 * trace_sqrt)
 
     def compute_fmd_matrix(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> float:
         """

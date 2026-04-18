@@ -1152,15 +1152,110 @@ class PaperExperimentRunner:
         with open(output_dir / "lakh_validation_summary.json", "w", encoding="utf-8") as fh:
             json.dump(summary, fh, indent=2, default=str)
 
+        # Step 8: Sample size ablation (if configured)
+        ablation_cfg = lakh_cfg.get("sample_size_ablation", {})
+        ablation_results = {}
+        if ablation_cfg.get("enabled", False):
+            logger.info("=== Lakh Validation: sample size ablation ===")
+            ablation_results = self._run_sample_size_ablation(
+                embeddings_cache=embeddings_cache,
+                genre_a=genre_a,
+                genre_b=genre_b,
+                sizes=ablation_cfg.get("sizes", [50, 100, 200, 500]),
+                n_repeats=ablation_cfg.get("n_repeats", 10),
+                output_dir=output_dir,
+            )
+
         logger.info(f"=== Lakh Validation complete: {len(pairwise_rows)} rows ===")
         return {
             "pairwise_rows": len(pairwise_rows),
             "valid_rows": summary["n_valid"],
             "output_dir": str(output_dir),
             "fmd_range": summary["fmd_range"],
+            "ablation_results": ablation_results,
             "outputs": {
                 "csv": str(csv_path),
                 "summary_json": str(output_dir / "lakh_validation_summary.json"),
                 **{k: v for k, v in diag_outputs.items()},
             },
         }
+
+    def _run_sample_size_ablation(
+        self,
+        embeddings_cache: Dict[str, Dict[str, np.ndarray]],
+        genre_a: str,
+        genre_b: str,
+        sizes: List[int] = None,
+        n_repeats: int = 10,
+        output_dir: Path = None,
+    ) -> Dict:
+        """Run sample size ablation study.
+
+        For each variant and each sample size, subsample embeddings n_repeats
+        times and compute FMD. Reports mean/std/CI per (variant, size).
+
+        Args:
+            embeddings_cache: variant_name → {genre: embeddings_array}
+            genre_a, genre_b: Genre labels.
+            sizes: List of sample sizes to test.
+            n_repeats: Number of subsampling repeats per size.
+            output_dir: Where to save CSV results.
+
+        Returns:
+            Dict with summary statistics.
+        """
+        if sizes is None:
+            sizes = [50, 100, 200, 500]
+
+        rng = np.random.default_rng(self.seed)
+        rows = []
+
+        for variant_name, embs in embeddings_cache.items():
+            emb_a = embs.get(genre_a)
+            emb_b = embs.get(genre_b)
+            if emb_a is None or emb_b is None:
+                continue
+
+            max_a = emb_a.shape[0]
+            max_b = emb_b.shape[0]
+
+            for size in sizes:
+                actual_size_a = min(size, max_a)
+                actual_size_b = min(size, max_b)
+
+                if actual_size_a < 2 or actual_size_b < 2:
+                    continue
+
+                fmd_values = []
+                for _ in range(n_repeats):
+                    idx_a = rng.choice(max_a, size=actual_size_a, replace=False)
+                    idx_b = rng.choice(max_b, size=actual_size_b, replace=False)
+                    fmd_val = float(self.fmd.compute_fmd(emb_a[idx_a], emb_b[idx_b]))
+                    fmd_values.append(fmd_val)
+
+                arr = np.array(fmd_values)
+                rows.append({
+                    "variant": variant_name,
+                    "sample_size": size,
+                    "actual_size_a": actual_size_a,
+                    "actual_size_b": actual_size_b,
+                    "n_repeats": n_repeats,
+                    "fmd_mean": float(np.mean(arr)),
+                    "fmd_std": float(np.std(arr)),
+                    "fmd_min": float(np.min(arr)),
+                    "fmd_max": float(np.max(arr)),
+                    "fmd_ci_lower": float(np.percentile(arr, 2.5)),
+                    "fmd_ci_upper": float(np.percentile(arr, 97.5)),
+                })
+
+        if output_dir and rows:
+            import csv as csv_mod
+            csv_path = Path(output_dir) / "sample_size_ablation.csv"
+            fields = list(rows[0].keys())
+            with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+                writer = csv_mod.DictWriter(fh, fieldnames=fields)
+                writer.writeheader()
+                writer.writerows(rows)
+            logger.info(f"Sample size ablation saved: {csv_path} ({len(rows)} rows)")
+
+        return {"rows": rows, "sizes": sizes, "n_repeats": n_repeats}

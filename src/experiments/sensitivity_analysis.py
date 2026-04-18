@@ -1,8 +1,9 @@
 """Statistical sensitivity analysis for FMD across pipeline variants.
 
-Publication-quality analysis: three-way ANOVA, variance decomposition (η²),
-post-hoc Tukey HSD, Kruskal-Wallis, Cohen's d effect sizes, and summary
-tables exported to CSV / JSON.
+Publication-quality analysis: three-way ANOVA with interactions,
+variance decomposition (η² and partial η²), post-hoc Tukey HSD,
+Kruskal-Wallis, Cohen's d effect sizes, permutation tests,
+and summary tables exported to CSV / JSON.
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ class SensitivityResult:
     # ANOVA
     anova_table: Optional[pd.DataFrame] = None
     eta_squared: Optional[Dict[str, float]] = None
+    partial_eta_squared: Optional[Dict[str, float]] = None
 
     # Post-hoc
     tukey_tokenizer: Optional[pd.DataFrame] = None
@@ -55,6 +57,9 @@ class SensitivityResult:
     # Nonparametric
     kruskal_tokenizer: Optional[Dict[str, float]] = None
     kruskal_model: Optional[Dict[str, float]] = None
+
+    # Permutation tests
+    permutation_results: Optional[Dict[str, Dict]] = None
 
     # Effect sizes
     cohens_d: Optional[Dict[str, float]] = None
@@ -109,19 +114,16 @@ def build_fmd_dataframe(bootstrap_rows: List[Dict]) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------
-# ANOVA
+# ANOVA (with interaction effects)
 # ------------------------------------------------------------------
 
-def run_three_way_anova(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optional[Dict[str, float]]]:
-    """Run three-way ANOVA (tokenizer × model × preprocessing).
+def run_three_way_anova(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optional[Dict[str, float]], Optional[Dict[str, float]]]:
+    """Run three-way ANOVA (tokenizer × model × preprocessing) with interactions.
 
-    Preprocessing is encoded as a single factor with 4 levels
-    (vel_on/quant_off, vel_off/quant_off, vel_on/quant_on, vel_off/quant_on).
-
-    Returns (anova_table, eta_squared_dict).
+    Returns (anova_table, eta_squared_dict, partial_eta_squared_dict).
     """
     if df.empty:
-        return None, None
+        return None, None, None
 
     work = df.copy()
     work["preprocess"] = (
@@ -130,6 +132,7 @@ def run_three_way_anova(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optio
 
     if _HAS_STATSMODELS:
         try:
+            # Full 3-way ANOVA with all interaction effects
             formula = "fmd ~ C(tokenizer) * C(model) * C(preprocess)"
             model = ols(formula, data=work).fit()
             anova_table = sm.stats.anova_lm(model, typ=2)
@@ -137,18 +140,27 @@ def run_three_way_anova(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optio
             # η² = SS_factor / SS_total
             ss_total = anova_table["sum_sq"].sum()
             eta_sq = {}
+            partial_eta_sq = {}
+            ss_residual = anova_table.loc["Residual", "sum_sq"] if "Residual" in anova_table.index else 0.0
+
             for idx in anova_table.index:
                 if idx == "Residual":
                     continue
-                eta_sq[idx] = float(anova_table.loc[idx, "sum_sq"] / ss_total) if ss_total > 0 else 0.0
+                ss_effect = anova_table.loc[idx, "sum_sq"]
+                # η² (eta-squared)
+                eta_sq[idx] = float(ss_effect / ss_total) if ss_total > 0 else 0.0
+                # Partial η² = SS_effect / (SS_effect + SS_residual)
+                denom = ss_effect + ss_residual
+                partial_eta_sq[idx] = float(ss_effect / denom) if denom > 0 else 0.0
 
-            logger.info("Three-way ANOVA completed (statsmodels)")
-            return anova_table, eta_sq
+            logger.info("Three-way ANOVA with interactions completed (statsmodels)")
+            return anova_table, eta_sq, partial_eta_sq
         except Exception as exc:
             logger.warning(f"statsmodels ANOVA failed: {exc}; falling back to scipy")
 
     # Scipy fallback: one-way per factor
     eta_sq: Dict[str, float] = {}
+    partial_eta_sq: Dict[str, float] = {}
     rows: List[Dict[str, Any]] = []
 
     for factor in ("tokenizer", "model", "preprocess"):
@@ -158,13 +170,76 @@ def run_three_way_anova(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optio
         stat, p = sp_stats.f_oneway(*groups)
         ss_between = sum(len(g) * (np.mean(g) - work["fmd"].mean()) ** 2 for g in groups)
         ss_total = ((work["fmd"] - work["fmd"].mean()) ** 2).sum()
+        ss_within = ss_total - ss_between
         eta = float(ss_between / ss_total) if ss_total > 0 else 0.0
+        p_eta = float(ss_between / (ss_between + ss_within)) if (ss_between + ss_within) > 0 else 0.0
         eta_sq[factor] = eta
-        rows.append({"source": factor, "F": float(stat), "p": float(p), "eta_sq": eta})
+        partial_eta_sq[factor] = p_eta
+        rows.append({"source": factor, "F": float(stat), "p": float(p), "eta_sq": eta, "partial_eta_sq": p_eta})
 
     anova_table = pd.DataFrame(rows)
     logger.info("ANOVA completed (scipy one-way fallback)")
-    return anova_table, eta_sq
+    return anova_table, eta_sq, partial_eta_sq
+
+
+# ------------------------------------------------------------------
+# Permutation tests
+# ------------------------------------------------------------------
+
+def run_permutation_test(
+    df: pd.DataFrame,
+    factor: str,
+    n_permutations: int = 5000,
+    seed: int = 42,
+) -> Dict[str, float]:
+    """Permutation test for a single factor.
+
+    Shuffles factor labels and computes F-statistic distribution
+    to get a non-parametric p-value.
+
+    Args:
+        df: DataFrame with 'fmd' column and factor column.
+        factor: Column name to test.
+        n_permutations: Number of permutations.
+        seed: Random seed.
+
+    Returns:
+        Dict with observed_F, permutation_p, n_permutations.
+    """
+    if df.empty or factor not in df.columns:
+        return {"observed_F": None, "permutation_p": None, "n_permutations": 0}
+
+    groups = [g["fmd"].values for _, g in df.groupby(factor)]
+    if len(groups) < 2:
+        return {"observed_F": None, "permutation_p": None, "n_permutations": 0}
+
+    observed_F, _ = sp_stats.f_oneway(*groups)
+
+    rng = np.random.default_rng(seed)
+    fmd_values = df["fmd"].values.copy()
+    n_extreme = 0
+
+    for _ in range(n_permutations):
+        # Shuffle FMD values (break association with factor)
+        shuffled = rng.permutation(fmd_values)
+        shuffled_groups = []
+        start = 0
+        for g in groups:
+            shuffled_groups.append(shuffled[start:start + len(g)])
+            start += len(g)
+        perm_F, _ = sp_stats.f_oneway(*shuffled_groups)
+        if perm_F >= observed_F:
+            n_extreme += 1
+
+    p_value = (n_extreme + 1) / (n_permutations + 1)
+
+    logger.info(f"Permutation test for '{factor}': F={observed_F:.4f}, p={p_value:.4f} ({n_permutations} perms)")
+
+    return {
+        "observed_F": float(observed_F),
+        "permutation_p": float(p_value),
+        "n_permutations": n_permutations,
+    }
 
 
 # ------------------------------------------------------------------
@@ -172,13 +247,12 @@ def run_three_way_anova(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], Optio
 # ------------------------------------------------------------------
 
 def run_tukey_hsd(df: pd.DataFrame, factor: str) -> Optional[pd.DataFrame]:
-    """Run Tukey HSD on *factor* (e.g. ``'tokenizer'``)."""
+    """Run Tukey HSD on *factor*."""
     if df.empty or factor not in df.columns:
         return None
     if not _HAS_STATSMODELS:
         logger.warning("Tukey HSD requires statsmodels")
         return None
-
     try:
         result = pairwise_tukeyhsd(df["fmd"].values, df[factor].values, alpha=0.05)
         tukey_df = pd.DataFrame(
@@ -252,18 +326,21 @@ def variant_summary_table(df: pd.DataFrame) -> pd.DataFrame:
 def run_sensitivity_analysis(
     bootstrap_rows: List[Dict],
     output_dir: Path | str = "results/reports/lakh",
+    n_permutations: int = 5000,
+    seed: int = 42,
 ) -> SensitivityResult:
     """Run the full statistical sensitivity analysis and save artefacts.
 
     Parameters
     ----------
     bootstrap_rows:
-        List of dicts, one per (variant, bootstrap_resample) or per variant.
-        Must contain keys: variant, tokenizer, model, remove_velocity,
-        hard_quantization, fmd (or bootstrap_mean), bootstrap_std,
-        bootstrap_ci_lower, bootstrap_ci_upper.
+        List of dicts, one per variant.
     output_dir:
         Directory to write CSV/JSON outputs.
+    n_permutations:
+        Number of permutations for permutation tests.
+    seed:
+        Random seed for permutation tests.
 
     Returns
     -------
@@ -279,8 +356,8 @@ def run_sensitivity_analysis(
 
     logger.info(f"Sensitivity analysis: {len(df)} rows, {df['variant'].nunique()} variants")
 
-    # 1. ANOVA + η²
-    anova_table, eta_sq = run_three_way_anova(df)
+    # 1. ANOVA + η² + partial η²
+    anova_table, eta_sq, partial_eta_sq = run_three_way_anova(df)
 
     # 2. Tukey HSD
     tukey_tok = run_tukey_hsd(df, "tokenizer")
@@ -295,32 +372,38 @@ def run_sensitivity_analysis(
     cohens.update({f"tok_{k}": v for k, v in compute_pairwise_cohens_d(df, "tokenizer").items()})
     cohens.update({f"mod_{k}": v for k, v in compute_pairwise_cohens_d(df, "model").items()})
 
-    # 5. Summary
+    # 5. Permutation tests
+    work = df.copy()
+    work["preprocess"] = (
+        work["remove_velocity"].astype(str) + "_" + work["hard_quantization"].astype(str)
+    )
+    perm_results = {}
+    for factor in ("tokenizer", "model", "preprocess"):
+        perm_results[factor] = run_permutation_test(work, factor, n_permutations=n_permutations, seed=seed)
+
+    # 6. Summary
     summary = variant_summary_table(df)
 
     # ------------------------------------------------------------------
     # Save outputs
     # ------------------------------------------------------------------
-
-    # CSV – variant summary
     summary.to_csv(output_dir / "variant_summary.csv", index=False)
 
-    # CSV – ANOVA table
     if anova_table is not None:
         anova_table.to_csv(output_dir / "anova_table.csv")
 
-    # CSV – Tukey
     if tukey_tok is not None:
         tukey_tok.to_csv(output_dir / "tukey_tokenizer.csv", index=False)
     if tukey_mod is not None:
         tukey_mod.to_csv(output_dir / "tukey_model.csv", index=False)
 
-    # JSON – aggregated results
     json_payload = {
         "eta_squared": eta_sq,
+        "partial_eta_squared": partial_eta_sq,
         "kruskal_wallis_tokenizer": kw_tok,
         "kruskal_wallis_model": kw_mod,
         "cohens_d": cohens,
+        "permutation_tests": perm_results,
         "n_variants": int(df["variant"].nunique()),
         "n_rows": int(len(df)),
     }
@@ -333,12 +416,13 @@ def run_sensitivity_analysis(
         fmd_df=df,
         anova_table=anova_table,
         eta_squared=eta_sq,
+        partial_eta_squared=partial_eta_sq,
         tukey_tokenizer=tukey_tok,
         tukey_model=tukey_mod,
         kruskal_tokenizer=kw_tok,
         kruskal_model=kw_mod,
+        permutation_results=perm_results,
         cohens_d=cohens,
         variant_summary=summary,
     )
-
 

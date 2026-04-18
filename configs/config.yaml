@@ -36,6 +36,12 @@ data:
     - name: "lakh_jazz"
       url: "lakh-genre-subset"
       version: "lmd_matched"
+    - name: "lakh_electronic"
+      url: "lakh-genre-subset"
+      version: "lmd_matched"
+    - name: "lakh_country"
+      url: "lakh-genre-subset"
+      version: "lmd_matched"
 
 # Preprocessing Configuration
 preprocessing:
@@ -74,11 +80,11 @@ embeddings:
   models:
     - name: "CLaMP-1"
       model_name: "clamp-1"
-      hf_model_name: "sentence-transformers/all-MiniLM-L6-v2"
-      format_type: "abc"  # Abstract text format
+      hf_model_name: "sander-wood/clamp-small-512"
+      format_type: "abc"  # ABC notation via music21
     - name: "CLaMP-2"
       model_name: "clamp-2"
-      hf_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+      hf_model_name: "shanghaicai/CLaMP2"
       format_type: "midi"  # Direct MIDI structure
   # Embedding extraction settings
   batch_size: 32
@@ -253,8 +259,20 @@ lakh:
   genres:
     - "rock"
     - "jazz"
+    - "electronic"
+    - "country"
+  genre_pairs:
+    - ["rock", "jazz"]
+    - ["rock", "electronic"]
+    - ["rock", "country"]
+    - ["jazz", "country"]
   max_per_genre: 500
   seed: 42
+  # Sample size ablation study
+  sample_size_ablation:
+    enabled: true
+    sizes: [50, 100, 200, 500]
+    n_repeats: 10  # repeat each size for stability
   # Bootstrap settings for Lakh validation (higher precision for publication)
   bootstrap:
     enabled: true

@@ -14,6 +14,10 @@ transformers>=4.30.0
 miditok>=3.0.0
 pretty_midi>=0.2.10
 symusic>=0.4.0
+music21>=9.1.0  # MIDI→ABC conversion for CLaMP-1
+
+# NLP / Sentence Transformers (fallback proxy models)
+sentence-transformers>=2.2.0
 
 # Visualization
 matplotlib>=3.7.0
