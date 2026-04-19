@@ -1,7 +1,7 @@
-group1,group2,meandiff,p-adj,lower,upper,reject
-MIDI-Like,Octuple,0.0168,0.0072,0.0034,0.0301,True
-MIDI-Like,REMI,-0.055,0.0,-0.0684,-0.0416,True
-MIDI-Like,TSD,-0.0013,0.9942,-0.0147,0.0121,False
-Octuple,REMI,-0.0718,0.0,-0.0851,-0.0584,True
-Octuple,TSD,-0.0181,0.003,-0.0315,-0.0047,True
-REMI,TSD,0.0537,0.0,0.0403,0.0671,True
+group1,group2,meandiff,p-adj,lower,upper,reject,p_adj_holm,p_adj_bonf,still_sig_holm,still_sig_bonf
+MIDI-Like,Octuple,-0.2408,0.0002,-0.3905,-0.0911,True,0.0008,0.0012000000000000001,True,True
+MIDI-Like,REMI,0.1238,0.145,-0.0259,0.2735,False,0.29,0.8699999999999999,False,False
+MIDI-Like,TSD,0.1564,0.0365,0.0067,0.3061,True,0.10949999999999999,0.21899999999999997,False,False
+Octuple,REMI,0.3646,0.0,0.2149,0.5143,True,0.0,0.0,True,True
+Octuple,TSD,0.3972,0.0,0.2475,0.5469,True,0.0,0.0,True,True
+REMI,TSD,0.0326,0.9438,-0.1171,0.1823,False,0.9438,1.0,False,False

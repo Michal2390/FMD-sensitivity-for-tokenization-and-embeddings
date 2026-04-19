@@ -31,6 +31,11 @@ from embeddings.extractor import EmbeddingExtractor
 from metrics.fmd import FrechetMusicDistance
 from preprocessing.processor import MIDIPreprocessor
 from tokenization.tokenizer import TokenizationPipeline
+from experiments.sensitivity_analysis import (
+    bootstrap_eta_squared,
+    apply_multiple_comparison_correction,
+    correct_tukey_pvalues,
+)
 
 # ──────────────────────────────────────────────────────────────────────
 # Config
@@ -274,6 +279,17 @@ def main():
         _has_sm = False
         logger.warning("statsmodels not available — falling back to scipy")
 
+    # 4a-bis. Bootstrap CI for η²
+    logger.info("\n  Bootstrap CI for η² (5000 resamples):")
+    eta_sq_ci = {}
+    for factor in ("tokenizer", "model", "preprocess"):
+        eta_sq_ci[factor] = bootstrap_eta_squared(df, factor, n_bootstrap=5000, ci=0.95, seed=SEED)
+        pt, lo, hi = eta_sq_ci[factor]
+        logger.info(f"    {factor}: η²={pt:.4f} [{lo:.4f}, {hi:.4f}]")
+    # tok×model interaction
+    df["tok_model"] = df["tokenizer"] + "_" + df["model"]
+    eta_sq_ci["tokenizer:model"] = bootstrap_eta_squared(df, "tok_model", n_bootstrap=5000, ci=0.95, seed=SEED)
+
     # 4b. Also one-way per factor for simpler reporting
     from scipy import stats as sp_stats
 
@@ -292,7 +308,7 @@ def main():
 
     pd.DataFrame(oneway_rows).to_csv(OUTPUT_DIR / "oneway_anova.csv", index=False)
 
-    # 4c. Tukey HSD per factor
+    # 4c. Tukey HSD per factor + multiple comparison correction
     if _has_sm:
         for factor in ("tokenizer", "model"):
             try:
@@ -301,12 +317,16 @@ def main():
                     data=result._results_table.data[1:],
                     columns=result._results_table.data[0],
                 )
+                tukey_df = correct_tukey_pvalues(tukey_df)
                 tukey_df.to_csv(OUTPUT_DIR / f"tukey_{factor}.csv", index=False)
-                logger.info(f"  Tukey HSD ({factor}):")
+                logger.info(f"  Tukey HSD ({factor}) with corrected p-values:")
                 for _, row in tukey_df.iterrows():
                     sig = "✓" if row["reject"] else ""
+                    sig_holm = "✓" if row.get("still_sig_holm", False) else ""
                     logger.info(f"    {row['group1']:12s} vs {row['group2']:12s}: "
-                                f"diff={row['meandiff']:+.4f}  p={row['p-adj']:.4f}  {sig}")
+                                f"diff={row['meandiff']:+.4f}  p={row['p-adj']:.4f}  "
+                                f"p_holm={row.get('p_adj_holm', 'N/A'):.4f}  "
+                                f"p_bonf={row.get('p_adj_bonf', 'N/A'):.4f}  {sig}")
             except Exception as e:
                 logger.warning(f"Tukey for {factor} failed: {e}")
 
@@ -399,6 +419,7 @@ def main():
         "cohens_d": cohens,
         "permutation_tests": perm_results,
         "per_pair_stats": pair_stats,
+        "eta_sq_bootstrap_ci": {k: {"point": v[0], "ci_lower": v[1], "ci_upper": v[2]} for k, v in eta_sq_ci.items()},
     }
     if _has_sm:
         results_json["threeway_eta_sq"] = eta_sq
@@ -484,6 +505,29 @@ def main():
     save_fig(fig, "multi_eta_sq_comparison")
 
     # Plot 6: 4-panel publication figure
+
+    # Plot 5b: Bootstrap CI forest plot for η²
+    ci_factors = [f for f in ("tokenizer", "model", "preprocess", "tokenizer:model") if f in eta_sq_ci]
+    if ci_factors:
+        fig, ax = plt.subplots(figsize=(8, 5))
+        y_pos = np.arange(len(ci_factors))
+        points = [eta_sq_ci[f][0] for f in ci_factors]
+        lows = [eta_sq_ci[f][1] for f in ci_factors]
+        highs = [eta_sq_ci[f][2] for f in ci_factors]
+        xerr_low = [p - l for p, l in zip(points, lows)]
+        xerr_high = [h - p for p, h in zip(points, highs)]
+        ax.errorbar(points, y_pos, xerr=[xerr_low, xerr_high],
+                     fmt="o", color="#1f77b4", capsize=5, capthick=2, markersize=8)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(ci_factors)
+        ax.set_xlabel("η²")
+        ax.set_title("Bootstrap 95% CI for η² (5000 resamples)")
+        ax.axvline(0.14, color="red", linestyle="--", alpha=0.4, label="large threshold")
+        ax.axvline(0.06, color="orange", linestyle="--", alpha=0.4, label="medium threshold")
+        ax.legend(fontsize=8)
+        save_fig(fig, "multi_eta_sq_bootstrap_ci")
+
+    # Plot 6: 4-panel publication figure
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
     # A: Boxplot tokenizer × model
@@ -545,6 +589,15 @@ def main():
         mag = "**LARGE**" if e >= 0.14 else "medium" if e >= 0.06 else "small" if e >= 0.01 else "negl."
         sig = "***" if r["p"] < 0.001 else "**" if r["p"] < 0.01 else "*" if r["p"] < 0.05 else ""
         report.append(f"| {r['factor']} | {r['F']:.2f} | {r['p']:.2e}{sig} | {e:.4f} | {mag} |")
+
+    # Bootstrap CI for η²
+    report.append(f"\n## Bootstrap 95% CI for η² (5000 resamples)")
+    report.append(f"\n| Factor | η² | 95% CI lower | 95% CI upper |")
+    report.append(f"|--------|----|-------------|-------------|")
+    for factor in ("tokenizer", "model", "preprocess", "tokenizer:model"):
+        if factor in eta_sq_ci:
+            pt, lo, hi = eta_sq_ci[factor]
+            report.append(f"| {factor} | {pt:.4f} | {lo:.4f} | {hi:.4f} |")
 
     if _has_sm:
         report.append(f"\n## Three-Way ANOVA with Interactions")

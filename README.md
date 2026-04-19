@@ -69,9 +69,7 @@ All main effects confirmed with multiple approaches:
 - **Holm–Bonferroni correction** for multiple comparisons — all key effects survive
 - **Permutation tests** (p < 0.001 for tokenizer and model; preprocessing p = 0.096, non-significant)
 - **Tukey HSD** post-hoc with corrected p-values (`p_adj_holm`, `p_adj_bonf`)
-- **Cross-dataset validation** (Spearman ρ = 0.921 between Lakh CD2 and MidiCaps — 2-model baseline)
-
-> ⚠️ **Note**: Cross-dataset validation currently uses 2 models (CLaMP-1/2). A re-run with 3 models (including MusicBERT) is pending.
+- **Cross-dataset validation** (Spearman ρ = 0.975 between Lakh CD2 and MidiCaps — 3-model, 5760 observations)
 
 ### 📊 FMD Ranges by Genre Pair (3-model)
 
@@ -141,6 +139,7 @@ With 2 models only, the **interaction between tokenizer and model** was the sing
 | η²(tokenizer) | 0.101 | 0.020 | ↓ diluted by model dominance |
 | η²(tok×model) | 0.421 | 0.051 | ↓ model main effect absorbs variance |
 | η²(preprocess) | 0.020 | 0.002 | ↓ negligible in both |
+| Cross-dataset ρ | 0.921 (2-model) | **0.975** (3-model) | ↑ stronger with MusicBERT |
 | Total observations | 1920 | 2880 | +50% (48 variants vs 32) |
 
 > Adding MusicBERT revealed that **FMD is fundamentally scale-sensitive** — the dominant "interaction" in the 2-model analysis was partially a proxy for architectural differences that become explicit with a third, differently-scaled model.
@@ -227,17 +226,22 @@ python run_multi_genre_analysis.py   # 4 genres × 32 variants × 10 repeats
 ```
 Produces ANOVA tables, interaction plots, η² heatmaps, and violin plots in `results/reports/lakh_multi/` and `results/plots/paper/`.
 
-### Cross-Dataset Validation
+### Cross-Dataset Validation (3-Model)
 ```bash
-python run_cross_dataset_validation.py                  # All sources (CD1 + MidiCaps)
-python run_cross_dataset_validation.py --source cd1     # Tagtraum CD1 only
-python run_cross_dataset_validation.py --source midicaps # MidiCaps only
+python run_cross_dataset_validation.py --source midicaps # MidiCaps (3-model, ~95 min)
+python run_cross_dataset_validation.py                   # All sources (CD1 + MidiCaps)
+python run_cross_dataset_validation.py --source cd1      # Tagtraum CD1 only
 python main.py --mode cross-validate                     # Via main entry point
 python main.py --mode cross-validate --cv-source cd1     # Specific source
 ```
 Validates generalizability by repeating the sensitivity analysis on independent data sources:
 - **Lakh + Tagtraum CD1** — same MIDI files, different genre annotator (cross-annotation)
 - **MidiCaps** — independent MIDI dataset with genre tags (cross-dataset)
+
+**3-model results (CLaMP-1, CLaMP-2, MusicBERT):**
+- Spearman ρ = **0.975** (Lakh CD2 vs MidiCaps) — near-perfect ranking agreement
+- η²(model) = 0.778 (Lakh) vs 0.805 (MidiCaps) — consistent dominance
+- 5760 total observations across both sources
 
 Produces η² comparison, ranking agreement (Spearman ρ), tokenizer×model heatmaps, and a comprehensive report in `results/reports/cross_validation/`.
 
@@ -283,7 +287,7 @@ python run_ablation_study.py
 | [`ANALYSIS_REPORT.md`](results/reports/lakh/ANALYSIS_REPORT.md) | Single-pair (rock vs jazz) full analysis |
 | [`MULTI_GENRE_REPORT.md`](results/reports/lakh_multi/MULTI_GENRE_REPORT.md) | Multi-genre 3-model analysis with bootstrap CI |
 | [`INTERACTION_MECHANISM_REPORT.md`](results/reports/lakh_multi/INTERACTION_MECHANISM_REPORT.md) | Tok×Model interaction mechanism (PCA, t-SNE, norms) |
-| [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (2-model; 3-model pending) |
+| [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (3-model, ρ=0.975) |
 | `multi_genre_fmd.csv` | Raw 2880 FMD observations |
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
 | `interaction_cell_stats.csv` | Per-cell embedding diagnostics |

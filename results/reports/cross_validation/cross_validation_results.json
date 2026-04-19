@@ -3,24 +3,60 @@
     "lakh_cd2",
     "midicaps"
   ],
-  "total_rows": 3840,
+  "total_rows": 5760,
   "eta_squared_by_source": {
     "lakh_cd2": {
-      "tokenizer": 0.10093887524017564,
-      "model": 0.08647335238115003,
-      "preprocess": 0.020298277326162146
+      "tokenizer": 0.019577614646684786,
+      "model": 0.7782351960021824,
+      "preprocess": 0.002213763862357968
     },
     "midicaps": {
-      "tokenizer": 0.12450745568626341,
-      "model": 0.13630325574105429,
-      "preprocess": 0.00027571264725083545
+      "tokenizer": 0.03932017116360373,
+      "model": 0.8045971981753358,
+      "preprocess": 0.004000032300752281
+    }
+  },
+  "eta_sq_bootstrap_ci_by_source": {
+    "lakh_cd2": {
+      "tokenizer": {
+        "point": 0.019577614646684786,
+        "ci_lower": 0.013293482924095242,
+        "ci_upper": 0.029026117311216567
+      },
+      "model": {
+        "point": 0.7782351960021824,
+        "ci_lower": 0.7637465818527428,
+        "ci_upper": 0.7926646405702032
+      },
+      "preprocess": {
+        "point": 0.002213763862357968,
+        "ci_lower": 0.0004843423803138365,
+        "ci_upper": 0.007811574746086159
+      }
+    },
+    "midicaps": {
+      "tokenizer": {
+        "point": 0.03932017116360373,
+        "ci_lower": 0.027709135093083065,
+        "ci_upper": 0.054034761530113724
+      },
+      "model": {
+        "point": 0.8045971981753358,
+        "ci_lower": 0.7933424930207135,
+        "ci_upper": 0.8164897036879065
+      },
+      "preprocess": {
+        "point": 0.004000032300752281,
+        "ci_lower": 0.001194061908464417,
+        "ci_upper": 0.010578037932676063
+      }
     }
   },
   "ranking_comparisons": {
     "lakh_cd2 vs midicaps": {
-      "spearman_rho": 0.9208211143695014,
-      "p_value": 8.40672677272755e-14,
-      "n_common": 32
+      "spearman_rho": 0.9752496743378202,
+      "p_value": 8.517034695625896e-32,
+      "n_common": 48
     }
   },
   "cell_means_by_source": {
@@ -35,29 +71,29 @@
       {
         "tokenizer": "TSD",
         "model": "CLaMP-2",
-        "mean_fmd": 0.13390281486014521,
-        "std_fmd": 0.022799740191779033,
+        "mean_fmd": 0.132902228894333,
+        "std_fmd": 0.02218111655888432,
         "n": 240
       },
       {
         "tokenizer": "Octuple",
         "model": "CLaMP-1",
-        "mean_fmd": 0.18235343784714736,
-        "std_fmd": 0.05480115789822406,
+        "mean_fmd": 0.18221599288905657,
+        "std_fmd": 0.05735232955158048,
         "n": 240
       },
       {
         "tokenizer": "MIDI-Like",
         "model": "CLaMP-1",
-        "mean_fmd": 0.19948681776101387,
-        "std_fmd": 0.05825309974282575,
+        "mean_fmd": 0.20109588196501132,
+        "std_fmd": 0.058581169075778136,
         "n": 240
       },
       {
         "tokenizer": "MIDI-Like",
         "model": "CLaMP-2",
-        "mean_fmd": 0.22323293779045342,
-        "std_fmd": 0.06068401722679047,
+        "mean_fmd": 0.21892289010186988,
+        "std_fmd": 0.05713620279620157,
         "n": 240
       },
       {
@@ -70,15 +106,43 @@
       {
         "tokenizer": "Octuple",
         "model": "CLaMP-2",
-        "mean_fmd": 0.2738790735602379,
-        "std_fmd": 0.022015075869155645,
+        "mean_fmd": 0.2747137922172745,
+        "std_fmd": 0.024066593271383028,
         "n": 240
       },
       {
         "tokenizer": "TSD",
         "model": "CLaMP-1",
-        "mean_fmd": 0.2861610986913244,
-        "std_fmd": 0.08295941632160636,
+        "mean_fmd": 0.2869273845727245,
+        "std_fmd": 0.0857641762544737,
+        "n": 240
+      },
+      {
+        "tokenizer": "Octuple",
+        "model": "MusicBERT",
+        "mean_fmd": 1.4811309645573298,
+        "std_fmd": 0.3646927009001926,
+        "n": 240
+      },
+      {
+        "tokenizer": "MIDI-Like",
+        "model": "MusicBERT",
+        "mean_fmd": 2.2403836235404015,
+        "std_fmd": 1.195001069828696,
+        "n": 240
+      },
+      {
+        "tokenizer": "TSD",
+        "model": "MusicBERT",
+        "mean_fmd": 2.709886319935322,
+        "std_fmd": 0.6150478778549777,
+        "n": 240
+      },
+      {
+        "tokenizer": "REMI",
+        "model": "MusicBERT",
+        "mean_fmd": 2.719141693909963,
+        "std_fmd": 0.55614444451587,
         "n": 240
       }
     ],
@@ -86,57 +150,85 @@
       {
         "tokenizer": "REMI",
         "model": "CLaMP-2",
-        "mean_fmd": 0.08955991165712476,
-        "std_fmd": 0.021131018206723487,
+        "mean_fmd": 0.09600407431523005,
+        "std_fmd": 0.02008785136542984,
         "n": 240
       },
       {
         "tokenizer": "TSD",
         "model": "CLaMP-2",
-        "mean_fmd": 0.22392146500448387,
-        "std_fmd": 0.09174155647203405,
+        "mean_fmd": 0.22702494176725546,
+        "std_fmd": 0.08118966112584129,
         "n": 240
       },
       {
         "tokenizer": "Octuple",
         "model": "CLaMP-1",
-        "mean_fmd": 0.2601866018027067,
-        "std_fmd": 0.06679185504612327,
+        "mean_fmd": 0.3009309028585752,
+        "std_fmd": 0.08084753004009404,
         "n": 240
       },
       {
         "tokenizer": "MIDI-Like",
         "model": "CLaMP-2",
-        "mean_fmd": 0.28951372001320125,
-        "std_fmd": 0.06091508009082142,
+        "mean_fmd": 0.30666848265876373,
+        "std_fmd": 0.07025430479344322,
         "n": 240
       },
       {
         "tokenizer": "MIDI-Like",
         "model": "CLaMP-1",
-        "mean_fmd": 0.32320253513753416,
-        "std_fmd": 0.11318181285620164,
+        "mean_fmd": 0.3277156638602416,
+        "std_fmd": 0.10777745083213494,
         "n": 240
       },
       {
         "tokenizer": "REMI",
         "model": "CLaMP-1",
-        "mean_fmd": 0.3385207841172814,
-        "std_fmd": 0.08577563850574133,
+        "mean_fmd": 0.3693947864075502,
+        "std_fmd": 0.08990722919188125,
         "n": 240
       },
       {
         "tokenizer": "Octuple",
         "model": "CLaMP-2",
-        "mean_fmd": 0.37200391429165997,
-        "std_fmd": 0.07239960033090334,
+        "mean_fmd": 0.39634782063464324,
+        "std_fmd": 0.09826935542355356,
         "n": 240
       },
       {
         "tokenizer": "TSD",
         "model": "CLaMP-1",
-        "mean_fmd": 0.42611248840888344,
-        "std_fmd": 0.10605923621199494,
+        "mean_fmd": 0.44486301659295957,
+        "std_fmd": 0.07785280661583081,
+        "n": 240
+      },
+      {
+        "tokenizer": "Octuple",
+        "model": "MusicBERT",
+        "mean_fmd": 1.892783453563849,
+        "std_fmd": 0.3701549935632426,
+        "n": 240
+      },
+      {
+        "tokenizer": "MIDI-Like",
+        "model": "MusicBERT",
+        "mean_fmd": 2.1723423411448795,
+        "std_fmd": 0.5753017938606879,
+        "n": 240
+      },
+      {
+        "tokenizer": "REMI",
+        "model": "MusicBERT",
+        "mean_fmd": 3.4532113244136173,
+        "std_fmd": 0.6267694984122693,
+        "n": 240
+      },
+      {
+        "tokenizer": "TSD",
+        "model": "MusicBERT",
+        "mean_fmd": 3.8444791942834855,
+        "std_fmd": 0.6782140966002479,
         "n": 240
       }
     ]

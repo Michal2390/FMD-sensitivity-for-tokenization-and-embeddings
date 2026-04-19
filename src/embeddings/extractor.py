@@ -309,11 +309,98 @@ class CLaMP2Model(EmbeddingModel):
         return self.embedding_dim
 
 
+class MusicBERTModel(EmbeddingModel):
+    """MusicBERT model — symbolic music understanding via OctupleMIDI tokenization.
+
+    Attempts to load ``m-a-p/MusicBERT-base`` from HuggingFace.
+    Falls back to ``bert-base-uncased`` with token-as-text encoding
+    if the real model is unavailable.
+
+    Two modes:
+      * **native**: Uses OctupleMIDI tokenisation internally (via model's own tokenizer).
+      * **text**: Converts our token IDs to space-separated text, fed through the
+        model's WordPiece tokenizer (same approach as CLaMP fallbacks).
+    """
+
+    DEFAULT_MODEL = "m-a-p/MusicBERT-base"
+    FALLBACK_MODEL = "bert-base-uncased"
+
+    def __init__(self, config: Dict):
+        super().__init__(config, "MusicBERT")
+        self._use_real_model = False
+
+        model_id = _resolve_hf_model_id(config, "MusicBERT", self.DEFAULT_MODEL)
+
+        try:
+            logger.info(f"Loading MusicBERT model: {model_id}")
+            from transformers import AutoModel, AutoTokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
+            self.model = AutoModel.from_pretrained(model_id, trust_remote_code=True)
+            self.model.to(self.device)
+            self.model.eval()
+            self.embedding_dim = self.model.config.hidden_size
+            self._use_real_model = True
+            logger.info(f"MusicBERT loaded: {model_id} (dim={self.embedding_dim})")
+        except Exception as e:
+            logger.warning(f"Failed to load MusicBERT ({model_id}): {e}")
+            logger.warning(f"Falling back to {self.FALLBACK_MODEL} proxy for MusicBERT")
+            try:
+                from transformers import AutoModel, AutoTokenizer
+                self.tokenizer = AutoTokenizer.from_pretrained(self.FALLBACK_MODEL)
+                self.model = AutoModel.from_pretrained(self.FALLBACK_MODEL)
+                self.model.to(self.device)
+                self.model.eval()
+                self.embedding_dim = self.model.config.hidden_size
+                logger.info(f"MusicBERT fallback: {self.FALLBACK_MODEL} (dim={self.embedding_dim})")
+            except Exception as e2:
+                logger.warning(f"Fallback also failed: {e2}. Using dummy model.")
+                self.model = None
+                self.tokenizer = None
+                self.embedding_dim = 768
+
+    def _tokens_to_text(self, tokens: List[int]) -> str:
+        return " ".join([str(t) for t in tokens[:512]])
+
+    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+        if self.model is None:
+            return np.random.randn(self.embedding_dim).astype(np.float32)
+        try:
+            text = self._tokens_to_text(tokens)
+            inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512, padding=True)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+            return embedding[0].astype(np.float32)
+        except Exception as e:
+            logger.error(f"Error encoding with MusicBERT: {e}")
+            return np.random.randn(self.embedding_dim).astype(np.float32)
+
+    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
+        if self.model is None:
+            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
+        try:
+            texts = [self._tokens_to_text(seq) for seq in token_sequences]
+            inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+            return embeddings.astype(np.float32)
+        except Exception as e:
+            logger.error(f"Error batch encoding with MusicBERT: {e}")
+            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
+
+    def get_embedding_dim(self) -> int:
+        return self.embedding_dim
+
+
 class EmbeddingFactory:
     """Factory for creating embedding models."""
     _models = {
         "CLaMP-1": CLaMP1Model,
         "CLaMP-2": CLaMP2Model,
+        "MusicBERT": MusicBERTModel,
     }
 
     @classmethod

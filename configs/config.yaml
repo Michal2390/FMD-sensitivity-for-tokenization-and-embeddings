@@ -86,6 +86,10 @@ embeddings:
       model_name: "clamp-2"
       hf_model_name: "shanghaicai/CLaMP2"
       format_type: "midi"  # Direct MIDI structure
+    - name: "MusicBERT"
+      model_name: "musicbert"
+      hf_model_name: "m-a-p/MusicBERT-base"
+      format_type: "token_text"  # Token IDs as text (fallback: bert-base-uncased)
   # Embedding extraction settings
   batch_size: 32
   device: "auto"  # auto -> CUDA when available, otherwise CPU

@@ -13,8 +13,6 @@ results/reports/lakh_multi/INTERACTION_MECHANISM_REPORT.md + plots.
 
 from __future__ import annotations
 
-import csv
-import json
 import sys
 from itertools import product
 from pathlib import Path
@@ -238,7 +236,7 @@ class InteractionAnalyzer:
         if not cell_stats.empty:
             pivot = cell_stats.pivot_table(values="eff_dim_90", index="tokenizer", columns="model")
             fig, ax = plt.subplots(figsize=(7, 5))
-            sns.heatmap(pivot, annot=True, fmt="d", cmap="YlGnBu", ax=ax, linewidths=0.5)
+            sns.heatmap(pivot, annot=True, fmt=".0f", cmap="YlGnBu", ax=ax, linewidths=0.5)
             ax.set_title("Effective Dimensionality (90% variance) by Tok × Model")
             save_fig(fig, "interaction_eff_dim_heatmap")
 
@@ -398,4 +396,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
 

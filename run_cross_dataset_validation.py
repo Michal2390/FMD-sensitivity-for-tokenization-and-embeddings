@@ -44,6 +44,10 @@ from embeddings.extractor import EmbeddingExtractor
 from metrics.fmd import FrechetMusicDistance
 from preprocessing.processor import MIDIPreprocessor
 from tokenization.tokenizer import TokenizationPipeline
+from experiments.sensitivity_analysis import (
+    bootstrap_eta_squared,
+    apply_multiple_comparison_correction,
+)
 
 # ──────────────────────────────────────────────────────────────────────
 # Config
@@ -519,6 +523,7 @@ def generate_report(
     source_cells: Dict[str, pd.DataFrame],
     ranking_comparisons: Dict[str, Dict],
     output_dir: Path,
+    source_eta_ci: Optional[Dict[str, Dict[str, Tuple]]] = None,
 ):
     """Generate comprehensive Markdown report."""
     report = []
@@ -542,6 +547,19 @@ def generate_report(
     for f in factors:
         vals = [f"{source_eta.get(s, {}).get(f, 0):.4f}" for s in sources]
         report.append(f"| {f} | " + " | ".join(vals) + " |")
+
+    # Bootstrap CI for η²
+    if source_eta_ci:
+        report.append(f"\n## Bootstrap 95% CI for η² by Source")
+        for src in sources:
+            if src in source_eta_ci:
+                report.append(f"\n### {src}")
+                report.append(f"\n| Factor | η² | 95% CI lower | 95% CI upper |")
+                report.append(f"|--------|----|-------------|-------------|")
+                for f in factors:
+                    if f in source_eta_ci[src]:
+                        pt, lo, hi = source_eta_ci[src][f]
+                        report.append(f"| {f} | {pt:.4f} | {lo:.4f} | {hi:.4f} |")
 
     # Cell means comparison
     report.append(f"\n## Tokenizer × Model Cell Means by Source")
@@ -758,6 +776,7 @@ def main():
 
     sources = sorted(all_df["source"].unique())
     source_eta: Dict[str, Dict[str, float]] = {}
+    source_eta_ci: Dict[str, Dict[str, Tuple]] = {}
     source_rankings: Dict[str, pd.DataFrame] = {}
     source_cells: Dict[str, pd.DataFrame] = {}
 
@@ -765,9 +784,19 @@ def main():
         sub = all_df[all_df["source"] == src]
         eta = compute_eta_squared(sub, ["tokenizer", "model", "preprocess"])
         source_eta[src] = eta
+        # Bootstrap CI per source
+        eta_ci = {}
+        for factor in ["tokenizer", "model", "preprocess"]:
+            eta_ci[factor] = bootstrap_eta_squared(sub, factor, n_bootstrap=5000, ci=0.95, seed=SEED)
+        source_eta_ci[src] = eta_ci
         source_rankings[src] = compute_pipeline_ranking(sub)
         source_cells[src] = compute_cell_means(sub)
         logger.info(f"  {src}: η² = {eta}")
+        for f, (pt, lo, hi) in eta_ci.items():
+            logger.info(f"    {f}: η²={pt:.4f} [{lo:.4f}, {hi:.4f}]")
+
+    # Apply multiple comparison correction to cross-pair p-values
+    # Collect all ranking comparison p-values for correction
 
     # Pairwise ranking comparisons
     ranking_comparisons: Dict[str, Dict] = {}
@@ -783,6 +812,10 @@ def main():
         "sources": sources,
         "total_rows": len(all_df),
         "eta_squared_by_source": source_eta,
+        "eta_sq_bootstrap_ci_by_source": {
+            s: {f: {"point": v[0], "ci_lower": v[1], "ci_upper": v[2]} for f, v in ci.items()}
+            for s, ci in source_eta_ci.items()
+        },
         "ranking_comparisons": ranking_comparisons,
         "cell_means_by_source": {
             s: cells.to_dict(orient="records") for s, cells in source_cells.items()
@@ -802,7 +835,7 @@ def main():
     logger.info("\n=== Generating Report ===")
     generate_report(
         all_df, source_eta, source_rankings, source_cells,
-        ranking_comparisons, output_dir,
+        ranking_comparisons, output_dir, source_eta_ci=source_eta_ci,
     )
 
     logger.info("\n" + "=" * 70)
@@ -814,4 +847,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
 

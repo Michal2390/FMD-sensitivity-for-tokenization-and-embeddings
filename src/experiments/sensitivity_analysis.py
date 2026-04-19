@@ -24,6 +24,7 @@ try:
     import statsmodels.api as sm
     from statsmodels.formula.api import ols
     from statsmodels.stats.multicomp import pairwise_tukeyhsd
+    from statsmodels.stats.multitest import multipletests
 
     _HAS_STATSMODELS = True
 except ImportError:  # pragma: no cover
@@ -50,9 +51,15 @@ class SensitivityResult:
     eta_squared: Optional[Dict[str, float]] = None
     partial_eta_squared: Optional[Dict[str, float]] = None
 
+    # Bootstrap CI for η²
+    eta_sq_ci: Optional[Dict[str, Tuple[float, float, float]]] = None
+
     # Post-hoc
     tukey_tokenizer: Optional[pd.DataFrame] = None
     tukey_model: Optional[pd.DataFrame] = None
+
+    # Corrected p-values
+    corrected_pvalues: Optional[pd.DataFrame] = None
 
     # Nonparametric
     kruskal_tokenizer: Optional[Dict[str, float]] = None
@@ -83,6 +90,124 @@ def _cohens_d(a: np.ndarray, b: np.ndarray) -> float:
     if pooled_std < 1e-12:
         return 0.0
     return float((np.mean(a) - np.mean(b)) / pooled_std)
+
+
+# ------------------------------------------------------------------
+# Bootstrap CI for η²
+# ------------------------------------------------------------------
+
+def _compute_eta_squared_oneway(values: np.ndarray, labels: np.ndarray) -> float:
+    """Compute one-way η² = SS_between / SS_total."""
+    grand_mean = values.mean()
+    ss_total = ((values - grand_mean) ** 2).sum()
+    if ss_total < 1e-15:
+        return 0.0
+    unique_labels = np.unique(labels)
+    ss_between = sum(
+        np.sum(labels == lbl) * (values[labels == lbl].mean() - grand_mean) ** 2
+        for lbl in unique_labels
+    )
+    return float(ss_between / ss_total)
+
+
+def bootstrap_eta_squared(
+    df: pd.DataFrame,
+    factor: str,
+    n_bootstrap: int = 5000,
+    ci: float = 0.95,
+    seed: int = 42,
+) -> Tuple[float, float, float]:
+    """Bootstrap confidence interval for η² (one-way, percentile method).
+
+    Parameters
+    ----------
+    df : DataFrame with 'fmd' column and *factor* column.
+    factor : Column name for grouping.
+    n_bootstrap : Number of bootstrap resamples.
+    ci : Confidence level (default 0.95).
+    seed : Random seed.
+
+    Returns
+    -------
+    (point_estimate, ci_lower, ci_upper)
+    """
+    if df.empty or factor not in df.columns:
+        return (0.0, 0.0, 0.0)
+
+    values = df["fmd"].values
+    labels = df[factor].values
+    n = len(values)
+
+    point_est = _compute_eta_squared_oneway(values, labels)
+
+    rng = np.random.default_rng(seed)
+    boot_etas = np.empty(n_bootstrap)
+    for i in range(n_bootstrap):
+        idx = rng.integers(0, n, size=n)
+        boot_etas[i] = _compute_eta_squared_oneway(values[idx], labels[idx])
+
+    alpha = 1 - ci
+    lower = float(np.percentile(boot_etas, 100 * alpha / 2))
+    upper = float(np.percentile(boot_etas, 100 * (1 - alpha / 2)))
+
+    logger.info(
+        f"Bootstrap η² for '{factor}': {point_est:.4f} "
+        f"[{lower:.4f}, {upper:.4f}] ({n_bootstrap} resamples)"
+    )
+    return (point_est, lower, upper)
+
+
+# ------------------------------------------------------------------
+# Multiple comparison correction
+# ------------------------------------------------------------------
+
+def apply_multiple_comparison_correction(
+    p_values: List[float],
+    method: str = "holm",
+) -> np.ndarray:
+    """Apply multiple comparison correction to a list of p-values.
+
+    Parameters
+    ----------
+    p_values : Raw p-values.
+    method : 'holm' or 'bonferroni'.
+
+    Returns
+    -------
+    Array of adjusted p-values.
+    """
+    if not _HAS_STATSMODELS:
+        logger.warning("statsmodels required for multiple comparison correction")
+        return np.array(p_values)
+
+    if not p_values:
+        return np.array([])
+
+    _, p_adj, _, _ = multipletests(p_values, method=method)
+    return p_adj
+
+
+def correct_tukey_pvalues(tukey_df: pd.DataFrame) -> pd.DataFrame:
+    """Add Holm and Bonferroni corrected p-values to a Tukey HSD result DataFrame.
+
+    Parameters
+    ----------
+    tukey_df : DataFrame from ``run_tukey_hsd()`` with a 'p-adj' column.
+
+    Returns
+    -------
+    DataFrame with added 'p_adj_holm' and 'p_adj_bonf' columns.
+    """
+    if tukey_df is None or tukey_df.empty:
+        return tukey_df
+
+    raw_p = tukey_df["p-adj"].astype(float).tolist()
+    tukey_df = tukey_df.copy()
+    tukey_df["p_adj_holm"] = apply_multiple_comparison_correction(raw_p, method="holm")
+    tukey_df["p_adj_bonf"] = apply_multiple_comparison_correction(raw_p, method="bonferroni")
+    tukey_df["still_sig_holm"] = tukey_df["p_adj_holm"] < 0.05
+    tukey_df["still_sig_bonf"] = tukey_df["p_adj_bonf"] < 0.05
+    return tukey_df
 
 
 def build_fmd_dataframe(bootstrap_rows: List[Dict]) -> pd.DataFrame:
@@ -359,9 +484,23 @@ def run_sensitivity_analysis(
     # 1. ANOVA + η² + partial η²
     anova_table, eta_sq, partial_eta_sq = run_three_way_anova(df)
 
-    # 2. Tukey HSD
+    # 1b. Bootstrap CI for η²
+    work_bs = df.copy()
+    work_bs["preprocess"] = (
+        work_bs["remove_velocity"].astype(str) + "_" + work_bs["hard_quantization"].astype(str)
+    )
+    eta_sq_ci: Dict[str, Tuple[float, float, float]] = {}
+    for factor in ("tokenizer", "model", "preprocess"):
+        eta_sq_ci[factor] = bootstrap_eta_squared(work_bs, factor, n_bootstrap=5000, ci=0.95, seed=seed)
+    # Also bootstrap tok×model interaction approximation
+    work_bs["tok_model"] = work_bs["tokenizer"] + "_" + work_bs["model"]
+    eta_sq_ci["tokenizer:model"] = bootstrap_eta_squared(work_bs, "tok_model", n_bootstrap=5000, ci=0.95, seed=seed)
+
+    # 2. Tukey HSD + multiple comparison correction
     tukey_tok = run_tukey_hsd(df, "tokenizer")
     tukey_mod = run_tukey_hsd(df, "model")
+    tukey_tok = correct_tukey_pvalues(tukey_tok)
+    tukey_mod = correct_tukey_pvalues(tukey_mod)
 
     # 3. Kruskal-Wallis
     kw_tok = run_kruskal_wallis(df, "tokenizer")
@@ -400,6 +539,7 @@ def run_sensitivity_analysis(
     json_payload = {
         "eta_squared": eta_sq,
         "partial_eta_squared": partial_eta_sq,
+        "eta_sq_bootstrap_ci": {k: {"point": v[0], "ci_lower": v[1], "ci_upper": v[2]} for k, v in eta_sq_ci.items()},
         "kruskal_wallis_tokenizer": kw_tok,
         "kruskal_wallis_model": kw_mod,
         "cohens_d": cohens,
@@ -417,8 +557,10 @@ def run_sensitivity_analysis(
         anova_table=anova_table,
         eta_squared=eta_sq,
         partial_eta_squared=partial_eta_sq,
+        eta_sq_ci=eta_sq_ci,
         tukey_tokenizer=tukey_tok,
         tukey_model=tukey_mod,
+        corrected_pvalues=None,  # stored in tukey DataFrames
         kruskal_tokenizer=kw_tok,
         kruskal_model=kw_mod,
         permutation_results=perm_results,
