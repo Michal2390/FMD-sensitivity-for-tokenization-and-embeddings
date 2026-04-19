@@ -13,18 +13,96 @@
 
 This project implements a full experimental pipeline to analyze the impact of:
 - **4 tokenization strategies**: REMI, TSD, Octuple, MIDI-Like
-- **2 embedding models**: CLaMP-1, CLaMP-2
+- **3 embedding models**: CLaMP-1, CLaMP-2, MusicBERT
 - **4 preprocessing configs**: original, no velocity, hard quantization, combined
 
 on **Frechet Music Distance (FMD)**, a metric for symbolic music similarity.
 
-We evaluated **1920 FMD observations** across **6 genre pairs** (rock, jazz, electronic, country) from the **Lakh MIDI Dataset**, with 10× repeated subsampling per variant.
+We evaluated **2880 FMD observations** across **6 genre pairs** (rock, jazz, electronic, country) from the **Lakh MIDI Dataset**, with **48 pipeline variants** and 10× repeated subsampling per variant. Results are validated with **bootstrap confidence intervals**, **Holm–Bonferroni correction**, and **cross-dataset replication** on MidiCaps.
 
-## Key Findings
+## Key Findings (3-Model Analysis)
 
-### 🔥 Tokenizer × Model Interaction Dominates (η² = 0.42)
+### 🔥 Embedding Model Choice Dominates FMD Variance (η² = 0.78)
 
-The single largest source of FMD variance is the **interaction between tokenizer and model choice** — not either factor alone. This means the optimal tokenizer depends on which embedding model you use.
+With three embedding models (CLaMP-1, CLaMP-2, MusicBERT), the **model choice alone explains 78% of FMD variance** — far exceeding all other factors combined.
+
+| Source | η² | 95% CI | Partial η² | Interpretation |
+|--------|-----|--------|-----------|----------------|
+| **Model (main)** | **0.778** | **[0.764, 0.793]** | **0.844** | **Dominant** |
+| **Tokenizer × Model** | 0.051 | — | 0.260 | Medium interaction |
+| Tokenizer (main) | 0.020 | [0.013, 0.029] | 0.120 | Small |
+| Genre pair | 0.041 | — | — | Small (inherent) |
+| Preprocessing | 0.002 | [0.001, 0.008] | 0.015 | Negligible |
+
+> **Bootstrap 95% CIs (5000 resamples)** confirm all intervals are non-overlapping — the model effect is robust and not an artefact.
+
+### ⚠️ Critical Insight: FMD Is Not Scale-Invariant Across Model Architectures
+
+MusicBERT (bert-base-uncased fallback, 768-dim) produces embeddings with **3× higher norms** than CLaMP-2 (~15 vs ~2.7), yielding systematically higher FMD values. This means:
+
+> **Raw FMD values cannot be directly compared across embedding models of different architectures.** Normalization or model-specific baselines are required for fair comparison.
+
+| Comparison | Cohen's d | Magnitude |
+|------------|-----------|-----------|
+| CLaMP-2 vs MusicBERT | −3.295 | **Huge** |
+| CLaMP-1 vs MusicBERT | −3.216 | **Huge** |
+| CLaMP-1 vs CLaMP-2 | 0.634 | Medium |
+
+### 🔬 Interaction Mechanism Analysis
+
+Why do certain tokenizer×model combinations yield anomalous FMD? PCA and embedding diagnostics reveal:
+
+| Tokenizer + Model | Eff. Dim (90%) | Mean Norm | Cosine Sim | Implication |
+|-------------------|---------------|-----------|------------|-------------|
+| MIDI-Like + MusicBERT | **11** (lowest) | 14.4 | 0.950 | Low dimensionality inflates FMD |
+| REMI + CLaMP-2 | **21** (highest) | 2.8 | 0.964 | Best-separated genre clusters |
+| Octuple + CLaMP-2 | 21 | 2.7 | **0.843** (lowest) | Highest intra-group diversity |
+| CLaMP-1 (all tok.) | 15–20 | 7.4–7.8 | **0.980+** | Near-identical embeddings → low discriminability |
+
+**Key mechanism**: Lower effective dimensionality concentrates the Fréchet distance in fewer directions, inflating FMD. Models with very high cosine similarity (CLaMP-1 ~0.98) produce embeddings that are nearly indistinguishable regardless of input.
+
+### 🔒 Statistical Robustness
+
+All main effects confirmed with multiple approaches:
+- **Three-way factorial ANOVA** with interactions (N = 2880, 48 variants)
+- **Bootstrap 95% CI for η²** (5000 resamples, percentile method)
+- **Holm–Bonferroni correction** for multiple comparisons — all key effects survive
+- **Permutation tests** (p < 0.001 for tokenizer and model; preprocessing p = 0.096, non-significant)
+- **Tukey HSD** post-hoc with corrected p-values (`p_adj_holm`, `p_adj_bonf`)
+- **Cross-dataset validation** (Spearman ρ = 0.921 between Lakh CD2 and MidiCaps — 2-model baseline)
+
+> ⚠️ **Note**: Cross-dataset validation currently uses 2 models (CLaMP-1/2). A re-run with 3 models (including MusicBERT) is pending.
+
+### 📊 FMD Ranges by Genre Pair (3-model)
+
+| Genre Pair | Mean FMD | Std |
+|------------|----------|-----|
+| jazz ↔ country | 0.613 | 0.697 |
+| rock ↔ jazz | 0.730 | 0.867 |
+| rock ↔ electronic | 0.817 | 0.957 |
+| rock ↔ country | 0.843 | 1.037 |
+| jazz ↔ electronic | 1.092 | 1.253 |
+| electronic ↔ country | 1.287 | 1.540 |
+
+### 🎯 Practical Pipeline Recommendations
+
+| Goal | Recommended Pipeline | Rationale |
+|------|---------------------|-----------|
+| Finest resolution (low baseline) | REMI + CLaMP-2 | FMD ~0.05–0.10, highest eff. dim, best genre separation |
+| Maximum genre separability | REMI + CLaMP-1 | Highest absolute FMD values within CLaMP family |
+| Stable across genres | Octuple + CLaMP-1 | Lowest CV across pairs |
+| Highest intra-group diversity | Octuple + CLaMP-2 | Cosine sim = 0.843, but noisy |
+| ⚠️ Avoid | MIDI-Like + MusicBERT | Lowest eff. dim (11), inflated FMD |
+| ⚠️ Caution | Comparing FMD across model architectures | Scale-dependent — normalize first |
+
+---
+
+<details>
+<summary><b>📁 Previous Results (2-Model Baseline: CLaMP-1 + CLaMP-2)</b></summary>
+
+### Tokenizer × Model Interaction Dominates (η² = 0.42)
+
+With 2 models only, the **interaction between tokenizer and model** was the single largest source of FMD variance — not either factor alone.
 
 | Source | η² | Partial η² | Interpretation |
 |--------|-----|-----------|----------------|
@@ -34,7 +112,17 @@ The single largest source of FMD variance is the **interaction between tokenizer
 | Genre pair | 0.215 | — | Large (inherent) |
 | Preprocessing | 0.020 | 0.054 | Small effect |
 
-### 📊 FMD Ranges by Genre Pair
+### Effect Sizes (Cohen's d, 2-model)
+
+| Comparison | d | Magnitude |
+|------------|---|-----------|
+| Octuple vs REMI | **0.895** | **Large** |
+| MIDI-Like vs REMI | 0.691 | Medium |
+| CLaMP-1 vs CLaMP-2 | 0.615 | Medium |
+| REMI vs TSD | −0.558 | Medium |
+| MIDI-Like vs TSD | 0.016 | Negligible |
+
+### FMD Ranges by Genre Pair (2-model)
 
 | Genre Pair | Mean FMD | Std |
 |------------|----------|-----|
@@ -45,34 +133,21 @@ The single largest source of FMD variance is the **interaction between tokenizer
 | jazz ↔ electronic | 0.241 | 0.081 |
 | electronic ↔ country | 0.268 | 0.100 |
 
-### 🎯 Practical Pipeline Recommendations
+### What Changed with 3 Models?
 
-| Goal | Recommended Pipeline | Rationale |
-|------|---------------------|-----------|
-| Maximum genre separability | REMI + CLaMP-1 | Highest absolute FMD values |
-| Finest resolution (low baseline) | REMI + CLaMP-2 | FMD ~0.05–0.10, high sensitivity |
-| Stable across genres | Octuple + CLaMP-1 | Lowest CV across pairs |
-| ⚠️ Avoid | Octuple + CLaMP-2 | Anomalously high FMD, poor discrimination |
+| Metric | 2 Models | 3 Models | Change |
+|--------|----------|----------|--------|
+| η²(model) | 0.087 | **0.778** | ↑ 9× — MusicBERT on a different scale |
+| η²(tokenizer) | 0.101 | 0.020 | ↓ diluted by model dominance |
+| η²(tok×model) | 0.421 | 0.051 | ↓ model main effect absorbs variance |
+| η²(preprocess) | 0.020 | 0.002 | ↓ negligible in both |
+| Total observations | 1920 | 2880 | +50% (48 variants vs 32) |
 
-### 📈 Effect Sizes (Cohen's d)
+> Adding MusicBERT revealed that **FMD is fundamentally scale-sensitive** — the dominant "interaction" in the 2-model analysis was partially a proxy for architectural differences that become explicit with a third, differently-scaled model.
 
-| Comparison | d | Magnitude |
-|------------|---|-----------|
-| Octuple vs REMI | **0.895** | **Large** |
-| MIDI-Like vs REMI | 0.691 | Medium |
-| CLaMP-1 vs CLaMP-2 | 0.615 | Medium |
-| REMI vs TSD | −0.558 | Medium |
-| MIDI-Like vs TSD | 0.016 | Negligible |
+</details>
 
-> **Key insight**: MIDI-Like and TSD produce nearly identical FMD distributions (d ≈ 0), while Octuple and REMI represent opposite extremes.
-
-### 🔬 Statistical Validation
-
-All main effects confirmed with:
-- **Three-way factorial ANOVA** with interactions (N = 1920)
-- **Permutation tests** (p < 0.001 for all main effects)
-- **Tukey HSD** post-hoc comparisons
-- **Per-pair η² consistency** analysis across 6 genre pairs
+---
 
 ## Experimental Design
 
@@ -94,14 +169,14 @@ All main effects confirmed with:
                     └────────────┬────────────────────┘
                                  │
                     ┌────────────▼────────────────────┐
-                    │    Embedding Model (×2)           │
-                    │     CLaMP-1  |  CLaMP-2           │
+                    │    Embedding Model (×3)           │
+                    │  CLaMP-1 | CLaMP-2 | MusicBERT   │
                     └────────────┬────────────────────┘
                                  │
                     ┌────────────▼────────────────────┐
                     │   FMD Computation (×6 pairs)     │
                     │   10× repeated subsampling       │
-                    │   = 1920 total observations      │
+                    │   = 2880 total observations      │
                     └──────────────────────────────────┘
 ```
 
@@ -111,9 +186,9 @@ All main effects confirmed with:
 ├── src/                           # Source code
 │   ├── preprocessing/             # MIDI preprocessing
 │   ├── tokenization/              # 4 tokenizers (MidiTok)
-│   ├── embeddings/                # CLaMP-1/2 extraction + cache
+│   ├── embeddings/                # CLaMP-1/2 + MusicBERT extraction + cache
 │   ├── metrics/                   # FMD (Frechet Music Distance)
-│   ├── experiments/               # Analysis & publication plots
+│   ├── experiments/               # Analysis, bootstrap CI & publication plots
 │   └── utils/                     # Config and helpers
 │
 ├── tests/                         # 53+ unit tests
@@ -121,7 +196,7 @@ All main effects confirmed with:
 ├── data/                          # Lakh MIDI subsets
 ├── results/
 │   ├── reports/lakh/              # Single-pair analysis (32 variants)
-│   ├── reports/lakh_multi/        # Multi-genre analysis (1920 obs)
+│   ├── reports/lakh_multi/        # Multi-genre analysis (2880 obs)
 │   └── plots/paper/               # Publication-ready figures
 ├── docs/                          # Documentation & weekly summaries
 ├── scripts/                       # Data generation & plotting
@@ -195,6 +270,7 @@ python run_ablation_study.py
 | 5 | Ablation study & sensitivity | ✅ | 13 |
 | 6 | Multi-genre analysis & ANOVA | ✅ | — |
 | 7 | Cross-dataset validation (CD1 + MidiCaps) | ✅ | 9 |
+| 8 | MusicBERT, bootstrap CI, interaction mechanism, multiple comparison correction | ✅ | — |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
@@ -205,9 +281,12 @@ python run_ablation_study.py
 | File | Description |
 |------|-------------|
 | [`ANALYSIS_REPORT.md`](results/reports/lakh/ANALYSIS_REPORT.md) | Single-pair (rock vs jazz) full analysis |
-| `multi_genre_fmd.csv` | Raw 1920 FMD observations |
+| [`MULTI_GENRE_REPORT.md`](results/reports/lakh_multi/MULTI_GENRE_REPORT.md) | Multi-genre 3-model analysis with bootstrap CI |
+| [`INTERACTION_MECHANISM_REPORT.md`](results/reports/lakh_multi/INTERACTION_MECHANISM_REPORT.md) | Tok×Model interaction mechanism (PCA, t-SNE, norms) |
+| [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (2-model; 3-model pending) |
+| `multi_genre_fmd.csv` | Raw 2880 FMD observations |
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
-| [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability analysis |
+| `interaction_cell_stats.csv` | Per-cell embedding diagnostics |
 | `cross_dataset_fmd.csv` | Combined FMD from all sources |
 
 ### Publication Plots
@@ -216,10 +295,15 @@ python run_ablation_study.py
 |------|-------------|
 | `multi_summary_4panel` | Overview: violin + heatmap + η² + interaction |
 | `multi_fmd_violin_tok_model` | FMD distributions by tokenizer and model |
+| `multi_eta_sq_bootstrap_ci` | **Forest plot: η² with 95% bootstrap CI** |
 | `multi_eta_sq_heatmap` | η² stability across genre pairs |
 | `multi_eta_sq_comparison` | Factor importance comparison |
 | `multi_fmd_by_pair` | FMD distributions per genre pair |
 | `multi_interaction_per_pair` | Tokenizer×model interaction per pair |
+| `interaction_pca_curves` | **PCA explained variance per tok×model cell** |
+| `interaction_token_length` | **Token sequence length distributions** |
+| `interaction_eff_dim_heatmap` | **Effective dimensionality heatmap** |
+| `interaction_tsne_best_worst` | **t-SNE: best vs worst tok×model cell** |
 | `cross_summary_4panel` | Cross-dataset validation overview |
 | `cross_eta_sq_comparison` | η² comparison across data sources |
 | `cross_tok_model_heatmaps` | Tokenizer×model means per source |
@@ -247,4 +331,4 @@ python run_ablation_study.py
 
 ---
 
-**Status**: ✅ Complete (Weeks 1–6) | **Last Updated**: 19.04.2026
+**Status**: ✅ Complete (Weeks 1–8) | **Last Updated**: 19.04.2026
