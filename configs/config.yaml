@@ -283,3 +283,33 @@ lakh:
   output_dir: "results/reports/lakh"
   plots_dir: "results/plots/paper"
 
+# Cross-dataset validation configuration
+cross_validation:
+  # Tagtraum CD1 (alternative annotator for cross-annotation validation)
+  tagtraum_cd1:
+    url: "https://www.tagtraum.com/genres/msd_tagtraum_cd1.cls.zip"
+    file: "data/raw/lakh/msd_tagtraum_cd1.cls"
+    max_per_genre: 500  # take as many as available
+
+  # MidiCaps dataset (independent MIDI files with genre tags)
+  midicaps:
+    hf_repo: "amaai-lab/MidiCaps"
+    data_dir: "data/raw/midicaps"
+    metadata_file: "data/raw/midicaps/train.json"
+    genres:
+      - "rock"
+      - "jazz"
+      - "electronic"
+      - "country"
+    max_per_genre: 120
+    seed: 42
+    # Custom tag overrides (merged with built-in MIDICAPS_GENRE_MAP)
+    genre_map: {}
+
+  # Cross-validation experiment settings
+  subsample_size: 100
+  n_repeats: 10
+  seed: 42
+  output_dir: "results/reports/cross_validation"
+  plots_dir: "results/plots/paper"
+

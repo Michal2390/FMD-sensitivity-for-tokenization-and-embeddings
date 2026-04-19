@@ -19,29 +19,60 @@ from loguru import logger
 
 
 class LakhGenreLoader:
-    """Load and filter Lakh MIDI files by genre using Tagtraum CD2 labels."""
+    """Load and filter Lakh MIDI files by genre using Tagtraum labels.
 
-    def __init__(self, config: Dict):
+    Supports both Tagtraum CD2 (default) and CD1 annotations for
+    cross-annotation validation.  Set ``tagtraum_version="cd1"`` or
+    configure via ``cross_validation.tagtraum_cd1`` in config.
+    """
+
+    # Class-level URL defaults for each Tagtraum version
+    _TAGTRAUM_URLS = {
+        "cd2": "https://www.tagtraum.com/genres/msd_tagtraum_cd2.cls.zip",
+        "cd1": "https://www.tagtraum.com/genres/msd_tagtraum_cd1.cls.zip",
+    }
+
+    def __init__(self, config: Dict, tagtraum_version: str = "cd2"):
         self.config = config
+        self.tagtraum_version = tagtraum_version.lower()
         lakh_cfg = config.get("lakh", {})
 
         self.lmd_matched_url: str = lakh_cfg.get(
             "lmd_matched_url",
             "http://hog.ee.columbia.edu/craffel/lmd/lmd_matched.tar.gz",
         )
-        self.tagtraum_url: str = lakh_cfg.get(
-            "tagtraum_url",
-            "https://www.tagtraum.com/genres/msd_tagtraum_cd2.cls",
-        )
-        self.tagtraum_file = Path(lakh_cfg.get("tagtraum_file", "data/raw/lakh/msd_tagtraum_cd2.cls"))
+
+        # Resolve Tagtraum URL and file path based on version
+        if self.tagtraum_version == "cd1":
+            cv_cd1 = config.get("cross_validation", {}).get("tagtraum_cd1", {})
+            self.tagtraum_url: str = cv_cd1.get(
+                "url", self._TAGTRAUM_URLS["cd1"]
+            )
+            self.tagtraum_file = Path(cv_cd1.get(
+                "file", "data/raw/lakh/msd_tagtraum_cd1.cls"
+            ))
+            self.max_per_genre: int = int(cv_cd1.get(
+                "max_per_genre", lakh_cfg.get("max_per_genre", 500)
+            ))
+            self._dataset_prefix = "lakh_cd1"
+        else:
+            self.tagtraum_url: str = lakh_cfg.get(
+                "tagtraum_url",
+                self._TAGTRAUM_URLS["cd2"],
+            )
+            self.tagtraum_file = Path(lakh_cfg.get(
+                "tagtraum_file", "data/raw/lakh/msd_tagtraum_cd2.cls"
+            ))
+            self.max_per_genre: int = int(lakh_cfg.get("max_per_genre", 500))
+            self._dataset_prefix = "lakh"
+
         self.lmd_matched_dir = Path(lakh_cfg.get("lmd_matched_dir", "data/raw/lakh/lmd_matched"))
         self.genres: List[str] = [g.lower() for g in lakh_cfg.get("genres", ["rock", "classical"])]
-        self.max_per_genre: int = int(lakh_cfg.get("max_per_genre", 500))
         self.seed: int = int(lakh_cfg.get("seed", 42))
 
         logger.info(
-            f"LakhGenreLoader initialised: genres={self.genres}, "
-            f"max_per_genre={self.max_per_genre}"
+            f"LakhGenreLoader initialised: version={self.tagtraum_version}, "
+            f"genres={self.genres}, max_per_genre={self.max_per_genre}"
         )
 
     # ------------------------------------------------------------------
@@ -266,7 +297,7 @@ class LakhGenreLoader:
         counts: Dict[str, int] = {}
 
         for genre, paths in genre_files.items():
-            dataset_name = f"lakh_{genre}"
+            dataset_name = f"{self._dataset_prefix}_{genre}"
             dest_dir = raw_dir / dataset_name
             dest_dir.mkdir(parents=True, exist_ok=True)
 

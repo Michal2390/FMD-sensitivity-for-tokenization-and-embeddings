@@ -152,6 +152,20 @@ python run_multi_genre_analysis.py   # 4 genres × 32 variants × 10 repeats
 ```
 Produces ANOVA tables, interaction plots, η² heatmaps, and violin plots in `results/reports/lakh_multi/` and `results/plots/paper/`.
 
+### Cross-Dataset Validation
+```bash
+python run_cross_dataset_validation.py                  # All sources (CD1 + MidiCaps)
+python run_cross_dataset_validation.py --source cd1     # Tagtraum CD1 only
+python run_cross_dataset_validation.py --source midicaps # MidiCaps only
+python main.py --mode cross-validate                     # Via main entry point
+python main.py --mode cross-validate --cv-source cd1     # Specific source
+```
+Validates generalizability by repeating the sensitivity analysis on independent data sources:
+- **Lakh + Tagtraum CD1** — same MIDI files, different genre annotator (cross-annotation)
+- **MidiCaps** — independent MIDI dataset with genre tags (cross-dataset)
+
+Produces η² comparison, ranking agreement (Spearman ρ), tokenizer×model heatmaps, and a comprehensive report in `results/reports/cross_validation/`.
+
 ### Starter Data
 ```bash
 python scripts/generate_starter_midis.py --count-per-dataset 120 --bars 16
@@ -180,6 +194,7 @@ python run_ablation_study.py
 | 4 | FMD metric & single-pair analysis | ✅ | 24 |
 | 5 | Ablation study & sensitivity | ✅ | 13 |
 | 6 | Multi-genre analysis & ANOVA | ✅ | — |
+| 7 | Cross-dataset validation (CD1 + MidiCaps) | ✅ | 9 |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
@@ -192,6 +207,8 @@ python run_ablation_study.py
 | [`ANALYSIS_REPORT.md`](results/reports/lakh/ANALYSIS_REPORT.md) | Single-pair (rock vs jazz) full analysis |
 | `multi_genre_fmd.csv` | Raw 1920 FMD observations |
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
+| [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability analysis |
+| `cross_dataset_fmd.csv` | Combined FMD from all sources |
 
 ### Publication Plots
 
@@ -203,6 +220,11 @@ python run_ablation_study.py
 | `multi_eta_sq_comparison` | Factor importance comparison |
 | `multi_fmd_by_pair` | FMD distributions per genre pair |
 | `multi_interaction_per_pair` | Tokenizer×model interaction per pair |
+| `cross_summary_4panel` | Cross-dataset validation overview |
+| `cross_eta_sq_comparison` | η² comparison across data sources |
+| `cross_tok_model_heatmaps` | Tokenizer×model means per source |
+| `cross_ranking_agreement` | Pipeline ranking Spearman ρ |
+| `cross_fmd_violin_by_source` | FMD distributions per source |
 
 ## Documentation
 

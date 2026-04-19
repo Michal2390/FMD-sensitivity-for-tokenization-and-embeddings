@@ -19,6 +19,9 @@ music21>=9.1.0  # MIDI→ABC conversion for CLaMP-1
 # NLP / Sentence Transformers (fallback proxy models)
 sentence-transformers>=2.2.0
 
+# HuggingFace Hub (for MidiCaps dataset download)
+huggingface_hub>=0.20.0
+
 # Visualization
 matplotlib>=3.7.0
 seaborn>=0.12.0

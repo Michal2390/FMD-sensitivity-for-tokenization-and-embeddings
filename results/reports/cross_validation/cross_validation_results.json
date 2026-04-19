@@ -1,0 +1,144 @@
+{
+  "sources": [
+    "lakh_cd2",
+    "midicaps"
+  ],
+  "total_rows": 3840,
+  "eta_squared_by_source": {
+    "lakh_cd2": {
+      "tokenizer": 0.10093887524017564,
+      "model": 0.08647335238115003,
+      "preprocess": 0.020298277326162146
+    },
+    "midicaps": {
+      "tokenizer": 0.12450745568626341,
+      "model": 0.13630325574105429,
+      "preprocess": 0.00027571264725083545
+    }
+  },
+  "ranking_comparisons": {
+    "lakh_cd2 vs midicaps": {
+      "spearman_rho": 0.9208211143695014,
+      "p_value": 8.40672677272755e-14,
+      "n_common": 32
+    }
+  },
+  "cell_means_by_source": {
+    "lakh_cd2": [
+      {
+        "tokenizer": "REMI",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.07488325218049184,
+        "std_fmd": 0.016528277917252164,
+        "n": 240
+      },
+      {
+        "tokenizer": "TSD",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.13390281486014521,
+        "std_fmd": 0.022799740191779033,
+        "n": 240
+      },
+      {
+        "tokenizer": "Octuple",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.18235343784714736,
+        "std_fmd": 0.05480115789822406,
+        "n": 240
+      },
+      {
+        "tokenizer": "MIDI-Like",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.19948681776101387,
+        "std_fmd": 0.05825309974282575,
+        "n": 240
+      },
+      {
+        "tokenizer": "MIDI-Like",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.22323293779045342,
+        "std_fmd": 0.06068401722679047,
+        "n": 240
+      },
+      {
+        "tokenizer": "REMI",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.2378312852233648,
+        "std_fmd": 0.06684799481945819,
+        "n": 240
+      },
+      {
+        "tokenizer": "Octuple",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.2738790735602379,
+        "std_fmd": 0.022015075869155645,
+        "n": 240
+      },
+      {
+        "tokenizer": "TSD",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.2861610986913244,
+        "std_fmd": 0.08295941632160636,
+        "n": 240
+      }
+    ],
+    "midicaps": [
+      {
+        "tokenizer": "REMI",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.08955991165712476,
+        "std_fmd": 0.021131018206723487,
+        "n": 240
+      },
+      {
+        "tokenizer": "TSD",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.22392146500448387,
+        "std_fmd": 0.09174155647203405,
+        "n": 240
+      },
+      {
+        "tokenizer": "Octuple",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.2601866018027067,
+        "std_fmd": 0.06679185504612327,
+        "n": 240
+      },
+      {
+        "tokenizer": "MIDI-Like",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.28951372001320125,
+        "std_fmd": 0.06091508009082142,
+        "n": 240
+      },
+      {
+        "tokenizer": "MIDI-Like",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.32320253513753416,
+        "std_fmd": 0.11318181285620164,
+        "n": 240
+      },
+      {
+        "tokenizer": "REMI",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.3385207841172814,
+        "std_fmd": 0.08577563850574133,
+        "n": 240
+      },
+      {
+        "tokenizer": "Octuple",
+        "model": "CLaMP-2",
+        "mean_fmd": 0.37200391429165997,
+        "std_fmd": 0.07239960033090334,
+        "n": 240
+      },
+      {
+        "tokenizer": "TSD",
+        "model": "CLaMP-1",
+        "mean_fmd": 0.42611248840888344,
+        "std_fmd": 0.10605923621199494,
+        "n": 240
+      }
+    ]
+  }
+}

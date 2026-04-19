@@ -185,6 +185,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "paper-plots",
             "lakh",
             "lakh-plots",
+            "cross-validate",
             "fetch-data",
             "tests",
             "demo",
@@ -212,6 +213,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=None,
         help="Optional list of dataset names for --mode fetch-data",
+    )
+    parser.add_argument(
+        "--cv-source",
+        choices=["cd1", "midicaps", "all"],
+        default="all",
+        dest="cv_source",
+        help="Source for cross-validation mode: cd1, midicaps, or all (default: all)",
     )
     return parser
 
@@ -286,6 +294,17 @@ def main():
             analysis.logger.info("[Progress] 100.0% -> lakh-plots")
             analysis.run_lakh_plots()
             _done(True)
+            return
+
+        if args.mode == "cross-validate":
+            analysis.logger.info("[Progress] 100.0% -> cross-validate")
+            import subprocess as _sp
+            source_arg = getattr(args, "cv_source", "all") or "all"
+            cmd = [sys.executable, "run_cross_dataset_validation.py", "--source", source_arg]
+            result = _sp.run(cmd)
+            _done(result.returncode == 0)
+            if result.returncode != 0:
+                raise SystemExit(result.returncode)
             return
 
         if args.mode == "tests":
