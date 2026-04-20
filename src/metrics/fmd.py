@@ -218,6 +218,45 @@ class FrechetMusicDistance:
             "mean_norm2": mean_norm2,
         }
 
+    def compute_nfmd(
+        self,
+        embeddings1: np.ndarray,
+        embeddings2: np.ndarray,
+    ) -> Dict[str, float]:
+        """Compute Normalized FMD (nFMD) — scale-invariant across model architectures.
+
+        Returns raw FMD plus two normalizations:
+          - nfmd_trace: FMD / (Tr(Σ₁) + Tr(Σ₂))   — normalizes by total embedding variance
+          - nfmd_norm:  FMD / (‖μ₁‖ + ‖μ₂‖)²      — compensates for mean-norm scaling
+
+        Args:
+            embeddings1: First set of embeddings (N x D)
+            embeddings2: Second set of embeddings (M x D)
+
+        Returns:
+            Dict with keys: fmd, nfmd_trace, nfmd_norm, and all components
+            from compute_fmd_components.
+        """
+        components = self.compute_fmd_components(embeddings1, embeddings2)
+        fmd = components["fmd"]
+        trace_sum = components["trace_cov1"] + components["trace_cov2"]
+        norm_sum = components["mean_norm1"] + components["mean_norm2"]
+
+        nfmd_trace = fmd / trace_sum if trace_sum > 1e-12 else 0.0
+        nfmd_norm = fmd / (norm_sum ** 2) if norm_sum > 1e-12 else 0.0
+
+        result = {
+            **components,
+            "nfmd_trace": float(nfmd_trace),
+            "nfmd_norm": float(nfmd_norm),
+        }
+
+        logger.debug(
+            f"nFMD: raw={fmd:.6f}, trace={nfmd_trace:.6f}, norm={nfmd_norm:.6f}"
+        )
+
+        return result
+
     @staticmethod
     def _cov_trace_eigenvalue(cov1: np.ndarray, cov2: np.ndarray) -> float:
         """Fallback: compute Tr(Σ₁+Σ₂-2·(Σ₁Σ₂)^½) via eigenvalue decomposition.

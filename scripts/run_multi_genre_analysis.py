@@ -240,6 +240,19 @@ def main():
     # ── Step 4: Statistical analysis ──────────────────────────────────
     logger.info("\n=== Step 3: Statistical analysis ===")
     df = pd.DataFrame(rows)
+
+    # Filter NaN FMD values (e.g. from ill-conditioned MERT embeddings)
+    n_before = len(df)
+    nan_mask = df["fmd"].isna()
+    if nan_mask.any():
+        nan_by_model = df.loc[nan_mask, "model"].value_counts()
+        nan_by_pair = df.loc[nan_mask, "pair"].value_counts()
+        logger.warning(f"Dropping {nan_mask.sum()}/{n_before} rows with NaN FMD ({nan_mask.sum()/n_before*100:.1f}%)")
+        logger.warning(f"NaN by model:\n{nan_by_model.to_string()}")
+        logger.warning(f"NaN by pair:\n{nan_by_pair.to_string()}")
+        df = df.dropna(subset=["fmd"])
+        logger.info(f"After filtering: {len(df)} rows")
+
     df["preprocess"] = df["remove_velocity"].astype(str) + "_" + df["hard_quantization"].astype(str)
 
     # 4a. Three-way ANOVA with interactions (now possible!)
