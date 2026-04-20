@@ -32,38 +32,38 @@
         "country"
       ]
     ],
-    "n_variants": 48,
+    "n_variants": 64,
     "subsample_size": 100,
     "n_repeats": 10,
-    "total_rows": 2880
+    "total_rows": 3840
   },
   "oneway_anova": [
     {
       "factor": "tokenizer",
-      "F": 19.143184463151808,
-      "p": 2.734670779032107e-12,
-      "eta_sq": 0.019577614646684786,
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN,
       "n_groups": 4
     },
     {
       "factor": "model",
-      "F": 5048.101904665438,
-      "p": 0.0,
-      "eta_sq": 0.7782351960021824,
-      "n_groups": 3
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN,
+      "n_groups": 4
     },
     {
       "factor": "preprocess",
-      "F": 2.1269702325509723,
-      "p": 0.09472678222304125,
-      "eta_sq": 0.002213763862357968,
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN,
       "n_groups": 4
     },
     {
       "factor": "pair",
-      "F": 24.74951088481982,
-      "p": 1.7305650213276358e-24,
-      "eta_sq": 0.04128017859324794,
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN,
       "n_groups": 6
     }
   ],
@@ -71,231 +71,234 @@
     {
       "pair": "electronic_vs_country",
       "factor": "tokenizer",
-      "F": 5.809343047019212,
-      "p": 0.0006631328958058505,
-      "eta_sq": 0.035320306329974294
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "electronic_vs_country",
       "factor": "model",
-      "F": 1670.1354393787403,
-      "p": 3.789202964770803e-216,
-      "eta_sq": 0.8750416160785363
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "electronic_vs_country",
       "factor": "preprocess",
-      "F": 0.21448651667215263,
-      "p": 0.886359395851913,
-      "eta_sq": 0.0013499808654123281
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "jazz_vs_country",
       "factor": "tokenizer",
-      "F": 5.745687180004171,
-      "p": 0.0007236687097535212,
-      "eta_sq": 0.03494680932165559
+      "F": 1.1883175124786376,
+      "p": 0.31334391915182136,
+      "eta_sq": 0.0055740273498292485
     },
     {
       "pair": "jazz_vs_country",
       "factor": "model",
-      "F": 1355.891310451251,
-      "p": 1.6296386280599738e-197,
-      "eta_sq": 0.8504131335660012
+      "F": 8362.021118900217,
+      "p": 0.0,
+      "eta_sq": 0.9752741453443967
     },
     {
       "pair": "jazz_vs_country",
       "factor": "preprocess",
-      "F": 0.5965212486839246,
-      "p": 0.6175318138947299,
-      "eta_sq": 0.003745506142957403
+      "F": 0.4748248010344123,
+      "p": 0.6999189460473895,
+      "eta_sq": 0.0022347344043184797
     },
     {
       "pair": "jazz_vs_electronic",
       "factor": "tokenizer",
-      "F": 2.098346282263565,
-      "p": 0.09960902078235426,
-      "eta_sq": 0.013052257103541172
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "jazz_vs_electronic",
       "factor": "model",
-      "F": 3161.8224524136676,
-      "p": 5.800091449903178e-276,
-      "eta_sq": 0.9298595932186651
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "jazz_vs_electronic",
       "factor": "preprocess",
-      "F": 0.27584365019519164,
-      "p": 0.8428355106985582,
-      "eta_sq": 0.001735493227364287
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "rock_vs_country",
       "factor": "tokenizer",
-      "F": 9.644151104241717,
-      "p": 3.433051446522772e-06,
-      "eta_sq": 0.05729965091945892
+      "F": 0.29188733749057433,
+      "p": 0.8312762788767611,
+      "eta_sq": 0.0013749340172690963
     },
     {
       "pair": "rock_vs_country",
       "factor": "model",
-      "F": 954.554394454311,
-      "p": 1.768117266955022e-167,
-      "eta_sq": 0.8000929369954779
+      "F": 10216.50004801676,
+      "p": 0.0,
+      "eta_sq": 0.9796710937312296
     },
     {
       "pair": "rock_vs_country",
       "factor": "preprocess",
-      "F": 0.6959990839932727,
-      "p": 0.5548280556703704,
-      "eta_sq": 0.004367391074407848
+      "F": 0.8280151129405756,
+      "p": 0.47870659326194653,
+      "eta_sq": 0.0038905362740951897
     },
     {
       "pair": "rock_vs_electronic",
       "factor": "tokenizer",
-      "F": 3.5534218464090386,
-      "p": 0.014401065937832962,
-      "eta_sq": 0.021904943333344404
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "rock_vs_electronic",
       "factor": "model",
-      "F": 2113.5990743727866,
-      "p": 8.685927713464881e-238,
-      "eta_sq": 0.8986012100431614
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "rock_vs_electronic",
       "factor": "preprocess",
-      "F": 0.06660493503629061,
-      "p": 0.9775921175748324,
-      "eta_sq": 0.000419602861858838
+      "F": NaN,
+      "p": NaN,
+      "eta_sq": NaN
     },
     {
       "pair": "rock_vs_jazz",
       "factor": "tokenizer",
-      "F": 6.772642681546618,
-      "p": 0.00017659445598428098,
-      "eta_sq": 0.04093732443775922
+      "F": 0.7186128865232961,
+      "p": 0.5410889110272723,
+      "eta_sq": 0.0033782322889941347
     },
     {
       "pair": "rock_vs_jazz",
       "factor": "model",
-      "F": 1056.6919181905012,
-      "p": 5.486437387726441e-176,
-      "eta_sq": 0.8158574056474922
+      "F": 10396.487700275466,
+      "p": 0.0,
+      "eta_sq": 0.980016001715825
     },
     {
       "pair": "rock_vs_jazz",
       "factor": "preprocess",
-      "F": 1.3680534636100048,
-      "p": 0.251819208056595,
-      "eta_sq": 0.008548479120632932
+      "F": 0.6652288478311643,
+      "p": 0.5736265581511615,
+      "eta_sq": 0.0031280564831176836
     }
   ],
   "cohens_d": {
-    "tokenizer: MIDI-Like vs Octuple": 0.25448128534088194,
-    "tokenizer: MIDI-Like vs REMI": -0.10169690592696644,
-    "tokenizer: MIDI-Like vs TSD": -0.12952584723024066,
-    "tokenizer: Octuple vs REMI": -0.3676919228966452,
-    "tokenizer: Octuple vs TSD": -0.40549224355026287,
-    "tokenizer: REMI vs TSD": -0.026228549047942456,
-    "model: CLaMP-1 vs CLaMP-2": 0.6337273317906137,
-    "model: CLaMP-1 vs MusicBERT": -3.2158463486103592,
-    "model: CLaMP-2 vs MusicBERT": -3.2947629527152285
+    "tokenizer: MIDI-Like vs Octuple": 0.0,
+    "tokenizer: MIDI-Like vs REMI": 0.0,
+    "tokenizer: MIDI-Like vs TSD": 0.0,
+    "tokenizer: Octuple vs REMI": 0.0,
+    "tokenizer: Octuple vs TSD": 0.0,
+    "tokenizer: REMI vs TSD": 0.0,
+    "model: MERT vs MusicBERT": 0.0,
+    "model: MERT vs MusicBERT-large": 0.0,
+    "model: MERT vs NLP-Baseline": 0.0,
+    "model: MusicBERT vs MusicBERT-large": -4.281697557787084,
+    "model: MusicBERT vs NLP-Baseline": 6.135650407802658,
+    "model: MusicBERT-large vs NLP-Baseline": 9.826615911369537
   },
   "permutation_tests": {
     "tokenizer": {
-      "F": 19.143184463151808,
+      "F": NaN,
       "p_perm": 0.000999000999000999
     },
     "model": {
-      "F": 5048.101904665438,
+      "F": NaN,
       "p_perm": 0.000999000999000999
     },
     "preprocess": {
-      "F": 2.1269702325509723,
-      "p_perm": 0.0959040959040959
+      "F": NaN,
+      "p_perm": 0.000999000999000999
     }
   },
   "per_pair_stats": [
     {
       "pair": "electronic_vs_country",
-      "mean_fmd": 1.2866756436570237,
-      "std_fmd": 1.5395855573811257,
-      "n": 480
+      "mean_fmd": 9.26528152706805,
+      "std_fmd": 7.447682379957426,
+      "n": 640
     },
     {
       "pair": "jazz_vs_country",
-      "mean_fmd": 0.6125977805893247,
-      "std_fmd": 0.6973167913838205,
-      "n": 480
+      "mean_fmd": 6.219889028108446,
+      "std_fmd": 4.617333516660559,
+      "n": 640
     },
     {
       "pair": "jazz_vs_electronic",
-      "mean_fmd": 1.0916700274373095,
-      "std_fmd": 1.2524969748185388,
-      "n": 480
+      "mean_fmd": 8.809120641879169,
+      "std_fmd": 7.195922096966272,
+      "n": 640
     },
     {
       "pair": "rock_vs_country",
-      "mean_fmd": 0.842801691715916,
-      "std_fmd": 1.0365806381533058,
-      "n": 480
+      "mean_fmd": 7.184722289518686,
+      "std_fmd": 5.35585879858239,
+      "n": 640
     },
     {
       "pair": "rock_vs_electronic",
-      "mean_fmd": 0.8165797202770287,
-      "std_fmd": 0.95730587460674,
-      "n": 480
+      "mean_fmd": 7.770768429104431,
+      "std_fmd": 6.366993471825718,
+      "n": 640
     },
     {
       "pair": "rock_vs_jazz",
-      "mean_fmd": 0.7296927913169687,
-      "std_fmd": 0.8674358312146404,
-      "n": 480
+      "mean_fmd": 7.088538904441521,
+      "std_fmd": 5.216065281510762,
+      "n": 640
     }
   ],
   "eta_sq_bootstrap_ci": {
     "tokenizer": {
-      "point": 0.019577614646684786,
-      "ci_lower": 0.013293482924095242,
-      "ci_upper": 0.029026117311216567
+      "point": NaN,
+      "ci_lower": NaN,
+      "ci_upper": NaN
     },
     "model": {
-      "point": 0.7782351960021824,
-      "ci_lower": 0.7637465818527428,
-      "ci_upper": 0.7926646405702032
+      "point": NaN,
+      "ci_lower": NaN,
+      "ci_upper": NaN
     },
     "preprocess": {
-      "point": 0.002213763862357968,
-      "ci_lower": 0.0004843423803138365,
-      "ci_upper": 0.007811574746086159
+      "point": NaN,
+      "ci_lower": NaN,
+      "ci_upper": NaN
     },
     "tokenizer:model": {
-      "point": 0.8484078933037967,
-      "ci_lower": 0.8339063151368576,
-      "ci_upper": 0.8637076416201519
+      "point": NaN,
+      "ci_lower": NaN,
+      "ci_upper": NaN
     }
   },
   "threeway_eta_sq": {
-    "C(tokenizer)": 0.019577614646682173,
-    "C(model)": 0.7782351960021882,
-    "C(preprocess)": 0.002213763862358208,
-    "C(tokenizer):C(model)": 0.050595082654928895,
-    "C(tokenizer):C(preprocess)": 0.00092410955930572,
-    "C(model):C(preprocess)": 0.002649843529867388,
-    "C(tokenizer):C(model):C(preprocess)": 0.0014929868575887797
+    "C(tokenizer)": 0.0029235352665207843,
+    "C(model)": 0.9390631767777569,
+    "C(preprocess)": 0.0024895600244397523,
+    "C(tokenizer):C(model)": 0.004327473451194599,
+    "C(tokenizer):C(preprocess)": 0.000586393542834194,
+    "C(model):C(preprocess)": 0.0029340761726986938,
+    "C(tokenizer):C(model):C(preprocess)": 0.0007499849955635462
   },
   "threeway_partial_eta_sq": {
-    "C(tokenizer)": 0.11945653797484619,
-    "C(model)": 0.8435727766371592,
-    "C(preprocess)": 0.01510842069979549,
-    "C(tokenizer):C(model)": 0.2595864499543489,
-    "C(tokenizer):C(preprocess)": 0.0063628347071578275,
-    "C(model):C(preprocess)": 0.018030899944529864,
-    "C(tokenizer):C(model):C(preprocess)": 0.010239656434235462
+    "C(tokenizer)": 0.05864742758229516,
+    "C(model)": 0.9524073789005828,
+    "C(preprocess)": 0.05038028732051608,
+    "C(tokenizer):C(model)": 0.0844331138150648,
+    "C(tokenizer):C(preprocess)": 0.012341959020617133,
+    "C(model):C(preprocess)": 0.05884643949234871,
+    "C(tokenizer):C(model):C(preprocess)": 0.01573094180341896
   }
 }

@@ -12,8 +12,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from embeddings.extractor import (
     EmbeddingFactory,
-    CLaMP1Model,
-    CLaMP2Model,
+    MusicBERTModel,
+    MusicBERTLargeModel,
+    NLPBaselineModel,
+    MERTModel,
     EmbeddingExtractor,
     EmbeddingAnalyzer,
 )
@@ -23,17 +25,17 @@ from utils.config import load_config
 class TestEmbeddingFactory:
     """Test EmbeddingFactory class."""
 
-    def test_create_clamp1_model(self):
-        """Test creating CLaMP-1 model."""
+    def test_create_musicbert_model(self):
+        """Test creating MusicBERT model."""
         config = load_config("configs/config.yaml")
-        model = EmbeddingFactory.create_model(config, "CLaMP-1")
-        assert isinstance(model, CLaMP1Model)
+        model = EmbeddingFactory.create_model(config, "MusicBERT")
+        assert isinstance(model, MusicBERTModel)
 
-    def test_create_clamp2_model(self):
-        """Test creating CLaMP-2 model."""
+    def test_create_musicbert_large_model(self):
+        """Test creating MusicBERT-large model."""
         config = load_config("configs/config.yaml")
-        model = EmbeddingFactory.create_model(config, "CLaMP-2")
-        assert isinstance(model, CLaMP2Model)
+        model = EmbeddingFactory.create_model(config, "MusicBERT-large")
+        assert isinstance(model, MusicBERTLargeModel)
 
     def test_unknown_model(self):
         """Test error handling for unknown model."""
@@ -44,26 +46,28 @@ class TestEmbeddingFactory:
     def test_get_available_models(self):
         """Test getting list of available models."""
         models = EmbeddingFactory.get_available_models()
-        assert "CLaMP-1" in models
-        assert "CLaMP-2" in models
-        assert len(models) >= 2
+        assert "MusicBERT" in models
+        assert "MusicBERT-large" in models
+        assert "MERT" in models
+        assert "NLP-Baseline" in models
+        assert len(models) == 4
 
 
-class TestCLaMP1Model:
-    """Test CLaMP 1 model."""
+class TestMusicBERTModel:
+    """Test MusicBERT model."""
 
     def test_model_initialization(self):
-        """Test CLaMP-1 model initialization."""
+        """Test MusicBERT model initialization."""
         config = load_config("configs/config.yaml")
-        model = CLaMP1Model(config)
-        assert model.model_name == "CLaMP-1"
+        model = MusicBERTModel(config)
+        assert model.model_name == "MusicBERT"
         assert model.embedding_dim > 0
 
     def test_encode_single_sequence(self):
         """Test encoding single token sequence."""
         config = load_config("configs/config.yaml")
-        model = CLaMP1Model(config)
-        
+        model = MusicBERTModel(config)
+
         tokens = [1, 2, 3, 4, 5]
         embedding = model.encode(tokens)
         
@@ -74,8 +78,8 @@ class TestCLaMP1Model:
     def test_encode_empty_sequence(self):
         """Test encoding empty token sequence."""
         config = load_config("configs/config.yaml")
-        model = CLaMP1Model(config)
-        
+        model = MusicBERTModel(config)
+
         tokens = []
         embedding = model.encode(tokens)
         
@@ -85,8 +89,8 @@ class TestCLaMP1Model:
     def test_encode_batch(self):
         """Test batch encoding."""
         config = load_config("configs/config.yaml")
-        model = CLaMP1Model(config)
-        
+        model = MusicBERTModel(config)
+
         token_sequences = [
             [1, 2, 3],
             [4, 5, 6],
@@ -101,58 +105,11 @@ class TestCLaMP1Model:
     def test_get_embedding_dim(self):
         """Test getting embedding dimension."""
         config = load_config("configs/config.yaml")
-        model = CLaMP1Model(config)
-        
+        model = MusicBERTModel(config)
+
         dim = model.get_embedding_dim()
         assert dim > 0
         assert isinstance(dim, int)
-
-
-class TestCLaMP2Model:
-    """Test CLaMP 2 model."""
-
-    def test_model_initialization(self):
-        """Test CLaMP-2 model initialization."""
-        config = load_config("configs/config.yaml")
-        model = CLaMP2Model(config)
-        assert model.model_name == "CLaMP-2"
-        assert model.embedding_dim > 0
-
-    def test_encode_single_sequence(self):
-        """Test encoding single token sequence."""
-        config = load_config("configs/config.yaml")
-        model = CLaMP2Model(config)
-        
-        tokens = [1, 2, 3, 4, 5]
-        embedding = model.encode(tokens)
-        
-        assert isinstance(embedding, np.ndarray)
-        assert embedding.shape == (model.embedding_dim,)
-        assert embedding.dtype == np.float32
-
-    def test_encode_batch(self):
-        """Test batch encoding."""
-        config = load_config("configs/config.yaml")
-        model = CLaMP2Model(config)
-        
-        token_sequences = [
-            [10, 20, 30],
-            [40, 50, 60],
-            [70, 80, 90],
-        ]
-        embeddings = model.encode_batch(token_sequences)
-        
-        assert isinstance(embeddings, np.ndarray)
-        assert embeddings.shape == (3, model.embedding_dim)
-        assert embeddings.dtype == np.float32
-
-    def test_get_embedding_dim(self):
-        """Test getting embedding dimension."""
-        config = load_config("configs/config.yaml")
-        model = CLaMP2Model(config)
-        
-        dim = model.get_embedding_dim()
-        assert dim > 0
 
 
 class TestEmbeddingExtractor:
@@ -164,8 +121,8 @@ class TestEmbeddingExtractor:
         extractor = EmbeddingExtractor(config)
         
         assert extractor.models is not None
-        assert "CLaMP-1" in extractor.models
-        assert "CLaMP-2" in extractor.models
+        assert "MusicBERT" in extractor.models
+        assert "MERT" in extractor.models
 
     def test_extract_embeddings(self):
         """Test extracting embeddings."""
@@ -177,25 +134,25 @@ class TestEmbeddingExtractor:
             [6, 7, 8, 9, 10],
         ]
         
-        embeddings = extractor.extract_embeddings(token_sequences, "CLaMP-2")
-        
+        embeddings = extractor.extract_embeddings(token_sequences, "MusicBERT")
+
         assert isinstance(embeddings, np.ndarray)
         assert embeddings.shape[0] == 2
         assert embeddings.dtype == np.float32
 
-    def test_extract_embeddings_both_models(self):
-        """Test extracting embeddings with both models."""
+    def test_extract_embeddings_multiple_models(self):
+        """Test extracting embeddings with multiple models."""
         config = load_config("configs/config.yaml")
         extractor = EmbeddingExtractor(config)
         
         token_sequences = [[1, 2, 3, 4, 5]]
         
-        emb1 = extractor.extract_embeddings(token_sequences, "CLaMP-1")
-        emb2 = extractor.extract_embeddings(token_sequences, "CLaMP-2")
-        
-        assert emb1.shape == emb2.shape
-        # Embeddings should be different for different models (in real scenario)
-        # but may be same for dummy implementations
+        emb1 = extractor.extract_embeddings(token_sequences, "MusicBERT")
+        emb2 = extractor.extract_embeddings(token_sequences, "NLP-Baseline")
+
+        # Both should produce valid embeddings
+        assert emb1.shape[0] == 1
+        assert emb2.shape[0] == 1
 
     def test_unknown_model_error(self):
         """Test error handling for unknown model."""
@@ -214,11 +171,11 @@ class TestEmbeddingExtractor:
         token_sequences = [[1, 2, 3, 4, 5]]
         
         # First extraction
-        emb1 = extractor.extract_embeddings(token_sequences, "CLaMP-2")
-        
+        emb1 = extractor.extract_embeddings(token_sequences, "MusicBERT")
+
         # Second extraction (should use cache)
-        emb2 = extractor.extract_embeddings(token_sequences, "CLaMP-2")
-        
+        emb2 = extractor.extract_embeddings(token_sequences, "MusicBERT")
+
         # Should be identical due to caching
         np.testing.assert_array_equal(emb1, emb2)
 
@@ -231,9 +188,9 @@ class TestEmbeddingExtractor:
         token_sequences1 = [[1, 2, 3, 4, 5]]
         token_sequences2 = [[6, 7, 8, 9, 10]]
         
-        emb1 = extractor.extract_embeddings(token_sequences1, "CLaMP-2")
-        emb2 = extractor.extract_embeddings(token_sequences2, "CLaMP-2")
-        
+        emb1 = extractor.extract_embeddings(token_sequences1, "MusicBERT")
+        emb2 = extractor.extract_embeddings(token_sequences2, "MusicBERT")
+
         # Should be different (cache miss)
         assert not np.allclose(emb1[0], emb2[0])
 
@@ -291,11 +248,11 @@ class TestEmbeddingExtractor:
             
             # Extract embeddings
             output_dir = tmp_path / "embeddings"
-            stats = extractor.extract_dataset_embeddings(token_files, output_dir, "CLaMP-2")
-            
+            stats = extractor.extract_dataset_embeddings(token_files, output_dir, "MusicBERT")
+
             assert stats["successful"] == 3
             assert stats["failed"] == 0
-            assert stats["model"] == "CLaMP-2"
+            assert stats["model"] == "MusicBERT"
             assert len(list(output_dir.glob("*.npy"))) == 3
 
 

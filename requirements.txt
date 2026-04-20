@@ -15,6 +15,7 @@ miditok>=3.0.0
 pretty_midi>=0.2.10
 symusic>=0.4.0
 music21>=9.1.0  # MIDI→ABC conversion for CLaMP-1
+midi2audio>=0.4.0  # MIDI→audio synthesis for MERT (requires FluidSynth)
 
 # NLP / Sentence Transformers (fallback proxy models)
 sentence-transformers>=2.2.0

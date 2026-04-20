@@ -78,18 +78,22 @@ tokenization:
 # Embedding Model Configuration
 embeddings:
   models:
-    - name: "CLaMP-1"
-      model_name: "clamp-1"
-      hf_model_name: "sander-wood/clamp-small-512"
-      format_type: "abc"  # ABC notation via music21
-    - name: "CLaMP-2"
-      model_name: "clamp-2"
-      hf_model_name: "shanghaicai/CLaMP2"
-      format_type: "midi"  # Direct MIDI structure
     - name: "MusicBERT"
       model_name: "musicbert"
-      hf_model_name: "m-a-p/MusicBERT-base"
-      format_type: "token_text"  # Token IDs as text (fallback: bert-base-uncased)
+      hf_model_name: "manoskary/musicbert"
+      format_type: "token_text"  # Symbolic music BERT (768-dim, vocab=540)
+    - name: "MusicBERT-large"
+      model_name: "musicbert-large"
+      hf_model_name: "manoskary/musicbert-large"
+      format_type: "token_text"  # Larger symbolic music BERT (1024-dim, vocab=540)
+    - name: "MERT"
+      model_name: "mert"
+      hf_model_name: "m-a-p/MERT-v1-95M"
+      format_type: "audio"  # Audio-based model (MIDI→audio→embedding, 768-dim)
+    - name: "NLP-Baseline"
+      model_name: "nlp-baseline"
+      hf_model_name: "sentence-transformers/all-mpnet-base-v2"
+      format_type: "token_text"  # General NLP baseline control (768-dim)
   # Embedding extraction settings
   batch_size: 32
   device: "auto"  # auto -> CUDA when available, otherwise CPU
@@ -113,16 +117,16 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
       - tokenizer: "TSD"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
       - tokenizer: "Octuple"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
       - tokenizer: "MIDI-Like"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
 
   exp2_model_sensitivity:
@@ -131,10 +135,16 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "CLaMP-1"
+        model: "MusicBERT"
         dataset: "maestro"
       - tokenizer: "REMI"
-        model: "CLaMP-2"
+        model: "MusicBERT-large"
+        dataset: "maestro"
+      - tokenizer: "REMI"
+        model: "MERT"
+        dataset: "maestro"
+      - tokenizer: "REMI"
+        model: "NLP-Baseline"
         dataset: "maestro"
 
   exp3_expression_ablation:
@@ -143,11 +153,11 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
         remove_velocity: false
       - tokenizer: "REMI"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
         remove_velocity: true
 
@@ -157,11 +167,11 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
         hard_quantization: false
       - tokenizer: "REMI"
-        model: "CLaMP-2"
+        model: "MusicBERT"
         dataset: "maestro"
         hard_quantization: true
 
@@ -184,7 +194,7 @@ experiments:
       - ("maestro", "midicaps")
       - ("pop909", "midicaps")
     tokenizer: "REMI"
-    model: "CLaMP-2"
+    model: "MusicBERT"
 
 # Evaluation Configuration
 evaluation:

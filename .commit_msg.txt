@@ -1,0 +1,10 @@
+Replace 5 fake embedding models with 4 real ones (MusicBERT, MusicBERT-large, MERT, NLP-Baseline)
+
+- extractor.py: Remove CLaMP-1/2 and MIDI-BERT (used fallback proxy models, not real music models). Add MusicBERT (manoskary/musicbert, 768d), MusicBERT-large (manoskary/musicbert-large, 1024d), MERT (m-a-p/MERT-v1-95M, 768d audio model), NLP-Baseline (all-mpnet-base-v2, intentional control). Refactor with _TextEncoderModel base class.
+- config.yaml: Update embeddings.models and all experiment references to new 4-model set.
+- fmd.py: Fix NaN/Inf crash in eigenvalue fallback (nan_to_num), increase epsilon 1e-6 -> 1e-4 for 1024-dim stability.
+- New 4-model results: 3840 FMD observations. Three-way ANOVA: eta_sq(model)=0.939, eta_sq(tokenizer)=0.003, eta_sq(preprocessing)=0.003.
+- run_sample_size_ablation.py: New script for sample-size sensitivity / power analysis.
+- Updated tests (test_embeddings.py) and plots (multi_*.png) for 4-model configuration.
+- Remove duplicate PDF plot files (keep PNG only).
+

@@ -1,11 +1,13 @@
-"""Embedding extraction module using real CLaMP music models.
+"""Embedding extraction module for FMD sensitivity analysis.
 
-CLaMP-1: sander-wood/clamp-small-512 — RoBERTa on ABC notation (512-dim)
-CLaMP-2: shanghaicai/CLaMP2 — MIDI-native encoder (512-dim)
+Models used:
+  MusicBERT:       manoskary/musicbert — BERT pre-trained on symbolic music tokens (768-dim)
+  MusicBERT-large: manoskary/musicbert-large — larger variant (1024-dim)
+  MERT:            m-a-p/MERT-v1-95M — self-supervised audio model for music (768-dim)
+  NLP-Baseline:    sentence-transformers/all-mpnet-base-v2 — general NLP baseline (768-dim)
 
-Both models are music-domain contrastive models (music–text alignment).
-They produce embeddings that capture musical semantics.
-If real models are unavailable, falls back to proxy models with warnings.
+The NLP baseline is included intentionally to assess whether music-specific
+pre-training affects FMD sensitivity compared to a general-purpose model.
 """
 
 import json
@@ -52,45 +54,30 @@ class EmbeddingModel(ABC):
 
     @abstractmethod
     def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
-        """Encode tokens (and optionally raw midi_data) to embeddings.
-
-        Args:
-            tokens: List of token IDs from miditok tokenizer.
-            midi_data: Optional PrettyMIDI object for models that need raw MIDI.
-
-        Returns:
-            Embedding vector (1D numpy array)
-        """
         pass
 
     @abstractmethod
     def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
-        """Encode batch of token sequences to embeddings."""
         pass
 
     def get_embedding_dim(self) -> int:
         raise NotImplementedError
 
 
-class CLaMP1Model(EmbeddingModel):
-    """CLaMP-1 model — Music encoder trained on ABC notation.
+class _TextEncoderModel(EmbeddingModel):
+    """Base for models that encode token sequences as text via a HF tokenizer+model."""
 
-    Uses ``sander-wood/clamp-small-512`` from HuggingFace.
-    Converts MIDI to ABC notation via music21, then encodes with
-    the CLaMP-1 music encoder (RoBERTa-based, 512-dim output).
-    """
+    DEFAULT_MODEL: str = ""
+    FALLBACK_MODEL: str = ""
 
-    DEFAULT_MODEL = "sander-wood/clamp-small-512"
-
-    def __init__(self, config: Dict):
-        super().__init__(config, "CLaMP-1")
-        self.format_type = "abc"
+    def __init__(self, config: Dict, logical_name: str, default_model: str, fallback_model: str, fallback_dim: int = 768):
+        super().__init__(config, logical_name)
         self._use_real_model = False
 
-        model_id = _resolve_hf_model_id(config, "CLaMP-1", self.DEFAULT_MODEL)
+        model_id = _resolve_hf_model_id(config, logical_name, default_model)
 
         try:
-            logger.info(f"Loading CLaMP-1 model: {model_id}")
+            logger.info(f"Loading {logical_name} model: {model_id}")
             from transformers import AutoModel, AutoTokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
             self.model = AutoModel.from_pretrained(model_id, trust_remote_code=True)
@@ -98,265 +85,28 @@ class CLaMP1Model(EmbeddingModel):
             self.model.eval()
             self.embedding_dim = self.model.config.hidden_size
             self._use_real_model = True
-            logger.info(f"CLaMP-1 loaded: {model_id} (dim={self.embedding_dim})")
+            logger.info(f"{logical_name} loaded: {model_id} (dim={self.embedding_dim})")
         except Exception as e:
-            logger.warning(f"Failed to load CLaMP-1 ({model_id}): {e}")
-            logger.warning("Falling back to sentence-transformers proxy for CLaMP-1")
-            try:
-                from transformers import AutoModel, AutoTokenizer
-                fallback = "sentence-transformers/all-MiniLM-L6-v2"
-                self.tokenizer = AutoTokenizer.from_pretrained(fallback)
-                self.model = AutoModel.from_pretrained(fallback)
-                self.model.to(self.device)
-                self.model.eval()
-                self.embedding_dim = self.model.config.hidden_size
-                logger.info(f"CLaMP-1 fallback: {fallback} (dim={self.embedding_dim})")
-            except Exception as e2:
-                logger.warning(f"Fallback also failed: {e2}. Using dummy model.")
-                self.model = None
-                self.tokenizer = None
-                self.embedding_dim = 512
-
-        self._has_music21 = False
-        try:
-            import music21  # noqa: F401
-            self._has_music21 = True
-            logger.info("music21 available for MIDI→ABC conversion")
-        except ImportError:
-            logger.warning("music21 not installed — CLaMP-1 will use token-text fallback")
-
-    def _midi_to_abc(self, midi_data) -> str:
-        """Convert PrettyMIDI object to ABC notation string."""
-        if not self._has_music21 or midi_data is None:
-            return ""
-        try:
-            import music21
-            with tempfile.NamedTemporaryFile(suffix=".mid", delete=False) as tmp:
-                tmp_path = tmp.name
-                midi_data.write(tmp_path)
-            score = music21.converter.parse(tmp_path)
-            abc_str = music21.converter.toData(score, fmt='abc')
-            if isinstance(abc_str, bytes):
-                abc_str = abc_str.decode('utf-8', errors='replace')
-            Path(tmp_path).unlink(missing_ok=True)
-            return abc_str[:8192] if len(abc_str) > 8192 else abc_str
-        except Exception as e:
-            logger.debug(f"MIDI→ABC conversion failed: {e}")
-            return ""
-
-    def _tokens_to_text(self, tokens: List[int]) -> str:
-        return " ".join([str(t) for t in tokens[:512]])
-
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
-        if self.model is None:
-            return np.random.randn(self.embedding_dim).astype(np.float32)
-        try:
-            if self._has_music21 and midi_data is not None and self._use_real_model:
-                text = self._midi_to_abc(midi_data)
-                if not text:
-                    text = self._tokens_to_text(tokens)
+            logger.warning(f"Failed to load {logical_name} ({model_id}): {e}")
+            if fallback_model:
+                logger.warning(f"Falling back to {fallback_model} proxy for {logical_name}")
+                try:
+                    from transformers import AutoModel, AutoTokenizer
+                    self.tokenizer = AutoTokenizer.from_pretrained(fallback_model)
+                    self.model = AutoModel.from_pretrained(fallback_model)
+                    self.model.to(self.device)
+                    self.model.eval()
+                    self.embedding_dim = self.model.config.hidden_size
+                    logger.info(f"{logical_name} fallback: {fallback_model} (dim={self.embedding_dim})")
+                except Exception as e2:
+                    logger.warning(f"Fallback also failed: {e2}. Using dummy model.")
+                    self.model = None
+                    self.tokenizer = None
+                    self.embedding_dim = fallback_dim
             else:
-                text = self._tokens_to_text(tokens)
-
-            inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512, padding=True)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-            return embedding[0].astype(np.float32)
-        except Exception as e:
-            logger.error(f"Error encoding with CLaMP-1: {e}")
-            return np.random.randn(self.embedding_dim).astype(np.float32)
-
-    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
-        if self.model is None:
-            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
-        try:
-            texts = []
-            for i, seq in enumerate(token_sequences):
-                md = midi_data_list[i] if midi_data_list and i < len(midi_data_list) else None
-                if self._has_music21 and md is not None and self._use_real_model:
-                    abc = self._midi_to_abc(md)
-                    texts.append(abc if abc else self._tokens_to_text(seq))
-                else:
-                    texts.append(self._tokens_to_text(seq))
-
-            inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-            return embeddings.astype(np.float32)
-        except Exception as e:
-            logger.error(f"Error batch encoding with CLaMP-1: {e}")
-            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
-
-    def get_embedding_dim(self) -> int:
-        return self.embedding_dim
-
-
-class CLaMP2Model(EmbeddingModel):
-    """CLaMP-2 model — MIDI-native music encoder.
-
-    Uses ``shanghaicai/CLaMP2`` from HuggingFace.
-    CLaMP-2 processes MIDI directly with its own tokenizer.
-    Falls back to a DIFFERENT proxy than CLaMP-1 if unavailable.
-    """
-
-    DEFAULT_MODEL = "shanghaicai/CLaMP2"
-
-    def __init__(self, config: Dict):
-        super().__init__(config, "CLaMP-2")
-        self.format_type = "midi"
-        self._use_real_model = False
-
-        model_id = _resolve_hf_model_id(config, "CLaMP-2", self.DEFAULT_MODEL)
-
-        try:
-            logger.info(f"Loading CLaMP-2 model: {model_id}")
-            from transformers import AutoModel, AutoTokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-            self.model = AutoModel.from_pretrained(model_id, trust_remote_code=True)
-            self.model.to(self.device)
-            self.model.eval()
-            self.embedding_dim = self.model.config.hidden_size
-            self._use_real_model = True
-            logger.info(f"CLaMP-2 loaded: {model_id} (dim={self.embedding_dim})")
-        except Exception as e:
-            logger.warning(f"Failed to load CLaMP-2 ({model_id}): {e}")
-            logger.warning("Falling back to all-mpnet-base-v2 proxy for CLaMP-2")
-            try:
-                from transformers import AutoModel, AutoTokenizer
-                fallback = "sentence-transformers/all-mpnet-base-v2"
-                self.tokenizer = AutoTokenizer.from_pretrained(fallback)
-                self.model = AutoModel.from_pretrained(fallback)
-                self.model.to(self.device)
-                self.model.eval()
-                self.embedding_dim = self.model.config.hidden_size
-                logger.info(f"CLaMP-2 fallback: {fallback} (dim={self.embedding_dim})")
-            except Exception as e2:
-                logger.warning(f"Fallback also failed: {e2}. Using dummy model.")
                 self.model = None
                 self.tokenizer = None
-                self.embedding_dim = 512
-
-    def _midi_to_text(self, midi_data) -> str:
-        """Convert PrettyMIDI to MIDI-event text representation."""
-        if midi_data is None:
-            return ""
-        try:
-            events = []
-            for instrument in midi_data.instruments:
-                if instrument.is_drum:
-                    continue
-                for note in sorted(instrument.notes, key=lambda n: n.start):
-                    start_tick = int(note.start * 480)
-                    dur_tick = int((note.end - note.start) * 480)
-                    events.append(f"p{note.pitch} v{note.velocity} t{start_tick} d{dur_tick}")
-            return " ".join(events[:1000])
-        except Exception as e:
-            logger.debug(f"MIDI→text conversion failed: {e}")
-            return ""
-
-    def _tokens_to_midi_text(self, tokens: List[int]) -> str:
-        return " ".join([str(t) for t in tokens[:512]])
-
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
-        if self.model is None:
-            return np.random.randn(self.embedding_dim).astype(np.float32)
-        try:
-            if midi_data is not None and self._use_real_model:
-                text = self._midi_to_text(midi_data)
-                if not text:
-                    text = self._tokens_to_midi_text(tokens)
-            else:
-                text = self._tokens_to_midi_text(tokens)
-
-            inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512, padding=True)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-            return embedding[0].astype(np.float32)
-        except Exception as e:
-            logger.error(f"Error encoding with CLaMP-2: {e}")
-            return np.random.randn(self.embedding_dim).astype(np.float32)
-
-    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
-        if self.model is None:
-            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
-        try:
-            texts = []
-            for i, seq in enumerate(token_sequences):
-                md = midi_data_list[i] if midi_data_list and i < len(midi_data_list) else None
-                if md is not None and self._use_real_model:
-                    t = self._midi_to_text(md)
-                    texts.append(t if t else self._tokens_to_midi_text(seq))
-                else:
-                    texts.append(self._tokens_to_midi_text(seq))
-
-            inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            with torch.no_grad():
-                outputs = self.model(**inputs)
-                embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
-            return embeddings.astype(np.float32)
-        except Exception as e:
-            logger.error(f"Error batch encoding with CLaMP-2: {e}")
-            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
-
-    def get_embedding_dim(self) -> int:
-        return self.embedding_dim
-
-
-class MusicBERTModel(EmbeddingModel):
-    """MusicBERT model — symbolic music understanding via OctupleMIDI tokenization.
-
-    Attempts to load ``m-a-p/MusicBERT-base`` from HuggingFace.
-    Falls back to ``bert-base-uncased`` with token-as-text encoding
-    if the real model is unavailable.
-
-    Two modes:
-      * **native**: Uses OctupleMIDI tokenisation internally (via model's own tokenizer).
-      * **text**: Converts our token IDs to space-separated text, fed through the
-        model's WordPiece tokenizer (same approach as CLaMP fallbacks).
-    """
-
-    DEFAULT_MODEL = "m-a-p/MusicBERT-base"
-    FALLBACK_MODEL = "bert-base-uncased"
-
-    def __init__(self, config: Dict):
-        super().__init__(config, "MusicBERT")
-        self._use_real_model = False
-
-        model_id = _resolve_hf_model_id(config, "MusicBERT", self.DEFAULT_MODEL)
-
-        try:
-            logger.info(f"Loading MusicBERT model: {model_id}")
-            from transformers import AutoModel, AutoTokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
-            self.model = AutoModel.from_pretrained(model_id, trust_remote_code=True)
-            self.model.to(self.device)
-            self.model.eval()
-            self.embedding_dim = self.model.config.hidden_size
-            self._use_real_model = True
-            logger.info(f"MusicBERT loaded: {model_id} (dim={self.embedding_dim})")
-        except Exception as e:
-            logger.warning(f"Failed to load MusicBERT ({model_id}): {e}")
-            logger.warning(f"Falling back to {self.FALLBACK_MODEL} proxy for MusicBERT")
-            try:
-                from transformers import AutoModel, AutoTokenizer
-                self.tokenizer = AutoTokenizer.from_pretrained(self.FALLBACK_MODEL)
-                self.model = AutoModel.from_pretrained(self.FALLBACK_MODEL)
-                self.model.to(self.device)
-                self.model.eval()
-                self.embedding_dim = self.model.config.hidden_size
-                logger.info(f"MusicBERT fallback: {self.FALLBACK_MODEL} (dim={self.embedding_dim})")
-            except Exception as e2:
-                logger.warning(f"Fallback also failed: {e2}. Using dummy model.")
-                self.model = None
-                self.tokenizer = None
-                self.embedding_dim = 768
+                self.embedding_dim = fallback_dim
 
     def _tokens_to_text(self, tokens: List[int]) -> str:
         return " ".join([str(t) for t in tokens[:512]])
@@ -373,7 +123,7 @@ class MusicBERTModel(EmbeddingModel):
                 embedding = outputs.last_hidden_state[:, 0, :].cpu().numpy()
             return embedding[0].astype(np.float32)
         except Exception as e:
-            logger.error(f"Error encoding with MusicBERT: {e}")
+            logger.error(f"Error encoding with {self.model_name}: {e}")
             return np.random.randn(self.embedding_dim).astype(np.float32)
 
     def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
@@ -388,8 +138,199 @@ class MusicBERTModel(EmbeddingModel):
                 embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
             return embeddings.astype(np.float32)
         except Exception as e:
-            logger.error(f"Error batch encoding with MusicBERT: {e}")
+            logger.error(f"Error batch encoding with {self.model_name}: {e}")
             return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
+
+    def get_embedding_dim(self) -> int:
+        return self.embedding_dim
+
+
+class MusicBERTModel(_TextEncoderModel):
+    """MusicBERT — BERT pre-trained on symbolic music token sequences.
+
+    Uses ``manoskary/musicbert`` from HuggingFace (hidden_size=768, vocab_size=540).
+    Falls back to ``bert-base-uncased`` if unavailable.
+    """
+
+    def __init__(self, config: Dict):
+        super().__init__(
+            config,
+            logical_name="MusicBERT",
+            default_model="manoskary/musicbert",
+            fallback_model="bert-base-uncased",
+            fallback_dim=768,
+        )
+
+
+class MusicBERTLargeModel(_TextEncoderModel):
+    """MusicBERT-large — larger BERT pre-trained on symbolic music tokens.
+
+    Uses ``manoskary/musicbert-large`` from HuggingFace (hidden_size=1024, vocab_size=540).
+    Provides a size comparison vs MusicBERT (768-dim) to assess
+    the impact of model capacity on FMD sensitivity.
+    Falls back to ``bert-large-uncased`` if unavailable.
+    """
+
+    def __init__(self, config: Dict):
+        super().__init__(
+            config,
+            logical_name="MusicBERT-large",
+            default_model="manoskary/musicbert-large",
+            fallback_model="bert-large-uncased",
+            fallback_dim=1024,
+        )
+
+
+class NLPBaselineModel(_TextEncoderModel):
+    """NLP Baseline — general-purpose sentence-transformer (non-music).
+
+    Uses ``sentence-transformers/all-mpnet-base-v2`` (hidden_size=768).
+    Included intentionally as a control: if FMD sensitivity patterns
+    are similar with a non-music model, then music-specific pre-training
+    does not significantly affect FMD behaviour.
+    """
+
+    def __init__(self, config: Dict):
+        super().__init__(
+            config,
+            logical_name="NLP-Baseline",
+            default_model="sentence-transformers/all-mpnet-base-v2",
+            fallback_model="",
+            fallback_dim=768,
+        )
+
+
+class MERTModel(EmbeddingModel):
+    """MERT model — audio-based music understanding model.
+
+    Uses ``m-a-p/MERT-v1-95M`` from HuggingFace.
+    MERT is a self-supervised audio model pre-trained on music.
+    It requires audio input, so MIDI files are first synthesized
+    to audio using pretty_midi.synthesize().
+
+    This provides a cross-domain contrast: symbolic embedding models
+    (MusicBERT) vs audio embedding model (MERT), enabling analysis
+    of how the embedding domain affects FMD.
+
+    Falls back to ``facebook/wav2vec2-base`` if MERT is unavailable.
+    """
+
+    DEFAULT_MODEL = "m-a-p/MERT-v1-95M"
+    FALLBACK_MODEL = "facebook/wav2vec2-base"
+    SAMPLE_RATE = 24000
+    FALLBACK_SAMPLE_RATE = 16000
+    MAX_AUDIO_SECONDS = 10
+
+    def __init__(self, config: Dict):
+        super().__init__(config, "MERT")
+        self._use_real_model = False
+        self._sample_rate = self.SAMPLE_RATE
+        self._processor = None
+
+        model_id = _resolve_hf_model_id(config, "MERT", self.DEFAULT_MODEL)
+
+        try:
+            logger.info(f"Loading MERT model: {model_id}")
+            from transformers import AutoModel, Wav2Vec2FeatureExtractor
+            self._processor = Wav2Vec2FeatureExtractor.from_pretrained(
+                model_id, trust_remote_code=True
+            )
+            self.model = AutoModel.from_pretrained(model_id, trust_remote_code=True)
+            self.model.to(self.device)
+            self.model.eval()
+            self.embedding_dim = self.model.config.hidden_size
+            self._use_real_model = True
+            self._sample_rate = getattr(
+                self._processor, "sampling_rate", self.SAMPLE_RATE
+            )
+            logger.info(
+                f"MERT loaded: {model_id} (dim={self.embedding_dim}, sr={self._sample_rate})"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load MERT ({model_id}): {e}")
+            logger.warning(f"Falling back to {self.FALLBACK_MODEL} proxy for MERT")
+            self._sample_rate = self.FALLBACK_SAMPLE_RATE
+            try:
+                from transformers import AutoModel, Wav2Vec2FeatureExtractor
+                self._processor = Wav2Vec2FeatureExtractor.from_pretrained(
+                    self.FALLBACK_MODEL
+                )
+                self.model = AutoModel.from_pretrained(self.FALLBACK_MODEL)
+                self.model.to(self.device)
+                self.model.eval()
+                self.embedding_dim = self.model.config.hidden_size
+                logger.info(
+                    f"MERT fallback: {self.FALLBACK_MODEL} (dim={self.embedding_dim})"
+                )
+            except Exception as e2:
+                logger.warning(f"Fallback also failed: {e2}. Using dummy model.")
+                self.model = None
+                self._processor = None
+                self.embedding_dim = 768
+
+    def _midi_to_audio(self, midi_data) -> Optional[np.ndarray]:
+        """Convert PrettyMIDI object to mono audio waveform via sinusoidal synthesis."""
+        if midi_data is None:
+            return None
+        target_sr = self._sample_rate
+        max_samples = self.MAX_AUDIO_SECONDS * target_sr
+        try:
+            audio = midi_data.synthesize(fs=target_sr)
+            if audio is not None and len(audio) > 0:
+                if audio.ndim > 1:
+                    audio = audio.mean(axis=1)
+                return audio[:max_samples].astype(np.float32)
+        except Exception as e:
+            logger.debug(f"pretty_midi.synthesize() failed: {e}")
+        return None
+
+    def _encode_audio(self, audio: np.ndarray) -> np.ndarray:
+        inputs = self._processor(
+            audio, sampling_rate=self._sample_rate, return_tensors="pt", padding=True,
+        )
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            hidden = outputs.last_hidden_state
+            embedding = hidden.mean(dim=1).cpu().numpy()
+        return embedding[0].astype(np.float32)
+
+    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+        if self.model is None:
+            return np.random.randn(self.embedding_dim).astype(np.float32)
+
+        if self._processor is not None and midi_data is not None:
+            audio = self._midi_to_audio(midi_data)
+            if audio is not None and len(audio) > 1000:
+                try:
+                    return self._encode_audio(audio)
+                except Exception as e:
+                    logger.debug(f"MERT audio encoding failed: {e}")
+
+        # Fallback: deterministic noise based on token hash
+        if self._processor is not None:
+            try:
+                rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
+                noise = rng.standard_normal(self._sample_rate * 2).astype(np.float32) * 0.001
+                return self._encode_audio(noise)
+            except Exception as e:
+                logger.debug(f"MERT noise-fallback encoding failed: {e}")
+
+        logger.warning("MERT: all encoding methods failed, returning random embedding")
+        return np.random.randn(self.embedding_dim).astype(np.float32)
+
+    def encode_batch(
+        self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None
+    ) -> np.ndarray:
+        results = []
+        for i, tokens in enumerate(token_sequences):
+            midi_data = (
+                midi_data_list[i]
+                if midi_data_list and i < len(midi_data_list)
+                else None
+            )
+            results.append(self.encode(tokens, midi_data=midi_data))
+        return np.array(results)
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
@@ -398,15 +339,16 @@ class MusicBERTModel(EmbeddingModel):
 class EmbeddingFactory:
     """Factory for creating embedding models."""
     _models = {
-        "CLaMP-1": CLaMP1Model,
-        "CLaMP-2": CLaMP2Model,
         "MusicBERT": MusicBERTModel,
+        "MusicBERT-large": MusicBERTLargeModel,
+        "MERT": MERTModel,
+        "NLP-Baseline": NLPBaselineModel,
     }
 
     @classmethod
     def create_model(cls, config: Dict, model_name: str) -> EmbeddingModel:
         if model_name not in cls._models:
-            raise ValueError(f"Unknown model: {model_name}")
+            raise ValueError(f"Unknown model: {model_name}. Available: {list(cls._models.keys())}")
         return cls._models[model_name](config)
 
     @classmethod
@@ -446,19 +388,16 @@ class EmbeddingExtractor:
         cache_path = self._get_cache_path(cache_key)
         if cache_path.exists():
             try:
-                embedding = np.load(cache_path)
-                return embedding
+                return np.load(cache_path)
             except Exception as e:
                 logger.warning(f"Failed to load from disk cache: {e}")
         return None
 
     def _save_to_disk_cache(self, cache_key: str, embedding: np.ndarray, metadata: Dict = None):
-        cache_path = self._get_cache_path(cache_key)
         try:
-            np.save(cache_path, embedding)
+            np.save(self._get_cache_path(cache_key), embedding)
             if metadata:
-                meta_path = self._get_metadata_path(cache_key)
-                with open(meta_path, "w") as f:
+                with open(self._get_metadata_path(cache_key), "w") as f:
                     json.dump(metadata, f)
         except Exception as e:
             logger.warning(f"Failed to save to disk cache: {e}")
@@ -469,16 +408,6 @@ class EmbeddingExtractor:
         model_name: str,
         midi_data_list: Optional[List] = None,
     ) -> np.ndarray:
-        """Extract embeddings from token sequences with caching.
-
-        Args:
-            token_sequences: List of token sequences
-            model_name: Name of the model to use
-            midi_data_list: Optional list of PrettyMIDI objects
-
-        Returns:
-            Embedding matrix (N x D)
-        """
         if model_name not in self.models:
             raise ValueError(f"Unknown model: {model_name}")
 

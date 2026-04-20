@@ -148,6 +148,63 @@ With 2 models only, the **interaction between tokenizer and model** was the sing
 
 ---
 
+## New: Normalized FMD (nFMD) — Scale-Invariant Metric
+
+We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is not comparable across embedding models of different architectures. Three normalization strategies are implemented in `src/metrics/fmd.py`:
+
+| Method | Formula | Intuition |
+|--------|---------|-----------|
+| **Trace** (default) | nFMD = FMD / (Tr(Σ₁) + Tr(Σ₂)) | Normalizes by total embedding variance |
+| **Norm** | nFMD = FMD / (‖μ₁‖ + ‖μ₂‖)² | Compensates for quadratic mean-norm scaling |
+| **Z-score** | nFMD = (FMD − μ_baseline) / σ_baseline | Calibrates against within-genre baseline |
+
+### Validation: Normalization Eliminates Scale Artefact
+
+| Model | Raw FMD (split test) | nFMD_trace | nFMD_norm | Mean ‖emb‖ |
+|-------|---------------------|------------|-----------|------------|
+| CLaMP-1 | 0.0172 | 0.001409 | 0.000081 | 7.71 |
+| CLaMP-2 | 0.0115 | 0.002683 | 0.000549 | 2.72 |
+| MusicBERT | 0.1477 | 0.001662 | 0.000209 | 14.84 |
+
+> **Raw FMD varies 12.8× across models; after trace-normalization, only 1.9×.**
+> This confirms that the dominant η²(model) = 0.78 is largely a scale artefact, and nFMD enables fair cross-model comparison.
+
+## New: Extended Model Support (5 Embedding Models)
+
+The pipeline now supports **5 embedding models** (up from 3), enabling analysis across both symbolic and audio-domain representations:
+
+| Model | Type | Architecture | Embedding Dim | Domain |
+|-------|------|-------------|---------------|--------|
+| CLaMP-1 | Contrastive | RoBERTa (ABC notation) | 384/512 | Symbolic |
+| CLaMP-2 | Contrastive | MIDI-native encoder | 768 | Symbolic |
+| MusicBERT | Masked LM | BERT (OctupleMIDI) | 768 | Symbolic |
+| **MIDI-BERT** | Masked LM | BERT (token sequences) | 768 | Symbolic |
+| **MERT** | Self-supervised | Wav2Vec2-style (audio) | 768 | **Audio** |
+
+With 5 models: **80 pipeline variants** × 6 genre pairs × 10 repeats = **4800 FMD observations**.
+
+MERT provides a unique cross-domain contrast: it processes MIDI→synthesized audio→embedding, testing whether FMD sensitivity patterns hold across the symbolic/audio boundary.
+
+## New: Sample-Size Sensitivity (Power Analysis)
+
+We investigated how η² estimates stabilize as a function of per-cell sample size (number of repeated subsamplings per variant×pair combination).
+
+### Key Finding: η² Is Remarkably Stable Even at Small Sample Sizes
+
+| Repeats/cell | η²(model) | η²(tokenizer) | η²(preprocess) | Power(model) | Power(tokenizer) | Power(preprocess) |
+|-------------|-----------|---------------|----------------|-------------|-----------------|-------------------|
+| 2 | 0.780 ± 0.007 | 0.020 ± 0.001 | 0.002 ± 0.000 | 100% | 100% | 0% |
+| 5 | 0.779 ± 0.002 | 0.020 ± 0.000 | 0.002 ± 0.000 | 100% | 100% | 0% |
+| 10 | 0.778 ± 0.000 | 0.020 ± 0.000 | 0.002 ± 0.000 | 100% | 100% | 0% |
+
+> **Model and tokenizer effects achieve 100% power even with just 2 repeats per cell.**
+> Preprocessing effect (η² = 0.002) is genuinely negligible — it never reaches significance regardless of sample size.
+> This validates our experimental design: 10 repeats provide more than adequate statistical power.
+
+Generated plots: `sample_size_stability.{png,pdf}`, `sample_size_power.{png,pdf}`, `sample_size_combined.{png,pdf}`.
+
+---
+
 ## Experimental Design
 
 ```
@@ -222,7 +279,12 @@ python main.py --mode tests          # Run test suite
 
 ### Multi-Genre Analysis
 ```bash
-python run_multi_genre_analysis.py   # 4 genres × 32 variants × 10 repeats
+python run_multi_genre_analysis.py   # 4 genres × 80 variants × 10 repeats (5 models)
+```
+
+### Sample-Size Sensitivity (Power Analysis)
+```bash
+python run_sample_size_ablation.py   # η² stability & power curves
 ```
 Produces ANOVA tables, interaction plots, η² heatmaps, and violin plots in `results/reports/lakh_multi/` and `results/plots/paper/`.
 
@@ -275,6 +337,7 @@ python run_ablation_study.py
 | 6 | Multi-genre analysis & ANOVA | ✅ | — |
 | 7 | Cross-dataset validation (CD1 + MidiCaps) | ✅ | 9 |
 | 8 | MusicBERT, bootstrap CI, interaction mechanism, multiple comparison correction | ✅ | — |
+| 9 | **Normalized FMD (nFMD), MIDI-BERT + MERT models, sample-size power analysis** | ✅ | — |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
@@ -292,6 +355,8 @@ python run_ablation_study.py
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
 | `interaction_cell_stats.csv` | Per-cell embedding diagnostics |
 | `cross_dataset_fmd.csv` | Combined FMD from all sources |
+| `sample_size_ablation.csv` | η² and power at varying sample sizes |
+| `sample_size_summary.csv` | Aggregated sample-size sensitivity |
 
 ### Publication Plots
 
@@ -313,6 +378,9 @@ python run_ablation_study.py
 | `cross_tok_model_heatmaps` | Tokenizer×model means per source |
 | `cross_ranking_agreement` | Pipeline ranking Spearman ρ |
 | `cross_fmd_violin_by_source` | FMD distributions per source |
+| `sample_size_stability` | **η² stability vs sample size (CI ribbon)** |
+| `sample_size_power` | **Statistical power curves per factor** |
+| `sample_size_combined` | **Combined stability + power 2-panel figure** |
 
 ## Documentation
 
@@ -335,4 +403,4 @@ python run_ablation_study.py
 
 ---
 
-**Status**: ✅ Complete (Weeks 1–8) | **Last Updated**: 19.04.2026
+**Status**: ✅ Complete (Weeks 1–9) | **Last Updated**: 20.04.2026

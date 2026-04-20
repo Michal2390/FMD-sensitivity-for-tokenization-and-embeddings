@@ -1,4 +1,7 @@
 group1,group2,meandiff,p-adj,lower,upper,reject,p_adj_holm,p_adj_bonf,still_sig_holm,still_sig_bonf
-CLaMP-1,CLaMP-2,-0.0517,0.0795,-0.1079,0.0046,False,0.0795,0.2385,False,False
-CLaMP-1,MusicBERT,2.0606,0.0,2.0044,2.1169,True,0.0,0.0,True,True
-CLaMP-2,MusicBERT,2.1123,0.0,2.056,2.1685,True,0.0,0.0,True,True
+MERT,MusicBERT,,,,,False,,,False,False
+MERT,MusicBERT-large,,,,,False,,,False,False
+MERT,NLP-Baseline,,,,,False,,,False,False
+MusicBERT,MusicBERT-large,8.4979,,,,False,,,False,False
+MusicBERT,NLP-Baseline,-7.2234,,,,False,,,False,False
+MusicBERT-large,NLP-Baseline,-15.7213,,,,False,,,False,False

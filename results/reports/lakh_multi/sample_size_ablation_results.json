@@ -1,0 +1,167 @@
+{
+  "config": {
+    "sample_sizes": [
+      2,
+      3,
+      5,
+      7,
+      10
+    ],
+    "n_resamples": 30,
+    "seed": 42,
+    "input_csv": "results/reports/lakh_multi/multi_genre_fmd.csv",
+    "total_input_rows": 2880
+  },
+  "summary": [
+    {
+      "n_per_cell": 2,
+      "factor": "model",
+      "eta_sq_mean": 0.7800090429074285,
+      "eta_sq_std": 0.006891820316948424,
+      "eta_sq_ci_lo": 0.7670452591444549,
+      "eta_sq_ci_hi": 0.7906798983561585,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 2,
+      "factor": "preprocess",
+      "eta_sq_mean": 0.0023067548198365665,
+      "eta_sq_std": 0.00044402345015651475,
+      "eta_sq_ci_lo": 0.0016545526107064896,
+      "eta_sq_ci_hi": 0.003200806190932233,
+      "power": 0.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 2,
+      "factor": "tokenizer",
+      "eta_sq_mean": 0.01951541277882518,
+      "eta_sq_std": 0.0006197369145535779,
+      "eta_sq_ci_lo": 0.018485494727255292,
+      "eta_sq_ci_hi": 0.020625330302322834,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 3,
+      "factor": "model",
+      "eta_sq_mean": 0.7788988420335888,
+      "eta_sq_std": 0.005075168490952218,
+      "eta_sq_ci_lo": 0.7702585711558027,
+      "eta_sq_ci_hi": 0.7867263517051558,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 3,
+      "factor": "preprocess",
+      "eta_sq_mean": 0.0022699715311284034,
+      "eta_sq_std": 0.0003227235536123953,
+      "eta_sq_ci_lo": 0.0018695187485718314,
+      "eta_sq_ci_hi": 0.002998287999730041,
+      "power": 0.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 3,
+      "factor": "tokenizer",
+      "eta_sq_mean": 0.019575524002988128,
+      "eta_sq_std": 0.00042366922586608446,
+      "eta_sq_ci_lo": 0.018955439922267513,
+      "eta_sq_ci_hi": 0.020444988261893813,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 5,
+      "factor": "model",
+      "eta_sq_mean": 0.7789125590356427,
+      "eta_sq_std": 0.0022583842144416853,
+      "eta_sq_ci_lo": 0.7754112161455337,
+      "eta_sq_ci_hi": 0.7834992621935885,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 5,
+      "factor": "preprocess",
+      "eta_sq_mean": 0.0022073008409043897,
+      "eta_sq_std": 0.00019369523485397117,
+      "eta_sq_ci_lo": 0.0018395268692773384,
+      "eta_sq_ci_hi": 0.002526443300468836,
+      "power": 0.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 5,
+      "factor": "tokenizer",
+      "eta_sq_mean": 0.019588120074201496,
+      "eta_sq_std": 0.00029366737060222464,
+      "eta_sq_ci_lo": 0.018970333946022593,
+      "eta_sq_ci_hi": 0.020112310000125633,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 7,
+      "factor": "model",
+      "eta_sq_mean": 0.7778152661173944,
+      "eta_sq_std": 0.0020986206841580868,
+      "eta_sq_ci_lo": 0.7744289594905037,
+      "eta_sq_ci_hi": 0.7814828991594148,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 7,
+      "factor": "preprocess",
+      "eta_sq_mean": 0.002269609319699216,
+      "eta_sq_std": 0.00014581165958778744,
+      "eta_sq_ci_lo": 0.002040978934466131,
+      "eta_sq_ci_hi": 0.0025367255698260367,
+      "power": 0.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 7,
+      "factor": "tokenizer",
+      "eta_sq_mean": 0.019571859777815566,
+      "eta_sq_std": 0.00013660324762208203,
+      "eta_sq_ci_lo": 0.01936224807991587,
+      "eta_sq_ci_hi": 0.019826319242656067,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 10,
+      "factor": "model",
+      "eta_sq_mean": 0.7782351960021825,
+      "eta_sq_std": 8.986447290752814e-17,
+      "eta_sq_ci_lo": 0.7782351960021824,
+      "eta_sq_ci_hi": 0.7782351960021826,
+      "power": 1.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 10,
+      "factor": "preprocess",
+      "eta_sq_mean": 0.0022137638623579686,
+      "eta_sq_std": 1.394864087304094e-19,
+      "eta_sq_ci_lo": 0.002213763862357968,
+      "eta_sq_ci_hi": 0.0022137638623579686,
+      "power": 0.0,
+      "n_resamples": 30
+    },
+    {
+      "n_per_cell": 10,
+      "factor": "tokenizer",
+      "eta_sq_mean": 0.01957761464668479,
+      "eta_sq_std": 2.8082647783602542e-18,
+      "eta_sq_ci_lo": 0.019577614646684786,
+      "eta_sq_ci_hi": 0.019577614646684793,
+      "power": 1.0,
+      "n_resamples": 30
+    }
+  ]
+}

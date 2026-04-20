@@ -106,7 +106,7 @@ def extract_genre_embeddings(
             tokens = tokenizer.encode_midi_object(midi_data)
             if not tokens:
                 continue
-            vec = embeddings.extract_embeddings([tokens], model_name)[0]
+            vec = embeddings.extract_embeddings([tokens], model_name, midi_data_list=[midi_data])[0]
             vectors.append(vec)
         except Exception as exc:
             logger.debug(f"Skip {midi_path.name}: {exc}")
