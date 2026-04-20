@@ -182,7 +182,7 @@ def test_compute_eta_squared():
 def test_compare_rankings():
     """Test Spearman ranking comparison."""
     import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
     from run_cross_dataset_validation import compare_rankings
 
     rank_a = pd.DataFrame({
@@ -201,7 +201,7 @@ def test_compare_rankings():
 def test_compute_cell_means():
     """Test tokenizer×model cell aggregation."""
     import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
     from run_cross_dataset_validation import compute_cell_means
 
     df = pd.DataFrame({
