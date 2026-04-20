@@ -39,7 +39,7 @@ jobs:
           PY
       - name: CLI sanity check
         run: |
-          python run_experiment.py --help
+          python scripts/run_experiment.py --help
 
   tests:
     name: Tests
