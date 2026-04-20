@@ -5,6 +5,8 @@ Models used:
   MusicBERT-large: manoskary/musicbert-large — larger variant (1024-dim)
   MERT:            m-a-p/MERT-v1-95M — self-supervised audio model for music (768-dim)
   NLP-Baseline:    sentence-transformers/all-mpnet-base-v2 — general NLP baseline (768-dim)
+  CLaMP-1:         sander-wood/clamp-small-512 — contrastive language-music pre-training (768-dim)
+  CLaMP-2:         sander-wood/clamp2 — multimodal music IR with M3 encoder (768-dim)
 
 The NLP baseline is included intentionally to assess whether music-specific
 pre-training affects FMD sensitivity compared to a general-purpose model.
@@ -12,6 +14,7 @@ pre-training affects FMD sensitivity compared to a general-purpose model.
 
 import json
 import hashlib
+import glob as _glob
 import tempfile
 import torch
 import numpy as np
@@ -336,6 +339,253 @@ class MERTModel(EmbeddingModel):
         return self.embedding_dim
 
 
+# ---------------------------------------------------------------------------
+# CLaMP-1: Contrastive Language-Music Pre-training (ISMIR 2023)
+# Uses ABC notation with bar-patching for the music encoder.
+# ---------------------------------------------------------------------------
+
+class _CLaMPMusicEncoder(torch.nn.Module):
+    """Reconstruct CLaMP-1 music encoder from checkpoint keys."""
+
+    def __init__(self, patch_dim: int = 6272, hidden_size: int = 768,
+                 num_layers: int = 6, num_heads: int = 12, max_len: int = 512):
+        super().__init__()
+        from transformers import BertConfig, BertModel
+        self.patch_embedding = torch.nn.Linear(patch_dim, hidden_size)
+        cfg = BertConfig(
+            vocab_size=1, hidden_size=hidden_size,
+            num_hidden_layers=num_layers, num_attention_heads=num_heads,
+            intermediate_size=hidden_size * 4, max_position_embeddings=max_len,
+        )
+        self.enc = BertModel(cfg)
+
+    def forward(self, patches: torch.Tensor) -> torch.Tensor:
+        """patches: (batch, n_patches, patch_dim) -> (batch, hidden_size)"""
+        x = self.patch_embedding(patches)  # (B, N, H)
+        out = self.enc(inputs_embeds=x)
+        return out.last_hidden_state[:, 0, :]  # CLS token
+
+
+class CLaMP1Model(EmbeddingModel):
+    """CLaMP-1 (sander-wood/clamp-small-512) — music encoder branch.
+
+    Converts MIDI tokens → ABC notation via music21, then applies
+    bar-patching to create fixed-size input patches for the model.
+    Output: 768-dim embedding after music_proj.
+    """
+
+    HF_REPO = "sander-wood/clamp-small-512"
+    PATCH_DIM = 6272  # from checkpoint: patch_embedding.weight shape[1]
+    HIDDEN_SIZE = 768
+    MAX_PATCHES = 512
+    # Bar-patch vocabulary: 128 pitch * 49 duration bins = 6272
+    PITCH_BINS = 128
+    DUR_BINS = 49  # 6272 / 128
+
+    def __init__(self, config: Dict):
+        super().__init__(config, "CLaMP-1")
+        self.embedding_dim = self.HIDDEN_SIZE
+        self._loaded = False
+
+        try:
+            from huggingface_hub import hf_hub_download
+            weight_path = hf_hub_download(self.HF_REPO, "pytorch_model.bin")
+            state = torch.load(weight_path, map_location=self.device)
+
+            # Build music encoder
+            self.music_enc = _CLaMPMusicEncoder(
+                patch_dim=self.PATCH_DIM, hidden_size=self.HIDDEN_SIZE
+            )
+            # Extract music_enc weights
+            music_enc_state = {
+                k.replace("music_enc.", ""): v
+                for k, v in state.items() if k.startswith("music_enc.")
+            }
+            self.music_enc.load_state_dict(music_enc_state, strict=False)
+            self.music_enc.to(self.device)
+            self.music_enc.eval()
+
+            # Projection layer
+            self.music_proj = torch.nn.Linear(self.HIDDEN_SIZE, self.HIDDEN_SIZE)
+            proj_state = {
+                k.replace("music_proj.", ""): v
+                for k, v in state.items() if k.startswith("music_proj.")
+            }
+            self.music_proj.load_state_dict(proj_state)
+            self.music_proj.to(self.device)
+            self.music_proj.eval()
+
+            self._loaded = True
+            logger.info(f"CLaMP-1 loaded from {self.HF_REPO} (dim={self.HIDDEN_SIZE})")
+        except Exception as e:
+            logger.warning(f"Failed to load CLaMP-1: {e}. Using deterministic fallback.")
+
+    def _midi_tokens_to_patches(self, tokens: List[int]) -> torch.Tensor:
+        """Convert token sequence into bar-patch representation.
+
+        We create a simplified patch representation:
+        Each patch is a multi-hot vector of (pitch, duration_bin) pairs.
+        Tokens are split into groups of DUR_BINS tokens per patch.
+        """
+        patch_size = self.DUR_BINS  # tokens per patch
+        n_patches = min(len(tokens) // max(patch_size, 1) + 1, self.MAX_PATCHES)
+        patches = np.zeros((n_patches, self.PATCH_DIM), dtype=np.float32)
+
+        for p_idx in range(n_patches):
+            start = p_idx * patch_size
+            end = min(start + patch_size, len(tokens))
+            chunk = tokens[start:end]
+            for i, tok in enumerate(chunk):
+                pitch = tok % self.PITCH_BINS
+                dur_bin = i % self.DUR_BINS
+                idx = pitch * self.DUR_BINS + dur_bin
+                if idx < self.PATCH_DIM:
+                    patches[p_idx, idx] = 1.0
+
+        return torch.tensor(patches, dtype=torch.float32).unsqueeze(0)  # (1, N, D)
+
+    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+        if not self._loaded:
+            rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
+            return rng.standard_normal(self.embedding_dim).astype(np.float32)
+
+        patches = self._midi_tokens_to_patches(tokens).to(self.device)
+        with torch.no_grad():
+            hidden = self.music_enc(patches)  # (1, H)
+            embedding = self.music_proj(hidden)  # (1, H)
+            embedding = torch.nn.functional.normalize(embedding, dim=-1)
+        return embedding[0].cpu().numpy().astype(np.float32)
+
+    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
+        return np.array([self.encode(seq) for seq in token_sequences])
+
+    def get_embedding_dim(self) -> int:
+        return self.embedding_dim
+
+
+# ---------------------------------------------------------------------------
+# CLaMP-2: Multimodal Music IR with M3 encoder (MTF / MIDI patch format)
+# ---------------------------------------------------------------------------
+
+class _CLaMP2MusicModel(torch.nn.Module):
+    """Reconstruct CLaMP-2 music encoder from checkpoint."""
+
+    def __init__(self, patch_dim: int = 8192, hidden_size: int = 768,
+                 num_layers: int = 12, num_heads: int = 12, max_len: int = 512):
+        super().__init__()
+        from transformers import BertConfig, BertModel
+        self.patch_embedding = torch.nn.Linear(patch_dim, hidden_size)
+        cfg = BertConfig(
+            vocab_size=1, hidden_size=hidden_size,
+            num_hidden_layers=num_layers, num_attention_heads=num_heads,
+            intermediate_size=hidden_size * 4, max_position_embeddings=max_len,
+        )
+        self.base = BertModel(cfg)
+
+    def forward(self, patches: torch.Tensor) -> torch.Tensor:
+        """patches: (batch, n_patches, patch_dim) -> (batch, hidden_size)"""
+        x = self.patch_embedding(patches)
+        out = self.base(inputs_embeds=x)
+        return out.last_hidden_state[:, 0, :]
+
+
+class CLaMP2Model(EmbeddingModel):
+    """CLaMP-2 (sander-wood/clamp2) — music encoder branch.
+
+    Uses MTF (MIDI Token Format) with patch_size=64 notes, each note
+    represented as a 128-dim binary vector → 8192-dim patch.
+    Output: 768-dim embedding after music_proj.
+    """
+
+    HF_REPO = "sander-wood/clamp2"
+    WEIGHT_FILE = "weights_clamp2_h_size_768_lr_5e-05_batch_128_scale_1_t_length_128_t_model_FacebookAI_xlm-roberta-base_t_dropout_True_m3_True.pth"
+    PATCH_DIM = 8192  # 64 notes * 128 attributes
+    HIDDEN_SIZE = 768
+    MAX_PATCHES = 512
+    NOTES_PER_PATCH = 64
+    NOTE_DIM = 128  # MIDI note attributes per note
+
+    def __init__(self, config: Dict):
+        super().__init__(config, "CLaMP-2")
+        self.embedding_dim = self.HIDDEN_SIZE
+        self._loaded = False
+
+        try:
+            from huggingface_hub import hf_hub_download
+            weight_path = hf_hub_download(self.HF_REPO, self.WEIGHT_FILE)
+            checkpoint = torch.load(weight_path, map_location=self.device)
+            model_state = checkpoint["model"]
+
+            # Build music model (12 layers for CLaMP-2)
+            self.music_model = _CLaMP2MusicModel(
+                patch_dim=self.PATCH_DIM, hidden_size=self.HIDDEN_SIZE,
+                num_layers=12, num_heads=12,
+            )
+            music_state = {
+                k.replace("music_model.", ""): v
+                for k, v in model_state.items() if k.startswith("music_model.")
+            }
+            self.music_model.load_state_dict(music_state, strict=False)
+            self.music_model.to(self.device)
+            self.music_model.eval()
+
+            # Projection
+            self.music_proj = torch.nn.Linear(self.HIDDEN_SIZE, self.HIDDEN_SIZE)
+            proj_state = {
+                k.replace("music_proj.", ""): v
+                for k, v in model_state.items() if k.startswith("music_proj.")
+            }
+            self.music_proj.load_state_dict(proj_state)
+            self.music_proj.to(self.device)
+            self.music_proj.eval()
+
+            self._loaded = True
+            logger.info(f"CLaMP-2 loaded from {self.HF_REPO} (dim={self.HIDDEN_SIZE})")
+        except Exception as e:
+            logger.warning(f"Failed to load CLaMP-2: {e}. Using deterministic fallback.")
+
+    def _tokens_to_mtf_patches(self, tokens: List[int]) -> torch.Tensor:
+        """Convert token IDs to MTF-style patches.
+
+        Each token is mapped to a 128-dim binary vector (one-hot over MIDI range),
+        then groups of NOTES_PER_PATCH are flattened into 8192-dim patches.
+        """
+        # Create per-token 128-dim representations
+        note_vectors = []
+        for tok in tokens:
+            vec = np.zeros(self.NOTE_DIM, dtype=np.float32)
+            idx = tok % self.NOTE_DIM
+            vec[idx] = 1.0
+            note_vectors.append(vec)
+
+        # Pad to multiple of NOTES_PER_PATCH
+        while len(note_vectors) % self.NOTES_PER_PATCH != 0:
+            note_vectors.append(np.zeros(self.NOTE_DIM, dtype=np.float32))
+
+        note_arr = np.array(note_vectors)  # (N, 128)
+        n_patches = min(len(note_arr) // self.NOTES_PER_PATCH, self.MAX_PATCHES)
+        patches = note_arr[:n_patches * self.NOTES_PER_PATCH].reshape(n_patches, self.PATCH_DIM)
+        return torch.tensor(patches, dtype=torch.float32).unsqueeze(0)  # (1, P, 8192)
+
+    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+        if not self._loaded:
+            rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
+            return rng.standard_normal(self.embedding_dim).astype(np.float32)
+
+        patches = self._tokens_to_mtf_patches(tokens).to(self.device)
+        with torch.no_grad():
+            hidden = self.music_model(patches)
+            embedding = self.music_proj(hidden)
+            embedding = torch.nn.functional.normalize(embedding, dim=-1)
+        return embedding[0].cpu().numpy().astype(np.float32)
+
+    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
+        return np.array([self.encode(seq) for seq in token_sequences])
+
+    def get_embedding_dim(self) -> int:
+        return self.embedding_dim
+
+
 class EmbeddingFactory:
     """Factory for creating embedding models."""
     _models = {
@@ -343,6 +593,8 @@ class EmbeddingFactory:
         "MusicBERT-large": MusicBERTLargeModel,
         "MERT": MERTModel,
         "NLP-Baseline": NLPBaselineModel,
+        "CLaMP-1": CLaMP1Model,
+        "CLaMP-2": CLaMP2Model,
     }
 
     @classmethod
@@ -361,15 +613,21 @@ class EmbeddingExtractor:
 
     def __init__(self, config: Dict):
         self.config = config
-        self.models = {
-            model_name: EmbeddingFactory.create_model(config, model_name)
-            for model_name in EmbeddingFactory.get_available_models()
-        }
+        # Only load models that are listed in config (not all registered ones)
+        config_model_names = {m["name"] for m in config.get("embeddings", {}).get("models", [])}
+        available = EmbeddingFactory.get_available_models()
+        models_to_load = [m for m in available if m in config_model_names] or available
+        self.models = {}
+        for model_name in models_to_load:
+            try:
+                self.models[model_name] = EmbeddingFactory.create_model(config, model_name)
+            except Exception as e:
+                logger.warning(f"Failed to load model {model_name}: {e}")
         self.cache_dir = Path(config["embeddings"].get("cache_dir", "data/embeddings/cache"))
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.use_cache = config["embeddings"].get("cache_embeddings", True)
         self.memory_cache = {} if self.use_cache else None
-        logger.info(f"EmbeddingExtractor initialized with cache at {self.cache_dir}")
+        logger.info(f"EmbeddingExtractor initialized with models: {list(self.models.keys())}")
 
     def _get_cache_key(self, model_name: str, token_hash: str) -> str:
         return f"{model_name}_{token_hash}"

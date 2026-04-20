@@ -24,7 +24,7 @@ import pandas as pd
 import yaml
 from loguru import logger
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from data.manager import DatasetManager
 from embeddings.extractor import EmbeddingExtractor

@@ -94,6 +94,14 @@ embeddings:
       model_name: "nlp-baseline"
       hf_model_name: "sentence-transformers/all-mpnet-base-v2"
       format_type: "token_text"  # General NLP baseline control (768-dim)
+    - name: "CLaMP-1"
+      model_name: "clamp1"
+      hf_model_name: "sander-wood/clamp-small-512"
+      format_type: "music_patches"  # ABC bar-patching music encoder (768-dim)
+    - name: "CLaMP-2"
+      model_name: "clamp2"
+      hf_model_name: "sander-wood/clamp2"
+      format_type: "midi_patches"  # MTF patch-based music encoder (768-dim)
   # Embedding extraction settings
   batch_size: 32
   device: "auto"  # auto -> CUDA when available, otherwise CPU

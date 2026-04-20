@@ -1,5 +1,5 @@
 factor,F,p,eta_sq,n_groups
 tokenizer,,,,4
-model,,,,4
+model,,,,6
 preprocess,,,,4
 pair,,,,6
