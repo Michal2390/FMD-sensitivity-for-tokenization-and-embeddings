@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Add src directory to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from utils.config import load_config, setup_logging, get_logger
 from data.manager import DatasetManager
