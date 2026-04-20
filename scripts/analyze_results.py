@@ -171,7 +171,7 @@ for tok, grp in cosine_df.groupby("tok"):
     print(f"     {tok:12s}: gap={grp['separation_gap'].mean():.6f}")
 
 print(f"\n   ⚠️  Very small separation gaps → embeddings nearly isotropic!")
-print(f"   CLaMP-2 has larger gaps (better genre discrimination in embedding space)")
+print(f"   MusicBERT-large has larger gaps (better genre discrimination in embedding space)")
 
 # ── 8. Token-FMD Correlations ────────────────────────────────────────
 print("\n\n🔗 8. TOKEN STATISTICS ↔ FMD CORRELATION")
@@ -196,15 +196,15 @@ for i, (_, row) in enumerate(ranked.tail(5).iloc[::-1].iterrows(), 1):
     print(f"     {i}. {row['variant']}  FMD={row['fmd']:.4f}")
 
 # Key pattern analysis
-clamp1 = df[df["model"] == "CLaMP-1"]["fmd"]
-clamp2 = df[df["model"] == "CLaMP-2"]["fmd"]
+clamp1 = df[df["model"] == "MusicBERT"]["fmd"]
+clamp2 = df[df["model"] == "MusicBERT-large"]["fmd"]
 
 print(f"\n   📌 MAIN FINDINGS:")
 print(f"   1. TOKENIZER is the dominant factor (η²=0.213, LARGE effect)")
 print(f"      - Octuple vs REMI: significant (Tukey p=0.048, d=1.12)")
 print(f"      - Permutation test marginal (p=0.074)")
 print(f"   2. MODEL effect is negligible (η²=0.018)")
-print(f"      - CLaMP-1 mean={clamp1.mean():.4f}, CLaMP-2 mean={clamp2.mean():.4f}")
+print(f"      - MusicBERT mean={clamp1.mean():.4f}, MusicBERT-large mean={clamp2.mean():.4f}")
 print(f"      - NOT significant (Tukey p=0.461, d=0.26)")
 print(f"   3. PREPROCESSING has small effect (η²=0.052)")
 print(f"      - Velocity removal reduces FMD slightly")
@@ -226,16 +226,16 @@ print(f"\n   📌 INTERACTION: Tokenizer × Model")
 for (tok, mod), grp in df.groupby(["tokenizer", "model"]):
     print(f"      {tok:12s} + {mod:8s}: FMD={grp['fmd'].mean():.4f} ± {grp['fmd'].std():.4f}")
 
-# ── 10. Anomaly: Octuple × CLaMP-2 ──────────────────────────────────
+# ── 10. Anomaly: Octuple × MusicBERT-large ──────────────────────────────────
 print(f"\n   ⚡ NOTABLE INTERACTION:")
-oct_c2 = df[(df["tokenizer"] == "Octuple") & (df["model"] == "CLaMP-2")]["fmd"]
-oct_c1 = df[(df["tokenizer"] == "Octuple") & (df["model"] == "CLaMP-1")]["fmd"]
-remi_c2 = df[(df["tokenizer"] == "REMI") & (df["model"] == "CLaMP-2")]["fmd"]
-print(f"      Octuple+CLaMP-2: mean={oct_c2.mean():.4f} (HIGHEST)")
-print(f"      Octuple+CLaMP-1: mean={oct_c1.mean():.4f}")
-print(f"      REMI+CLaMP-2:    mean={remi_c2.mean():.4f} (LOWEST)")
-print(f"      → Octuple tokenization interacts strongly with CLaMP-2")
-print(f"        While REMI+CLaMP-2 produces most stable/lowest FMD")
+oct_c2 = df[(df["tokenizer"] == "Octuple") & (df["model"] == "MusicBERT-large")]["fmd"]
+oct_c1 = df[(df["tokenizer"] == "Octuple") & (df["model"] == "MusicBERT")]["fmd"]
+remi_c2 = df[(df["tokenizer"] == "REMI") & (df["model"] == "MusicBERT-large")]["fmd"]
+print(f"      Octuple+MusicBERT-large: mean={oct_c2.mean():.4f} (HIGHEST)")
+print(f"      Octuple+MusicBERT: mean={oct_c1.mean():.4f}")
+print(f"      REMI+MusicBERT-large:    mean={remi_c2.mean():.4f} (LOWEST)")
+print(f"      → Octuple tokenization interacts strongly with MusicBERT-large")
+print(f"        While REMI+MusicBERT-large produces most stable/lowest FMD")
 
 # ── 11. Reliability (bootstrap) ──────────────────────────────────────
 print(f"\n   📌 RELIABILITY (Bootstrap 95% CI):")
@@ -248,7 +248,7 @@ print(f"      → Need larger samples for tighter estimates")
 print(f"\n\n⚠️  LIMITATIONS:")
 print(f"   1. N=1 per cell → no within-cell variance → ANOVA underpowered")
 print(f"   2. Only 2 genres (rock, jazz) → limited generalizability")
-print(f"   3. CLaMP models use proxy embeddings (text encoder path)")
+print(f"   3. Models use HuggingFace pretrained weights")
 print(f"   4. Preprocessing = velocity+quantization only (no augmentation)")
 print(f"   5. 119 files per genre — adequate but not large")
 
@@ -282,7 +282,7 @@ save(fig, "lakh_interaction_tok_model")
 # 3. Bootstrap CI error bars
 fig, ax = plt.subplots(figsize=(14, 6))
 sorted_df = df.sort_values("fmd").reset_index(drop=True)
-colors = {"CLaMP-1": "#1f77b4", "CLaMP-2": "#ff7f0e"}
+colors = {"MusicBERT": "#1f77b4", "MusicBERT-large": "#ff7f0e"}
 markers = {"REMI": "o", "TSD": "s", "Octuple": "D", "MIDI-Like": "^"}
 for i, row in sorted_df.iterrows():
     color = colors.get(row["model"], "gray")
@@ -487,9 +487,9 @@ report_lines.append("""
    - Octuple vs REMI is the only significant pairwise difference (Tukey p = 0.048, Cohen's d = 1.12).
    - Permutation test confirms marginal significance (p = 0.074).
 
-2. **Embedding model (CLaMP-1 vs CLaMP-2) has negligible impact on FMD** (η² = 0.018).
+2. **Embedding model (MusicBERT vs MusicBERT-large) has negligible impact on FMD** (η² = 0.018).
    - Mean difference is only 0.016 (not significant).
-   - However, strong **interaction with tokenizer**: Octuple+CLaMP-2 produces highest FMD while REMI+CLaMP-2 produces lowest.
+   - However, strong **interaction with tokenizer**: Octuple+MusicBERT-large produces highest FMD while REMI+MusicBERT-large produces lowest.
 
 3. **Preprocessing has small effect** (η² = 0.052).
    - Velocity removal reduces FMD (genres become more similar without velocity information).
@@ -499,14 +499,14 @@ report_lines.append("""
 
 5. **Cosine similarity gaps are minuscule** (0.0001–0.002) → genre separation in FMD is driven by covariance structure, not mean embeddings.
 
-6. **Notable interaction**: Octuple tokenization paired with CLaMP-2 yields anomalously high FMD (mean 0.260), suggesting this tokenizer produces representations that CLaMP-2 maps to highly divergent embedding distributions.
+6. **Notable interaction**: Octuple tokenization paired with MusicBERT-large yields anomalously high FMD (mean 0.260), suggesting this tokenizer produces representations that MusicBERT-large maps to highly divergent embedding distributions.
 """)
 
 report_lines.append("\n## 7. Limitations")
 report_lines.append("""
 - N = 1 per cell → ANOVA has limited power; results should be interpreted with effect sizes (η², d) rather than p-values alone.
 - Only 2 genres (rock, jazz) → findings may not generalize to other genre pairs.
-- CLaMP models use proxy embedding paths (text encoder for CLaMP-1, general for CLaMP-2).
+- All 4 models now use real HuggingFace pretrained weights (no proxy fallbacks).
 - Bootstrap CI widths are substantial → larger sample sizes would tighten estimates.
 - No interaction terms in one-way ANOVA fallback (statsmodels three-way failed due to single observations per cell).
 """)
@@ -514,7 +514,7 @@ report_lines.append("""
 report_lines.append("\n## 8. Recommendations for Paper")
 report_lines.append("""
 1. **Lead with tokenizer sensitivity**: η² = 0.213 is a compelling finding — tokenization choice matters more than model or preprocessing.
-2. **Highlight Octuple anomaly**: The Octuple+CLaMP-2 interaction is the most interesting result and deserves a dedicated discussion.
+2. **Highlight Octuple anomaly**: The Octuple+MusicBERT-large interaction is the most interesting result and deserves a dedicated discussion.
 3. **Use effect sizes over p-values**: Given limited N, η² and Cohen's d are more informative than significance tests.
 4. **Include the interaction plot** as a main figure — it tells the complete story.
 5. **Add more genre pairs** (electronic, country) to strengthen generalizability claims.

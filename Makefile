@@ -1,10 +1,10 @@
-.PHONY: help install dev-install format lint type-check test clean run run-exp1 run-exp2 run-exp3 run-exp4 run-exp5 run-all docs
+.PHONY: help install dev-install format lint type-check test clean run run-multi run-cross-val run-ablation run-interaction run-power run-all docs
 
 help:
 	@echo "FMD Sensitivity Analysis - Available Commands"
 	@echo "=============================================="
 	@echo ""
-	@echo "Setup and Installation:"
+	@echo "Setup:"
 	@echo "  make install        - Install production dependencies"
 	@echo "  make dev-install    - Install development dependencies"
 	@echo ""
@@ -15,16 +15,15 @@ help:
 	@echo "  make test           - Run tests with pytest"
 	@echo ""
 	@echo "Experiments:"
-	@echo "  make run-exp1       - Run tokenization sensitivity experiment"
-	@echo "  make run-exp2       - Run model sensitivity experiment"
-	@echo "  make run-exp3       - Run expression ablation experiment"
-	@echo "  make run-exp4       - Run quantization sensitivity experiment"
-	@echo "  make run-exp5       - Run cross-genre stability experiment"
-	@echo "  make run-all        - Run all experiments"
+	@echo "  make run-multi      - Run multi-genre 4-model analysis (3840 FMD obs)"
+	@echo "  make run-cross-val  - Run cross-dataset validation"
+	@echo "  make run-ablation   - Run ablation study"
+	@echo "  make run-interaction- Run interaction analysis"
+	@echo "  make run-power      - Run sample-size power analysis"
+	@echo "  make run-all        - Run all experiments sequentially"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean          - Clean build artifacts and cache"
-	@echo "  make docs           - Generate documentation"
 
 install:
 	pip install -r requirements.txt
@@ -33,11 +32,11 @@ dev-install:
 	pip install -r requirements.txt
 
 format:
-	black src/ tests/ run_experiment.py
+	black src/ tests/ scripts/ main.py
 
 lint:
-	flake8 src/ tests/ run_experiment.py
-	ruff check src/ tests/ run_experiment.py
+	flake8 src/ tests/ scripts/ main.py
+	ruff check src/ tests/ scripts/ main.py
 
 type-check:
 	mypy src/ --ignore-missing-imports
@@ -48,23 +47,25 @@ test:
 test-quick:
 	pytest tests/ -v
 
-run-exp1:
-	python run_experiment.py --experiment exp1_tokenization_sensitivity
+run-multi:
+	python scripts/run_multi_genre_analysis.py
 
-run-exp2:
-	python run_experiment.py --experiment exp2_model_sensitivity
+run-cross-val:
+	python scripts/run_cross_dataset_validation.py
 
-run-exp3:
-	python run_experiment.py --experiment exp3_expression_ablation
+run-ablation:
+	python scripts/run_ablation_study.py
 
-run-exp4:
-	python run_experiment.py --experiment exp4_quantization_sensitivity
+run-interaction:
+	python scripts/run_interaction_analysis.py
 
-run-exp5:
-	python run_experiment.py --experiment exp5_cross_genre
+run-power:
+	python scripts/run_sample_size_ablation.py
 
 run-all:
-	python run_experiment.py --all
+	python scripts/run_multi_genre_analysis.py
+	python scripts/run_cross_dataset_validation.py
+	python scripts/run_sample_size_ablation.py
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +

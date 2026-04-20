@@ -336,14 +336,14 @@ class InteractionAnalyzer:
 
         report.append("\n## Hypotheses\n")
         report.append(
-            "- **Octuple + CLaMP-2**: Octuple produces significantly shorter token sequences. "
-            "CLaMP-2 (MIDI-native) encodes MIDI structure directly, but the compact Octuple "
+            "- **Octuple + MusicBERT-large**: Octuple produces significantly shorter token sequences. "
+            "MusicBERT-large (MIDI-native) encodes MIDI structure directly, but the compact Octuple "
             "representation may cause embeddings to cluster in a low-dimensional subspace, "
             "inflating FMD between genre distributions.\n"
         )
         report.append(
-            "- **REMI + CLaMP-2**: REMI's detailed beat-relative encoding provides rich "
-            "input for CLaMP-2's MIDI encoder, yielding well-separated genre clusters and low FMD.\n"
+            "- **REMI + MusicBERT-large**: REMI's detailed beat-relative encoding provides rich "
+            "input for MusicBERT-large's MIDI encoder, yielding well-separated genre clusters and low FMD.\n"
         )
 
         report.append("\n## Plots\n")

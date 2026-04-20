@@ -257,7 +257,7 @@ class AblationStudy:
         Returns:
             Comparison results across models
         """
-        models = ["CLaMP-1", "CLaMP-2"]
+        models = ["MusicBERT", "MusicBERT-large"]
         results = {}
 
         for model in models:
@@ -357,7 +357,7 @@ def main():
     # Run Experiment 3: Velocity removal ablation
     logger.info("\n=== EXPERIMENT 3: Velocity Removal Impact ===")
     ablation_results_velocity = ablation.run_ablation_experiment(
-        midi_files, "REMI", "CLaMP-2"
+        midi_files, "REMI", "MusicBERT-large"
     )
     ablation.save_results(ablation_results_velocity, "ablation_velocity.json")
     logger.info(ablation.generate_report(ablation_results_velocity))
@@ -365,7 +365,7 @@ def main():
     # Run Experiment 4: Hard quantization ablation
     logger.info("\n=== EXPERIMENT 4: Hard Quantization Impact ===")
     ablation_results_quantization = ablation.run_ablation_experiment(
-        midi_files, "REMI", "CLaMP-2"
+        midi_files, "REMI", "MusicBERT-large"
     )
     ablation.save_results(ablation_results_quantization, "ablation_quantization.json")
     logger.info(ablation.generate_report(ablation_results_quantization))
@@ -373,7 +373,7 @@ def main():
     # Run tokenization sensitivity comparison
     logger.info("\n=== TOKENIZATION SENSITIVITY COMPARISON ===")
     tokenization_comparison = ablation.compare_tokenization_sensitivity(
-        midi_files, "CLaMP-2"
+        midi_files, "MusicBERT-large"
     )
     ablation.save_results(tokenization_comparison, "tokenization_sensitivity.json")
     logger.info(ablation.generate_report(tokenization_comparison))

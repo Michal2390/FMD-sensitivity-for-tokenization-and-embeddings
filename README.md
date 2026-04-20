@@ -13,26 +13,25 @@
 
 This project implements a full experimental pipeline to analyze the impact of:
 - **4 tokenization strategies**: REMI, TSD, Octuple, MIDI-Like
-- **3 embedding models**: CLaMP-1, CLaMP-2, MusicBERT
+- **4 embedding models**: MusicBERT, MusicBERT-large, MERT, NLP-Baseline
 - **4 preprocessing configs**: original, no velocity, hard quantization, combined
 
 on **Frechet Music Distance (FMD)**, a metric for symbolic music similarity.
 
-We evaluated **2880 FMD observations** across **6 genre pairs** (rock, jazz, electronic, country) from the **Lakh MIDI Dataset**, with **48 pipeline variants** and 10× repeated subsampling per variant. Results are validated with **bootstrap confidence intervals**, **Holm–Bonferroni correction**, and **cross-dataset replication** on MidiCaps.
+We evaluated **3840 FMD observations** across **6 genre pairs** (rock, jazz, electronic, country) from the **Lakh MIDI Dataset**, with **64 pipeline variants** and 10× repeated subsampling per variant. Results are validated with **bootstrap confidence intervals**, **Holm–Bonferroni correction**, and **cross-dataset replication** on MidiCaps.
 
-## Key Findings (3-Model Analysis)
+## Key Findings (4-Model Analysis)
 
-### 🔥 Embedding Model Choice Dominates FMD Variance (η² = 0.78)
+### 🔥 Embedding Model Choice Dominates FMD Variance (η² = 0.94)
 
-With three embedding models (CLaMP-1, CLaMP-2, MusicBERT), the **model choice alone explains 78% of FMD variance** — far exceeding all other factors combined.
+With four embedding models (MusicBERT, MusicBERT-large, MERT, NLP-Baseline), the **model choice alone explains 94% of FMD variance** — far exceeding all other factors combined.
 
-| Source | η² | 95% CI | Partial η² | Interpretation |
-|--------|-----|--------|-----------|----------------|
-| **Model (main)** | **0.778** | **[0.764, 0.793]** | **0.844** | **Dominant** |
-| **Tokenizer × Model** | 0.051 | — | 0.260 | Medium interaction |
-| Tokenizer (main) | 0.020 | [0.013, 0.029] | 0.120 | Small |
-| Genre pair | 0.041 | — | — | Small (inherent) |
-| Preprocessing | 0.002 | [0.001, 0.008] | 0.015 | Negligible |
+| Source | η² | F | Interpretation |
+|--------|-----|---|----------------|
+| **Model (main)** | **0.939** | **22459.75** | **Dominant** |
+| **Tokenizer × Model** | 0.004 | 34.50 | Small interaction |
+| Tokenizer (main) | 0.003 | 69.92 | Negligible |
+| Preprocessing | 0.003 | 59.54 | Negligible |
 
 > **Bootstrap 95% CIs (5000 resamples)** confirm all intervals are non-overlapping — the model effect is robust and not an artefact.
 
@@ -169,19 +168,18 @@ We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is 
 > **Raw FMD varies 12.8× across models; after trace-normalization, only 1.9×.**
 > This confirms that the dominant η²(model) = 0.78 is largely a scale artefact, and nFMD enables fair cross-model comparison.
 
-## New: Extended Model Support (5 Embedding Models)
+## Embedding Models (4 Real HuggingFace Models)
 
-The pipeline now supports **5 embedding models** (up from 3), enabling analysis across both symbolic and audio-domain representations:
+The pipeline uses **4 embedding models**, all loaded from HuggingFace with real pretrained weights:
 
 | Model | Type | Architecture | Embedding Dim | Domain |
 |-------|------|-------------|---------------|--------|
-| CLaMP-1 | Contrastive | RoBERTa (ABC notation) | 384/512 | Symbolic |
-| CLaMP-2 | Contrastive | MIDI-native encoder | 768 | Symbolic |
-| MusicBERT | Masked LM | BERT (OctupleMIDI) | 768 | Symbolic |
-| **MIDI-BERT** | Masked LM | BERT (token sequences) | 768 | Symbolic |
+| MusicBERT | Masked LM | BERT (symbolic tokens) | 768 | Symbolic |
+| MusicBERT-large | Masked LM | BERT-large (symbolic tokens) | 1024 | Symbolic |
 | **MERT** | Self-supervised | Wav2Vec2-style (audio) | 768 | **Audio** |
+| **NLP-Baseline** | Sentence encoder | MPNet (general text) | 768 | **Text (control)** |
 
-With 5 models: **80 pipeline variants** × 6 genre pairs × 10 repeats = **4800 FMD observations**.
+With 4 models: **64 pipeline variants** × 6 genre pairs × 10 repeats = **3840 FMD observations**.
 
 MERT provides a unique cross-domain contrast: it processes MIDI→synthesized audio→embedding, testing whether FMD sensitivity patterns hold across the symbolic/audio boundary.
 
@@ -225,14 +223,15 @@ Generated plots: `sample_size_stability.{png,pdf}`, `sample_size_power.{png,pdf}
                     └────────────┬────────────────────┘
                                  │
                     ┌────────────▼────────────────────┐
-                    │    Embedding Model (×3)           │
-                    │  CLaMP-1 | CLaMP-2 | MusicBERT   │
+                    │    Embedding Model (×4)           │
+                    │  MusicBERT | MusicBERT-large     │
+                    │  MERT | NLP-Baseline             │
                     └────────────┬────────────────────┘
                                  │
                     ┌────────────▼────────────────────┐
                     │   FMD Computation (×6 pairs)     │
                     │   10× repeated subsampling       │
-                    │   = 2880 total observations      │
+                    │   = 3840 total observations      │
                     └──────────────────────────────────┘
 ```
 
@@ -242,11 +241,12 @@ Generated plots: `sample_size_stability.{png,pdf}`, `sample_size_power.{png,pdf}
 ├── src/                           # Source code
 │   ├── preprocessing/             # MIDI preprocessing
 │   ├── tokenization/              # 4 tokenizers (MidiTok)
-│   ├── embeddings/                # CLaMP-1/2 + MusicBERT extraction + cache
+│   ├── embeddings/                # MusicBERT, MERT, NLP-Baseline extraction + cache
 │   ├── metrics/                   # FMD (Frechet Music Distance)
 │   ├── experiments/               # Analysis, bootstrap CI & publication plots
 │   └── utils/                     # Config and helpers
 │
+├── scripts/                       # Experiment runners, demos, data tools
 ├── tests/                         # 53+ unit tests
 ├── configs/                       # YAML configuration
 ├── data/                          # Lakh MIDI subsets
@@ -279,20 +279,20 @@ python main.py --mode tests          # Run test suite
 
 ### Multi-Genre Analysis
 ```bash
-python run_multi_genre_analysis.py   # 4 genres × 80 variants × 10 repeats (5 models)
+python scripts/run_multi_genre_analysis.py   # 4 genres × 64 variants × 10 repeats (4 models)
 ```
 
 ### Sample-Size Sensitivity (Power Analysis)
 ```bash
-python run_sample_size_ablation.py   # η² stability & power curves
+python scripts/run_sample_size_ablation.py   # η² stability & power curves
 ```
 Produces ANOVA tables, interaction plots, η² heatmaps, and violin plots in `results/reports/lakh_multi/` and `results/plots/paper/`.
 
 ### Cross-Dataset Validation (3-Model)
 ```bash
-python run_cross_dataset_validation.py --source midicaps # MidiCaps (3-model, ~95 min)
-python run_cross_dataset_validation.py                   # All sources (CD1 + MidiCaps)
-python run_cross_dataset_validation.py --source cd1      # Tagtraum CD1 only
+python scripts/run_cross_dataset_validation.py --source midicaps # MidiCaps (3-model, ~95 min)
+python scripts/run_cross_dataset_validation.py                   # All sources (CD1 + MidiCaps)
+python scripts/run_cross_dataset_validation.py --source cd1      # Tagtraum CD1 only
 python main.py --mode cross-validate                     # Via main entry point
 python main.py --mode cross-validate --cv-source cd1     # Specific source
 ```
@@ -320,9 +320,9 @@ pytest tests/test_paper_pipeline.py -v
 
 ### Run Demos
 ```bash
-python demo_embeddings.py --demo all
-python demo_fmd.py --demo basic
-python run_ablation_study.py
+python scripts/demo_embeddings.py --demo all
+python scripts/demo_fmd.py --demo basic
+python scripts/run_ablation_study.py
 ```
 
 ## Weeks Overview

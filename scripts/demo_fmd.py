@@ -151,7 +151,7 @@ def demo_embedding_fmd_integration():
     embeddings_list = []
     
     for name, tokens in token_sequences_list:
-        emb = extractor.extract_embeddings([tokens], "CLaMP-2")[0]
+        emb = extractor.extract_embeddings([tokens], "MusicBERT-large")[0]
         embeddings_list.append((name, emb))
         print(f"  [{len(embeddings_list)}] Extracted embedding for {name}")
     
@@ -259,7 +259,7 @@ def demo_tokenization_sensitivity():
         for dataset_name, tokens in datasets.items():
             # In real scenario, different tokenizers would produce different token sequences
             # Here we just create different embeddings to simulate
-            base_emb = extractor.extract_embeddings([tokens], "CLaMP-2")[0]
+            base_emb = extractor.extract_embeddings([tokens], "MusicBERT-large")[0]
             # Add tokenizer-specific perturbation
             perturbation = {
                 "REMI": np.random.randn(base_emb.shape[0]) * 0.05,

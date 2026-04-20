@@ -142,7 +142,7 @@ class TestEmbeddingExtractionForVariants:
         # Create simple token sequence
         tokens = [list(range(1, 11))]
         
-        embeddings = extractor.extract_embeddings(tokens, "CLaMP-2")
+        embeddings = extractor.extract_embeddings(tokens, "MusicBERT-large")
         
         assert embeddings.shape[0] == 1
         assert embeddings.shape[1] > 0
@@ -154,8 +154,8 @@ class TestEmbeddingExtractionForVariants:
         
         tokens = [list(range(1, 11))]
         
-        emb1 = extractor.extract_embeddings(tokens, "CLaMP-2")
-        emb2 = extractor.extract_embeddings(tokens, "CLaMP-2")
+        emb1 = extractor.extract_embeddings(tokens, "MusicBERT-large")
+        emb2 = extractor.extract_embeddings(tokens, "MusicBERT-large")
         
         # Due to caching or determinism, should be close
         # (Note: without cache, may differ due to randomness in dummy model)
@@ -216,7 +216,7 @@ class TestAblationExperimentStructure:
         results = {
             "total_files": 3,
             "tokenizer": "REMI",
-            "model": "CLaMP-2",
+            "model": "MusicBERT-large",
             "per_file_results": {},
             "aggregate_statistics": {
                 "no_velocity": {

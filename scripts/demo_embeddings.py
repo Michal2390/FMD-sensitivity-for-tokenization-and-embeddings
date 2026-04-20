@@ -1,4 +1,4 @@
-"""Demo script for embedding extraction with CLaMP models."""
+"""Demo script for embedding extraction with embedding models."""
 
 import sys
 from pathlib import Path
@@ -51,7 +51,7 @@ def demo_single_encoding():
     print(f"Number of tokens: {len(tokens)}")
     
     # Encode with both models
-    for model_name in ["CLaMP-1", "CLaMP-2"]:
+    for model_name in ["MusicBERT", "MusicBERT-large"]:
         print(f"\n--- Encoding with {model_name} ---")
         model = EmbeddingFactory.create_model(config, model_name)
         embedding = model.encode(tokens)
@@ -88,7 +88,7 @@ def demo_batch_encoding():
         print(f"  {i}: {seq}")
     
     # Batch encode
-    model = EmbeddingFactory.create_model(config, "CLaMP-2")
+    model = EmbeddingFactory.create_model(config, "MusicBERT-large")
     embeddings = model.encode_batch(token_sequences)
     
     print(f"\n--- Batch Encoding Results ---")
@@ -129,7 +129,7 @@ def demo_extractor():
     print(f"\nProcessing {len(token_sequences)} token sequences...")
     
     # Extract embeddings with both models
-    for model_name in ["CLaMP-1", "CLaMP-2"]:
+    for model_name in ["MusicBERT", "MusicBERT-large"]:
         print(f"\n--- Extracting with {model_name} ---")
         
         embeddings = extractor.extract_embeddings(token_sequences, model_name)
@@ -162,12 +162,12 @@ def demo_caching():
     # First extraction
     token_sequence = [[1, 2, 3, 4, 5]]
     print(f"\nFirst extraction of tokens: {token_sequence[0]}")
-    emb1 = extractor.extract_embeddings(token_sequence, "CLaMP-2")
+    emb1 = extractor.extract_embeddings(token_sequence, "MusicBERT-large")
     print(f"  [OK] Extracted (shape: {emb1.shape})")
     
     # Second extraction (should use cache)
     print(f"\nSecond extraction of same tokens (should use cache)...")
-    emb2 = extractor.extract_embeddings(token_sequence, "CLaMP-2")
+    emb2 = extractor.extract_embeddings(token_sequence, "MusicBERT-large")
     print(f"  [OK] Extracted from cache (shape: {emb2.shape})")
     
     # Verify they're identical
@@ -179,7 +179,7 @@ def demo_caching():
     # Different sequence should not use cache
     print(f"\nThird extraction of different tokens...")
     token_sequence2 = [[10, 20, 30, 40, 50]]
-    emb3 = extractor.extract_embeddings(token_sequence2, "CLaMP-2")
+    emb3 = extractor.extract_embeddings(token_sequence2, "MusicBERT-large")
     print(f"  [OK] Extracted (shape: {emb3.shape})")
     
     if not np.allclose(emb1, emb3):
@@ -216,7 +216,7 @@ def demo_similarity():
     # Extract embeddings
     embeddings = extractor.extract_embeddings(
         [similar_seq1, similar_seq2, different_seq],
-        "CLaMP-2"
+        "MusicBERT-large"
     )
     
     # Compute pairwise distances
@@ -262,7 +262,7 @@ def main():
     
     print("\n" + "=" * 80)
     print("EMBEDDING EXTRACTION - DEMO SCRIPT")
-    print("Week 3: CLaMP Models Integration")
+    print("Week 3: Embedding Models Integration")
     print("=" * 80)
     
     # Run selected demos

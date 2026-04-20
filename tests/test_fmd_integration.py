@@ -181,14 +181,14 @@ class TestFMDComparator:
     def test_compare_models(self, comparator):
         """Test comparing FMD across models."""
         embeddings_by_model = {
-            "CLaMP-1": np.random.randn(100, 512),
-            "CLaMP-2": np.random.randn(100, 512),
+            "MusicBERT": np.random.randn(100, 768),
+            "MusicBERT-large": np.random.randn(100, 1024),
         }
         
         results = comparator.compare_models(embeddings_by_model)
         
-        assert "CLaMP-1_vs_CLaMP-2" in results
-        assert isinstance(results["CLaMP-1_vs_CLaMP-2"], float)
+        assert "MusicBERT_vs_MusicBERT-large" in results
+        assert isinstance(results["MusicBERT_vs_MusicBERT-large"], float)
 
 
 class TestEmbeddingFMDIntegration:
@@ -213,8 +213,8 @@ class TestEmbeddingFMDIntegration:
         
         # Extract embeddings
         extractor = EmbeddingExtractor(config)
-        embeddings = extractor.extract_embeddings(token_sequences, "CLaMP-2")
-        
+        embeddings = extractor.extract_embeddings(token_sequences, "MusicBERT-large")
+
         # Compute FMD
         fmd_calc = FrechetMusicDistance(config)
         fmd = fmd_calc.compute_fmd(embeddings, embeddings)
@@ -252,7 +252,7 @@ class TestEmbeddingFMDIntegration:
         
         embeddings_list = []
         for i, tokens in enumerate(token_sequences_list):
-            emb = extractor.extract_embeddings([tokens], "CLaMP-2")[0]
+            emb = extractor.extract_embeddings([tokens], "MusicBERT-large")[0]
             embeddings_list.append((f"dataset_{i}", emb))
         
         # Compute pairwise FMD

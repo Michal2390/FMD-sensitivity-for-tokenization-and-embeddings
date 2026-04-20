@@ -9,8 +9,9 @@ import time
 from pathlib import Path
 from tqdm import tqdm
 
-# Add src to path
+# Add src and scripts to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
 from experiments.paper_pipeline import PaperExperimentRunner
 from experiments.publication_plots import generate_publication_plots

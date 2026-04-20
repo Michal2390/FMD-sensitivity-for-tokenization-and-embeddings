@@ -30,6 +30,7 @@ extract_pdf.py
 .gen_*.txt
 .last_*.txt
 .pytest_status.txt
+.commit_msg.txt
 
 # Private files (not for public repo)
 PUBLIKACJA_OPINIA.md

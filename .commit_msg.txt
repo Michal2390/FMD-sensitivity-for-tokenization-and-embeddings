@@ -1,10 +1,10 @@
-Replace 5 fake embedding models with 4 real ones (MusicBERT, MusicBERT-large, MERT, NLP-Baseline)
+Refactor: clean project structure, fix all old model references
 
-- extractor.py: Remove CLaMP-1/2 and MIDI-BERT (used fallback proxy models, not real music models). Add MusicBERT (manoskary/musicbert, 768d), MusicBERT-large (manoskary/musicbert-large, 1024d), MERT (m-a-p/MERT-v1-95M, 768d audio model), NLP-Baseline (all-mpnet-base-v2, intentional control). Refactor with _TextEncoderModel base class.
-- config.yaml: Update embeddings.models and all experiment references to new 4-model set.
-- fmd.py: Fix NaN/Inf crash in eigenvalue fallback (nan_to_num), increase epsilon 1e-6 -> 1e-4 for 1024-dim stability.
-- New 4-model results: 3840 FMD observations. Three-way ANOVA: eta_sq(model)=0.939, eta_sq(tokenizer)=0.003, eta_sq(preprocessing)=0.003.
-- run_sample_size_ablation.py: New script for sample-size sensitivity / power analysis.
-- Updated tests (test_embeddings.py) and plots (multi_*.png) for 4-model configuration.
-- Remove duplicate PDF plot files (keep PNG only).
+- Move 12 loose scripts from root to scripts/ (run_*.py, demo_*.py, analyze_results.py, run_all_analyses.sh). Root now contains only main.py.
+- Update main.py to add scripts/ to sys.path for run_experiment import.
+- Rewrite Makefile with new script paths (run-multi, run-cross-val, run-ablation, run-power targets).
+- Replace all CLaMP-1/CLaMP-2/MIDI-BERT references with MusicBERT/MusicBERT-large/MERT across 10+ files (src, tests, scripts).
+- Update README.md: 4 models, 3840 observations, eta_sq(model)=0.939, new script paths, updated diagram.
+- Delete dead files: .commit_msg.txt, rerun_after_current.sh, validate_week2.py, extract_pdf.py, htmlcov/.
+- Update .gitignore with .commit_msg.txt pattern.
 

@@ -46,7 +46,7 @@ def _save(fig: plt.Figure, base_path: Path) -> str:
 
 
 def _parse_variant(variant_str: str) -> Dict[str, str]:
-    """Parse 'tok=REMI|model=CLaMP-1|vel=on|quant=off' into dict."""
+    """Parse 'tok=REMI|model=MusicBERT|vel=on|quant=off' into dict."""
     parts = {}
     for segment in variant_str.split("|"):
         if "=" in segment:
@@ -136,7 +136,7 @@ def generate_lakh_plots(config: Dict) -> Dict[str, str]:
     if df is not None and not df.empty and "bootstrap_ci_lower" in df.columns:
         fig, ax = plt.subplots(figsize=(14, 6))
         sorted_df = df.sort_values("fmd").reset_index(drop=True)
-        colors = {"CLaMP-1": "#1f77b4", "CLaMP-2": "#ff7f0e"}
+        colors = {"MusicBERT": "#1f77b4", "MusicBERT-large": "#ff7f0e", "MERT": "#2ca02c", "NLP-Baseline": "#d62728"}
         for i, row in sorted_df.iterrows():
             color = colors.get(row["model"], "gray")
             ci_lower = row.get("bootstrap_ci_lower", row["fmd"])

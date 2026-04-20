@@ -72,7 +72,7 @@ def light_config(tmp_path: Path):
             ]
         },
         "embeddings": {
-            "models": [{"name": "CLaMP-1"}, {"name": "CLaMP-2"}],
+            "models": [{"name": "MusicBERT"}, {"name": "MusicBERT-large"}],
         },
         "results": {"reports_dir": str(tmp_path / "reports")},
         "paper": {
@@ -124,7 +124,7 @@ def test_parse_pairs_handles_mixed_formats():
 
 
 def test_run_pairwise_and_outputs(runner):
-    variants = runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    variants = runner.build_variants(tokenizers=["REMI"], models=["MusicBERT"], preprocessing_grid=[(False, False)])
     rows = runner.run_pairwise_benchmark(variants)
     assert len(rows) == 1
     assert rows[0]["dataset_a"] == "maestro"
@@ -167,7 +167,7 @@ def test_pairwise_all_combinations(monkeypatch, light_config):
     local_runner = pipeline_mod.PaperExperimentRunner(light_config)
     local_runner._extract_dataset_embeddings = lambda dataset_name, variant: np.zeros((5, 8), dtype=np.float32)
 
-    variants = local_runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    variants = local_runner.build_variants(tokenizers=["REMI"], models=["MusicBERT"], preprocessing_grid=[(False, False)])
     rows = local_runner.run_pairwise_benchmark(variants)
     # 3 datasets => C(3,2) = 3 pairs.
     assert len(rows) == 3
@@ -189,7 +189,7 @@ def test_strict_mode_marks_invalid_pair(monkeypatch, light_config):
         return np.zeros((5, 8), dtype=np.float32)
 
     local_runner._extract_dataset_embeddings = _fake_extract  # type: ignore[attr-defined]
-    variants = local_runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    variants = local_runner.build_variants(tokenizers=["REMI"], models=["MusicBERT"], preprocessing_grid=[(False, False)])
     rows = local_runner.run_pairwise_benchmark(variants)
     assert len(rows) == 1
     assert rows[0]["valid"] is False
@@ -212,13 +212,13 @@ def test_hard_strict_raises_immediately(monkeypatch, light_config):
         return np.zeros((5, 8), dtype=np.float32)
 
     local_runner._extract_dataset_embeddings = _fake_extract  # type: ignore[attr-defined]
-    variants = local_runner.build_variants(tokenizers=["REMI"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    variants = local_runner.build_variants(tokenizers=["REMI"], models=["MusicBERT"], preprocessing_grid=[(False, False)])
     with pytest.raises(RuntimeError):
         local_runner.run_pairwise_benchmark(variants)
 
 
 def test_split_rows_and_effects(runner):
-    variants = runner.build_variants(tokenizers=["REMI", "Octuple"], models=["CLaMP-1"], preprocessing_grid=[(False, False)])
+    variants = runner.build_variants(tokenizers=["REMI", "Octuple"], models=["MusicBERT"], preprocessing_grid=[(False, False)])
     rows = runner.run_pairwise_benchmark(variants)
     split = runner._split_pairwise_rows(rows)
     assert len(split["all"]) == len(rows)

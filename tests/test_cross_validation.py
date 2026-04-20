@@ -206,7 +206,7 @@ def test_compute_cell_means():
 
     df = pd.DataFrame({
         "tokenizer": ["REMI", "REMI", "Octuple", "Octuple"],
-        "model": ["CLaMP-1", "CLaMP-2", "CLaMP-1", "CLaMP-2"],
+        "model": ["MusicBERT", "MusicBERT-large", "MusicBERT", "MusicBERT-large"],
         "fmd": [0.2, 0.1, 0.3, 0.4],
     })
     cells = compute_cell_means(df)
