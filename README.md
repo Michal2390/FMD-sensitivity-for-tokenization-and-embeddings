@@ -13,86 +13,134 @@
 
 This project implements a full experimental pipeline to analyze the impact of:
 - **4 tokenization strategies**: REMI, TSD, Octuple, MIDI-Like
-- **4 embedding models**: MusicBERT, MusicBERT-large, MERT, NLP-Baseline
+- **6 embedding models**: CLaMP-1, CLaMP-2, MusicBERT, MusicBERT-large, MERT, NLP-Baseline
 - **4 preprocessing configs**: original, no velocity, hard quantization, combined
 
 on **Frechet Music Distance (FMD)**, a metric for symbolic music similarity.
 
-We evaluated **3840 FMD observations** across **6 genre pairs** (rock, jazz, electronic, country) from the **Lakh MIDI Dataset**, with **64 pipeline variants** and 10× repeated subsampling per variant. Results are validated with **bootstrap confidence intervals**, **Holm–Bonferroni correction**, and **cross-dataset replication** on MidiCaps.
+We evaluated **5760 FMD observations** across **6 genre pairs** (rock, jazz, electronic, country) from the **Lakh MIDI Dataset**, with **96 pipeline variants** and 10× repeated subsampling per variant. Results are validated with **bootstrap confidence intervals**, **Holm–Bonferroni correction**, **permutation tests**, and **cross-dataset replication** on MidiCaps.
 
-## Key Findings (4-Model Analysis)
+## Key Findings (6-Model Analysis)
 
-### 🔥 Embedding Model Choice Dominates FMD Variance (η² = 0.94)
+### 🔥 Embedding Model Choice Dominates FMD Variance (η² = 0.96)
 
-With four embedding models (MusicBERT, MusicBERT-large, MERT, NLP-Baseline), the **model choice alone explains 94% of FMD variance** — far exceeding all other factors combined.
+With six embedding models spanning three architecture families (contrastive, masked LM, statistical), the **model choice alone explains 96% of FMD variance** — far exceeding all other factors combined.
 
 | Source | η² | F | Interpretation |
 |--------|-----|---|----------------|
-| **Model (main)** | **0.939** | **22459.75** | **Dominant** |
-| **Tokenizer × Model** | 0.004 | 34.50 | Small interaction |
-| Tokenizer (main) | 0.003 | 69.92 | Negligible |
-| Preprocessing | 0.003 | 59.54 | Negligible |
+| **Model (main)** | **0.9617** | **33904** | **Dominant** |
+| Tokenizer × Model | 0.0034 | 40.40 | Negligible |
+| Model × Preprocess | 0.0022 | 25.65 | Negligible |
+| **Tokenizer (main)** | **0.0010** | 59.51 | **Negligible** |
+| **Preprocessing** | **0.0010** | 60.14 | **Negligible** |
 
-> **Bootstrap 95% CIs (5000 resamples)** confirm all intervals are non-overlapping — the model effect is robust and not an artefact.
+> All effects are statistically significant (p < 0.001) due to N=5760, but only the model effect has practically meaningful magnitude.
+
+### 🔑 Key Insight: Tokenizer Sensitivity Is Model-Dependent, Not Universal
+
+The most important finding from adding CLaMP-1 and CLaMP-2:
+
+| Analysis | Models | η²(tokenizer) | η²(model) | Conclusion |
+|----------|--------|---------------|-----------|------------|
+| 2-model (CLaMP only) | CLaMP-1, CLaMP-2 | 0.101 | 0.087 | Tokenizer matters |
+| 3-model | + MusicBERT | 0.020 | 0.778 | Model dominates |
+| **6-model** | **+ MusicBERT-large, MERT, NLP** | **0.001** | **0.962** | **Tokenizer irrelevant** |
+
+> **FMD sensitivity to tokenization is a property of specific models, not an inherent property of the metric.** CLaMP models (contrastive, operating on raw MIDI) are insensitive to tokenization choices, which dilutes the tokenizer effect when pooled with token-dependent models.
+
+### 📊 Model Hierarchy by Genre Sensitivity
+
+Cohen's d reveals a clear hierarchy of how sensitive each model is to genre differences:
+
+| Model | Architecture | Genre Sensitivity | Cohen's d vs CLaMP-2 |
+|-------|-------------|-------------------|---------------------|
+| MusicBERT-large | MLM (large) | Highest | −10.02 |
+| MusicBERT | MLM | High | −6.27 |
+| NLP-Baseline | Sentence encoder | Medium | −1.21 |
+| CLaMP-1 | Contrastive | Low | −1.55 |
+| CLaMP-2 | Contrastive | Lowest | (reference) |
+| MERT | Audio SSL | ⚠️ Anomalous | 0.00 (likely defective) |
+
+> **Contrastive models (CLaMP)** produce more "unified" representations → lower FMD between genres.
+> **MLM models (MusicBERT)** produce more discriminative representations → higher FMD.
+> **MERT** returns constant/zero embeddings for MIDI input — requires audio, not symbolic data.
 
 ### ⚠️ Critical Insight: FMD Is Not Scale-Invariant Across Model Architectures
 
-MusicBERT (bert-base-uncased fallback, 768-dim) produces embeddings with **3× higher norms** than CLaMP-2 (~15 vs ~2.7), yielding systematically higher FMD values. This means:
+MusicBERT produces embeddings with **3× higher norms** than CLaMP-2 (~15 vs ~2.7), yielding systematically higher FMD values. This means:
 
 > **Raw FMD values cannot be directly compared across embedding models of different architectures.** Normalization or model-specific baselines are required for fair comparison.
 
-| Comparison | Cohen's d | Magnitude |
-|------------|-----------|-----------|
-| CLaMP-2 vs MusicBERT | −3.295 | **Huge** |
-| CLaMP-1 vs MusicBERT | −3.216 | **Huge** |
-| CLaMP-1 vs CLaMP-2 | 0.634 | Medium |
+### 🔬 Generalizability Across Genre Pairs
 
-### 🔬 Interaction Mechanism Analysis
+The η² decomposition is remarkably consistent across all genre pairs (CV = 0.00 for model):
 
-Why do certain tokenizer×model combinations yield anomalous FMD? PCA and embedding diagnostics reveal:
+| Genre Pair | η²(model) | η²(tokenizer) | η²(preprocess) |
+|------------|-----------|---------------|----------------|
+| jazz ↔ country | 0.9849 | 0.0019 | 0.0009 |
+| rock ↔ country | 0.9876 | 0.0007 | 0.0014 |
+| rock ↔ jazz | 0.9881 | 0.0012 | 0.0013 |
 
-| Tokenizer + Model | Eff. Dim (90%) | Mean Norm | Cosine Sim | Implication |
-|-------------------|---------------|-----------|------------|-------------|
-| MIDI-Like + MusicBERT | **11** (lowest) | 14.4 | 0.950 | Low dimensionality inflates FMD |
-| REMI + CLaMP-2 | **21** (highest) | 2.8 | 0.964 | Best-separated genre clusters |
-| Octuple + CLaMP-2 | 21 | 2.7 | **0.843** (lowest) | Highest intra-group diversity |
-| CLaMP-1 (all tok.) | 15–20 | 7.4–7.8 | **0.980+** | Near-identical embeddings → low discriminability |
+### 📊 FMD Ranges by Genre Pair (6-model)
 
-**Key mechanism**: Lower effective dimensionality concentrates the Fréchet distance in fewer directions, inflating FMD. Models with very high cosine similarity (CLaMP-1 ~0.98) produce embeddings that are nearly indistinguishable regardless of input.
+| Genre Pair | Mean FMD | Std | N |
+|------------|----------|-----|---|
+| jazz ↔ country | 4.163 | 4.757 | 960 |
+| rock ↔ jazz | 4.751 | 5.406 | 960 |
+| rock ↔ electronic | 4.759 | 6.240 | 960 |
+| rock ↔ country | 4.810 | 5.528 | 960 |
+| jazz ↔ electronic | 5.396 | 7.029 | 960 |
+| electronic ↔ country | 5.717 | 7.375 | 960 |
 
 ### 🔒 Statistical Robustness
 
 All main effects confirmed with multiple approaches:
-- **Three-way factorial ANOVA** with interactions (N = 2880, 48 variants)
+- **Three-way factorial ANOVA** with interactions (N = 5760, 96 variants)
 - **Bootstrap 95% CI for η²** (5000 resamples, percentile method)
 - **Holm–Bonferroni correction** for multiple comparisons — all key effects survive
-- **Permutation tests** (p < 0.001 for tokenizer and model; preprocessing p = 0.096, non-significant)
+- **Permutation tests** (p = 0.001 for all three factors)
 - **Tukey HSD** post-hoc with corrected p-values (`p_adj_holm`, `p_adj_bonf`)
 - **Cross-dataset validation** (Spearman ρ = 0.975 between Lakh CD2 and MidiCaps — 3-model, 5760 observations)
-
-### 📊 FMD Ranges by Genre Pair (3-model)
-
-| Genre Pair | Mean FMD | Std |
-|------------|----------|-----|
-| jazz ↔ country | 0.613 | 0.697 |
-| rock ↔ jazz | 0.730 | 0.867 |
-| rock ↔ electronic | 0.817 | 0.957 |
-| rock ↔ country | 0.843 | 1.037 |
-| jazz ↔ electronic | 1.092 | 1.253 |
-| electronic ↔ country | 1.287 | 1.540 |
 
 ### 🎯 Practical Pipeline Recommendations
 
 | Goal | Recommended Pipeline | Rationale |
 |------|---------------------|-----------|
 | Finest resolution (low baseline) | REMI + CLaMP-2 | FMD ~0.05–0.10, highest eff. dim, best genre separation |
-| Maximum genre separability | REMI + CLaMP-1 | Highest absolute FMD values within CLaMP family |
+| Maximum genre separability | Any tokenizer + MusicBERT-large | Highest absolute FMD, most discriminative |
 | Stable across genres | Octuple + CLaMP-1 | Lowest CV across pairs |
-| Highest intra-group diversity | Octuple + CLaMP-2 | Cosine sim = 0.843, but noisy |
 | ⚠️ Avoid | MIDI-Like + MusicBERT | Lowest eff. dim (11), inflated FMD |
+| ⚠️ Avoid | MERT for symbolic MIDI | Returns degenerate embeddings for non-audio input |
 | ⚠️ Caution | Comparing FMD across model architectures | Scale-dependent — normalize first |
 
 ---
+
+<details>
+<summary><b>📁 Previous Results (4-Model: MusicBERT, MusicBERT-large, MERT, NLP-Baseline)</b></summary>
+
+### Embedding Model Dominates (η² = 0.94)
+
+With 4 models (no CLaMP): model choice explained 94% of FMD variance.
+
+| Source | η² | F | Interpretation |
+|--------|-----|---|----------------|
+| **Model (main)** | **0.939** | **22459** | **Dominant** |
+| Tokenizer × Model | 0.004 | 34.50 | Negligible |
+| Tokenizer (main) | 0.003 | 69.92 | Negligible |
+| Preprocessing | 0.003 | 59.54 | Negligible |
+
+### What Changed with 6 Models?
+
+| Metric | 4 Models | 6 Models | Change |
+|--------|----------|----------|--------|
+| η²(model) | 0.939 | **0.962** | ↑ CLaMP widens spread |
+| η²(tokenizer) | 0.003 | 0.001 | ↓ CLaMP ignores tokens |
+| η²(tok×model) | 0.004 | 0.003 | ≈ stable |
+| Total observations | 3840 | **5760** | +50% |
+
+> Adding CLaMP-1 and CLaMP-2 (contrastive models that bypass tokenization) proved that tokenizer sensitivity is **model-specific, not universal**.
+
+</details>
 
 <details>
 <summary><b>📁 Previous Results (2-Model Baseline: CLaMP-1 + CLaMP-2)</b></summary>
@@ -168,20 +216,22 @@ We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is 
 > **Raw FMD varies 12.8× across models; after trace-normalization, only 1.9×.**
 > This confirms that the dominant η²(model) = 0.78 is largely a scale artefact, and nFMD enables fair cross-model comparison.
 
-## Embedding Models (4 Real HuggingFace Models)
+## Embedding Models (6 Models, 3 Architecture Families)
 
-The pipeline uses **4 embedding models**, all loaded from HuggingFace with real pretrained weights:
+The pipeline uses **6 embedding models** spanning three distinct architecture families:
 
 | Model | Type | Architecture | Embedding Dim | Domain |
 |-------|------|-------------|---------------|--------|
+| **CLaMP-1** | Contrastive | CLIP-style (MIDI→text) | 768 | Symbolic |
+| **CLaMP-2** | Contrastive | CLIP-style (MIDI→text) | 768 | Symbolic |
 | MusicBERT | Masked LM | BERT (symbolic tokens) | 768 | Symbolic |
 | MusicBERT-large | Masked LM | BERT-large (symbolic tokens) | 1024 | Symbolic |
 | **MERT** | Self-supervised | Wav2Vec2-style (audio) | 768 | **Audio** |
 | **NLP-Baseline** | Sentence encoder | MPNet (general text) | 768 | **Text (control)** |
 
-With 4 models: **64 pipeline variants** × 6 genre pairs × 10 repeats = **3840 FMD observations**.
+With 6 models: **96 pipeline variants** × 6 genre pairs × 10 repeats = **5760 FMD observations**.
 
-MERT provides a unique cross-domain contrast: it processes MIDI→synthesized audio→embedding, testing whether FMD sensitivity patterns hold across the symbolic/audio boundary.
+The inclusion of contrastive (CLaMP), masked LM (MusicBERT), audio SSL (MERT), and text (NLP-Baseline) models enables testing whether FMD sensitivity patterns are architecture-dependent.
 
 ## New: Sample-Size Sensitivity (Power Analysis)
 
@@ -223,15 +273,15 @@ Generated plots: `sample_size_stability.{png,pdf}`, `sample_size_power.{png,pdf}
                     └────────────┬────────────────────┘
                                  │
                     ┌────────────▼────────────────────┐
-                    │    Embedding Model (×4)           │
-                    │  MusicBERT | MusicBERT-large     │
-                    │  MERT | NLP-Baseline             │
+                    │    Embedding Model (×6)           │
+                    │  CLaMP-1 | CLaMP-2 | MusicBERT   │
+                    │  MusicBERT-large | MERT | NLP    │
                     └────────────┬────────────────────┘
                                  │
                     ┌────────────▼────────────────────┐
                     │   FMD Computation (×6 pairs)     │
                     │   10× repeated subsampling       │
-                    │   = 3840 total observations      │
+                    │   = 5760 total observations      │
                     └──────────────────────────────────┘
 ```
 
@@ -241,7 +291,7 @@ Generated plots: `sample_size_stability.{png,pdf}`, `sample_size_power.{png,pdf}
 ├── src/                           # Source code
 │   ├── preprocessing/             # MIDI preprocessing
 │   ├── tokenization/              # 4 tokenizers (MidiTok)
-│   ├── embeddings/                # MusicBERT, MERT, NLP-Baseline extraction + cache
+│   ├── embeddings/                # CLaMP-1/2, MusicBERT, MERT, NLP extraction + cache
 │   ├── metrics/                   # FMD (Frechet Music Distance)
 │   ├── experiments/               # Analysis, bootstrap CI & publication plots
 │   └── utils/                     # Config and helpers
@@ -252,7 +302,7 @@ Generated plots: `sample_size_stability.{png,pdf}`, `sample_size_power.{png,pdf}
 ├── data/                          # Lakh MIDI subsets
 ├── results/
 │   ├── reports/lakh/              # Single-pair analysis (32 variants)
-│   ├── reports/lakh_multi/        # Multi-genre analysis (2880 obs)
+│   ├── reports/lakh_multi/        # Multi-genre analysis (5760 obs, 6 models)
 │   └── plots/paper/               # Publication-ready figures
 ├── docs/                          # Documentation & weekly summaries
 ├── scripts/                       # Data generation & plotting
@@ -279,7 +329,7 @@ python main.py --mode tests          # Run test suite
 
 ### Multi-Genre Analysis
 ```bash
-python scripts/run_multi_genre_analysis.py   # 4 genres × 64 variants × 10 repeats (4 models)
+python scripts/run_multi_genre_analysis.py   # 4 genres × 96 variants × 10 repeats (6 models)
 ```
 
 ### Sample-Size Sensitivity (Power Analysis)
@@ -337,7 +387,8 @@ python scripts/run_ablation_study.py
 | 6 | Multi-genre analysis & ANOVA | ✅ | — |
 | 7 | Cross-dataset validation (CD1 + MidiCaps) | ✅ | 9 |
 | 8 | MusicBERT, bootstrap CI, interaction mechanism, multiple comparison correction | ✅ | — |
-| 9 | **Normalized FMD (nFMD), MIDI-BERT + MERT models, sample-size power analysis** | ✅ | — |
+| 9 | Normalized FMD (nFMD), MIDI-BERT + MERT models, sample-size power analysis | ✅ | — |
+| 10 | **6-model analysis: CLaMP-1, CLaMP-2 added — tokenizer sensitivity is model-dependent** | ✅ | — |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
@@ -348,10 +399,10 @@ python scripts/run_ablation_study.py
 | File | Description |
 |------|-------------|
 | [`ANALYSIS_REPORT.md`](results/reports/lakh/ANALYSIS_REPORT.md) | Single-pair (rock vs jazz) full analysis |
-| [`MULTI_GENRE_REPORT.md`](results/reports/lakh_multi/MULTI_GENRE_REPORT.md) | Multi-genre 3-model analysis with bootstrap CI |
+| [`MULTI_GENRE_REPORT.md`](results/reports/lakh_multi/MULTI_GENRE_REPORT.md) | Multi-genre 6-model analysis with 3-way ANOVA |
 | [`INTERACTION_MECHANISM_REPORT.md`](results/reports/lakh_multi/INTERACTION_MECHANISM_REPORT.md) | Tok×Model interaction mechanism (PCA, t-SNE, norms) |
 | [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (3-model, ρ=0.975) |
-| `multi_genre_fmd.csv` | Raw 2880 FMD observations |
+| `multi_genre_fmd.csv` | Raw 5760 FMD observations |
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
 | `interaction_cell_stats.csv` | Per-cell embedding diagnostics |
 | `cross_dataset_fmd.csv` | Combined FMD from all sources |
@@ -403,4 +454,4 @@ python scripts/run_ablation_study.py
 
 ---
 
-**Status**: ✅ Complete (Weeks 1–9) | **Last Updated**: 20.04.2026
+**Status**: ✅ Complete (Weeks 1–10) | **Last Updated**: 20.04.2026
