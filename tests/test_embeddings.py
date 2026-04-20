@@ -50,7 +50,9 @@ class TestEmbeddingFactory:
         assert "MusicBERT-large" in models
         assert "MERT" in models
         assert "NLP-Baseline" in models
-        assert len(models) == 4
+        assert "CLaMP-1" in models
+        assert "CLaMP-2" in models
+        assert len(models) == 6
 
 
 class TestMusicBERTModel:

@@ -166,7 +166,7 @@ def test_midicaps_csv_parsing(base_config, tmp_path):
 def test_compute_eta_squared():
     """Test η² computation."""
     import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent))
+    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
     from run_cross_dataset_validation import compute_eta_squared
 
     rng = np.random.default_rng(42)
