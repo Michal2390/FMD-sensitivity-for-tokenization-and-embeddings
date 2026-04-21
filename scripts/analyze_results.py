@@ -27,7 +27,7 @@ DPI = 300
 
 def save(fig, name):
     fig.tight_layout()
-    for fmt in ("png", "pdf"):
+    for fmt in ("png",):
         fig.savefig(PLOTS_DIR / f"{name}.{fmt}", dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  ✅ {name}")

@@ -323,7 +323,7 @@ def main():
 
     def save_fig(fig, name):
         fig.tight_layout()
-        for fmt in ("png", "pdf"):
+        for fmt in ("png",):
             fig.savefig(PLOTS_DIR / f"{name}.{fmt}", dpi=300, bbox_inches="tight")
         plt.close(fig)
         logger.info(f"  ✅ {name}")

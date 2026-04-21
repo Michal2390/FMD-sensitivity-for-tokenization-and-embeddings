@@ -351,7 +351,7 @@ def generate_cross_validation_plots(
 
     def save_fig(fig, name):
         fig.tight_layout()
-        for fmt in ("png", "pdf"):
+        for fmt in ("png",):
             fig.savefig(plots_dir / f"{name}.{fmt}", dpi=DPI, bbox_inches="tight")
         plt.close(fig)
         logger.info(f"  ✅ {name}")
