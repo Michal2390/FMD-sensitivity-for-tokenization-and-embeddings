@@ -197,6 +197,57 @@ With 2 models only, the **interaction between tokenizer and model** was the sing
 
 ---
 
+## New: Linear Mixed-Effects Models (LME) — Genre as Random Effect
+
+To account for non-independence across genre pairs, we fit **Mixed Linear Models** with genre pair as a random intercept (6 groups, 5350 observations). Key results from `raw_fmd_fmd/main_effects`:
+
+| Fixed Effect | Coef. | z | p | Interpretation |
+|---|---|---|---|---|
+| **C(model)[T.MusicBERT-large]** | **15.87** | **351.7** | **<0.001** | Massive FMD increase |
+| C(model)[T.MusicBERT] | 7.37 | 163.4 | <0.001 | Large FMD increase |
+| C(model)[T.MERT] | 6.94 | 128.8 | <0.001 | Large (degenerate embeddings) |
+| C(tokenizer)[T.REMI] | −0.26 | −6.83 | <0.001 | Slight FMD reduction |
+| C(tokenizer)[T.TSD] | −0.28 | −7.26 | <0.001 | Slight FMD reduction |
+| C(preprocess)[T.True_False] | −0.39 | −10.08 | <0.001 | Quantization reduces FMD |
+| C(model)[T.CLaMP-2] | 0.06 | 1.25 | 0.213 | **Not significant** |
+
+> **LME confirms ANOVA conclusions**: model choice dominates (coefficients 7–16), tokenizer effects are statistically significant but tiny (|coef| < 0.3), and CLaMP-2 is indistinguishable from CLaMP-1 (reference). Random genre-pair variance (σ² = 0.46) is small relative to model effects.
+
+### LME Interactions Model
+
+The interaction model reveals **tokenizer×model specificity**:
+- **MusicBERT × REMI**: −1.51 (z = −13.4, p < 0.001) — REMI strongly reduces MusicBERT FMD
+- **MusicBERT × TSD**: −1.74 (z = −15.4, p < 0.001) — TSD has even stronger effect
+- **MusicBERT-large × preprocess[True_False]**: −1.41 (z = −12.5, p < 0.001) — quantization reduces large-model FMD
+- CLaMP-2 and MERT interactions are all non-significant → confirming architecture-dependent sensitivity
+
+## New: Covariance Shrinkage Comparison
+
+We tested 4 covariance estimators for FMD computation (empirical, Ledoit-Wolf, basic shrinkage, OAS) on 240 observations:
+
+| Estimator | η²(model) FMD | η²(tokenizer) nFMD_trace | Interpretation |
+|-----------|---------------|--------------------------|----------------|
+| Empirical | 0.910 | 0.130 | Standard (high-variance) |
+| Ledoit-Wolf | 0.867 | 0.075 | Most regularized |
+| Basic shrinkage | 0.896 | 0.138 | Moderate regularization |
+| OAS | 0.872 | 0.058 | Oracle approximation |
+
+> **Model dominance is robust to covariance estimation method** (η² = 0.87–0.91 across all estimators). Shrinkage slightly reduces tokenizer sensitivity in nFMD, suggesting part of the tokenizer effect may be due to covariance estimation noise.
+
+## New: Generative Model Evaluation (FMD Ranking Validity)
+
+Validated whether FMD correctly ranks: **real < Markov < random** (expected quality ordering):
+
+| Metric | % Models with Correct Ranking |
+|--------|-------------------------------|
+| FMD (raw) | 17% |
+| nFMD_trace | 33% |
+| nFMD_norm | 33% |
+
+> ⚠️ **FMD does not reliably produce the expected ranking** across all models. Only a minority of embedding models yield real < Markov < random. This highlights that FMD validity as a generative evaluation metric is **model-dependent** — consistent with our main finding that model choice dominates all other factors.
+
+---
+
 ## New: Normalized FMD (nFMD) — Scale-Invariant Metric ✅ VALIDATED
 
 We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is not comparable across embedding models of different architectures. Three normalization strategies are implemented in `src/metrics/fmd.py`:
@@ -425,6 +476,7 @@ python scripts/run_ablation_study.py
 | 9 | Normalized FMD (nFMD), MIDI-BERT + MERT models, sample-size power analysis | ✅ | — |
 | 10 | **6-model analysis: CLaMP-1, CLaMP-2 added — tokenizer sensitivity is model-dependent** | ✅ | — |
 | 11 | **nFMD validation: normalization reveals hidden tokenizer effects (η² ↑14×)** | ✅ | — |
+| 12 | **LME models, shrinkage comparison, generative eval — publication refinements** | ✅ | — |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
@@ -439,6 +491,9 @@ python scripts/run_ablation_study.py
 | [`INTERACTION_MECHANISM_REPORT.md`](results/reports/lakh_multi/INTERACTION_MECHANISM_REPORT.md) | Tok×Model interaction mechanism (PCA, t-SNE, norms) |
 | [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (3-model, ρ=0.975) |
 | [`NFMD_ANALYSIS_REPORT.md`](results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md) | **nFMD validation: raw vs normalized η² comparison (6-model)** |
+| [`GENERATIVE_EVAL_REPORT.md`](results/reports/generative_eval/GENERATIVE_EVAL_REPORT.md) | **Generative ranking validity (real < Markov < random)** |
+| `lme/raw_fmd_fmd/*/lme_summary.txt` | **LME mixed models: main effects & interactions with genre as random effect** |
+| `shrinkage_comparison/shrinkage_eta_sq.csv` | **Covariance shrinkage robustness (4 estimators)** |
 | `multi_genre_fmd.csv` | Raw 5760 FMD observations |
 | `nfmd_multi_genre.csv` | **5350 nFMD observations with trace/norm components** |
 | `nfmd_eta_sq_comparison.csv` | **η² comparison: raw FMD vs nFMD_trace vs nFMD_norm** |
@@ -498,4 +553,4 @@ python scripts/run_ablation_study.py
 
 ---
 
-**Status**: ✅ Complete (Weeks 1–11) | **Last Updated**: 21.04.2026
+**Status**: ✅ Complete (Weeks 1–12) | **Last Updated**: 21.04.2026
