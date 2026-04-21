@@ -35,3 +35,4 @@ extract_pdf.py
 # Private files (not for public repo)
 PUBLIKACJA_OPINIA.md
 docs/private/**
+results/plots/**/*.pdf
