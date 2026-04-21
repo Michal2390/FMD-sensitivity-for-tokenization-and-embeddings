@@ -108,10 +108,12 @@ All main effects confirmed with multiple approaches:
 |------|---------------------|-----------|
 | Finest resolution (low baseline) | REMI + CLaMP-2 | FMD ~0.05–0.10, highest eff. dim, best genre separation |
 | Maximum genre separability | Any tokenizer + MusicBERT-large | Highest absolute FMD, most discriminative |
+| Tokenizer-sensitive evaluation | **REMI or TSD + MusicBERT** | **η²(tok)=0.36 after nFMD** — tokenizer matters most here |
 | Stable across genres | Octuple + CLaMP-1 | Lowest CV across pairs |
+| Fair cross-model comparison | **Use nFMD_trace** | Raw FMD varies 12.8× by model scale |
 | ⚠️ Avoid | MIDI-Like + MusicBERT | Lowest eff. dim (11), inflated FMD |
 | ⚠️ Avoid | MERT for symbolic MIDI | Returns degenerate embeddings for non-audio input |
-| ⚠️ Caution | Comparing FMD across model architectures | Scale-dependent — normalize first |
+| ⚠️ Caution | Comparing raw FMD across model architectures | Scale-dependent — use nFMD instead |
 
 ---
 
@@ -195,7 +197,7 @@ With 2 models only, the **interaction between tokenizer and model** was the sing
 
 ---
 
-## New: Normalized FMD (nFMD) — Scale-Invariant Metric
+## New: Normalized FMD (nFMD) — Scale-Invariant Metric ✅ VALIDATED
 
 We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is not comparable across embedding models of different architectures. Three normalization strategies are implemented in `src/metrics/fmd.py`:
 
@@ -205,7 +207,35 @@ We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is 
 | **Norm** | nFMD = FMD / (‖μ₁‖ + ‖μ₂‖)² | Compensates for quadratic mean-norm scaling |
 | **Z-score** | nFMD = (FMD − μ_baseline) / σ_baseline | Calibrates against within-genre baseline |
 
-### Validation: Normalization Eliminates Scale Artefact
+### 🔥 Full 6-Model nFMD Validation (5350 observations)
+
+Normalization reveals hidden tokenizer effects masked by model scale:
+
+| Factor | η²(raw FMD) | η²(nFMD_trace) | η²(nFMD_norm) | Change |
+|--------|-------------|----------------|---------------|--------|
+| **model** | **0.9617** | **0.7079** | 0.6534 | ↓ 26% — still dominant but reduced |
+| **tokenizer** | 0.0010 | **0.0142** | **0.0414** | ↑ **14×** larger after normalization |
+| **pair** | 0.0067 | **0.0959** | 0.0066 | ↑ 14× — genre matters more |
+| **preprocess** | 0.0011 | 0.0038 | 0.0053 | ↑ 4× |
+
+> **Key insight: Normalization increases the tokenizer effect 14× — from negligible (η²=0.001) to small-medium (η²=0.014–0.041), proving the raw FMD model dominance was partly a scale artefact.**
+
+### 🎯 Per-Model Tokenizer Sensitivity (nFMD_trace)
+
+Which models are actually sensitive to tokenization after removing the scale effect?
+
+| Model | η²(tokenizer) | η²(preprocess) | Interpretation |
+|-------|---------------|----------------|----------------|
+| **MusicBERT** | **0.3588** | 0.0111 | 🔴 **Very sensitive** to tokenizer choice |
+| **MusicBERT-large** | **0.1851** | 0.0241 | 🟡 Moderately sensitive |
+| **CLaMP-2** | 0.0839 | 0.0008 | 🟡 Slightly sensitive |
+| **CLaMP-1** | 0.0605 | 0.0002 | 🟢 Low sensitivity |
+| **NLP-Baseline** | 0.0184 | **0.1344** | 🟢 Insensitive to tokenizer, **sensitive to preprocessing** |
+| **MERT** | 0.0055 | 0.0240 | 🟢 Insensitive (audio-based, ignores tokens) |
+
+> **MusicBERT is the most tokenizer-sensitive model (η²=0.36)** — tokenizer choice explains 36% of its nFMD variance. For CLaMP and MERT, tokenizer choice is irrelevant. NLP-Baseline is uniquely sensitive to preprocessing (velocity removal, quantization) rather than tokenization.
+
+### Previous Validation (3-Model)
 
 | Model | Raw FMD (split test) | nFMD_trace | nFMD_norm | Mean ‖emb‖ |
 |-------|---------------------|------------|-----------|------------|
@@ -214,7 +244,6 @@ We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is 
 | MusicBERT | 0.1477 | 0.001662 | 0.000209 | 14.84 |
 
 > **Raw FMD varies 12.8× across models; after trace-normalization, only 1.9×.**
-> This confirms that the dominant η²(model) = 0.78 is largely a scale artefact, and nFMD enables fair cross-model comparison.
 
 ## Embedding Models (6 Models, 3 Architecture Families)
 
@@ -332,6 +361,12 @@ python main.py --mode tests          # Run test suite
 python scripts/run_multi_genre_analysis.py   # 4 genres × 96 variants × 10 repeats (6 models)
 ```
 
+### Normalized FMD (nFMD) Analysis
+```bash
+python scripts/run_nfmd_analysis.py          # nFMD validation: raw vs normalized η² (6 models, ~3h)
+```
+Computes nFMD_trace and nFMD_norm for all 96 variants, runs ANOVA on all three metrics, per-model η² breakdown, and generates comparison plots. Results in `results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md`.
+
 ### Sample-Size Sensitivity (Power Analysis)
 ```bash
 python scripts/run_sample_size_ablation.py   # η² stability & power curves
@@ -389,6 +424,7 @@ python scripts/run_ablation_study.py
 | 8 | MusicBERT, bootstrap CI, interaction mechanism, multiple comparison correction | ✅ | — |
 | 9 | Normalized FMD (nFMD), MIDI-BERT + MERT models, sample-size power analysis | ✅ | — |
 | 10 | **6-model analysis: CLaMP-1, CLaMP-2 added — tokenizer sensitivity is model-dependent** | ✅ | — |
+| 11 | **nFMD validation: normalization reveals hidden tokenizer effects (η² ↑14×)** | ✅ | — |
 
 **👉 [See detailed summaries →](docs/weekly_summaries/)**
 
@@ -402,7 +438,11 @@ python scripts/run_ablation_study.py
 | [`MULTI_GENRE_REPORT.md`](results/reports/lakh_multi/MULTI_GENRE_REPORT.md) | Multi-genre 6-model analysis with 3-way ANOVA |
 | [`INTERACTION_MECHANISM_REPORT.md`](results/reports/lakh_multi/INTERACTION_MECHANISM_REPORT.md) | Tok×Model interaction mechanism (PCA, t-SNE, norms) |
 | [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (3-model, ρ=0.975) |
+| [`NFMD_ANALYSIS_REPORT.md`](results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md) | **nFMD validation: raw vs normalized η² comparison (6-model)** |
 | `multi_genre_fmd.csv` | Raw 5760 FMD observations |
+| `nfmd_multi_genre.csv` | **5350 nFMD observations with trace/norm components** |
+| `nfmd_eta_sq_comparison.csv` | **η² comparison: raw FMD vs nFMD_trace vs nFMD_norm** |
+| `nfmd_per_model_eta_sq.csv` | **Per-model η² breakdown (tok/preprocess within each model)** |
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
 | `interaction_cell_stats.csv` | Per-cell embedding diagnostics |
 | `cross_dataset_fmd.csv` | Combined FMD from all sources |
@@ -432,6 +472,10 @@ python scripts/run_ablation_study.py
 | `sample_size_stability` | **η² stability vs sample size (CI ribbon)** |
 | `sample_size_power` | **Statistical power curves per factor** |
 | `sample_size_combined` | **Combined stability + power 2-panel figure** |
+| `nfmd_eta_sq_comparison` | **η² bar chart: raw FMD vs nFMD_trace vs nFMD_norm** |
+| `nfmd_per_model_heatmap` | **Per-model η² heatmap (tokenizer/preprocess sensitivity)** |
+| `nfmd_trace_by_tok_model` | **nFMD_trace boxplot by tokenizer × model** |
+| `nfmd_summary_4panel` | **nFMD 4-panel: η² comparison, per-model, distributions** |
 
 ## Documentation
 
@@ -454,4 +498,4 @@ python scripts/run_ablation_study.py
 
 ---
 
-**Status**: ✅ Complete (Weeks 1–10) | **Last Updated**: 20.04.2026
+**Status**: ✅ Complete (Weeks 1–11) | **Last Updated**: 21.04.2026

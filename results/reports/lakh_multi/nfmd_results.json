@@ -1,0 +1,357 @@
+{
+  "config": {
+    "n_rows": 5350,
+    "n_rows_raw": 5760,
+    "metrics": [
+      "fmd",
+      "nfmd_trace",
+      "nfmd_norm"
+    ],
+    "factors": [
+      "tokenizer",
+      "model",
+      "preprocess",
+      "pair"
+    ]
+  },
+  "eta_sq_comparison": [
+    {
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.0009917950260590466,
+      "F": 1.7691333540982404,
+      "p": 0.1507612260243385
+    },
+    {
+      "metric": "fmd",
+      "factor": "model",
+      "eta_sq": 0.9617188373303228,
+      "F": 26850.93716217885,
+      "p": 0.0
+    },
+    {
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.001063502511147227,
+      "F": 1.8971791296328233,
+      "p": 0.12775900975103283
+    },
+    {
+      "metric": "fmd",
+      "factor": "pair",
+      "eta_sq": 0.006674336610920531,
+      "F": 7.181462467619442,
+      "p": 1.042755529645661e-06
+    },
+    {
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.014191956582220784,
+      "F": 25.654149201133688,
+      "p": 1.7969773538435907e-16
+    },
+    {
+      "metric": "nfmd_trace",
+      "factor": "model",
+      "eta_sq": 0.7079387194999827,
+      "F": 2590.705971384446,
+      "p": 0.0
+    },
+    {
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.003809473534425665,
+      "F": 6.814441272024177,
+      "p": 0.00013981817037131137
+    },
+    {
+      "metric": "nfmd_trace",
+      "factor": "pair",
+      "eta_sq": 0.0959254012618819,
+      "F": 113.40332867641797,
+      "p": 2.950670386650935e-114
+    },
+    {
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.04139258194794983,
+      "F": 76.9465994547953,
+      "p": 1.0049968133831936e-48
+    },
+    {
+      "metric": "nfmd_norm",
+      "factor": "model",
+      "eta_sq": 0.6533816597732292,
+      "F": 2014.7067737637617,
+      "p": 0.0
+    },
+    {
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.005292884416624086,
+      "F": 9.482107730668517,
+      "p": 3.0319722456518003e-06
+    },
+    {
+      "metric": "nfmd_norm",
+      "factor": "pair",
+      "eta_sq": 0.006630853765224029,
+      "F": 7.134363424849592,
+      "p": 1.1613250106505206e-06
+    }
+  ],
+  "per_model_eta_sq": [
+    {
+      "model": "CLaMP-1",
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.6321979033523444,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-1",
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.00038046008607198575,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-1",
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.06053197608525224,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-1",
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.0002128030293587739,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-1",
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.6524981836934681,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-1",
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.0005003902394510332,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-2",
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.8072324662625456,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-2",
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.04115267896527308,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-2",
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.08385158444909999,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-2",
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.0008377629686168058,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-2",
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.7831153713802774,
+      "n": 960
+    },
+    {
+      "model": "CLaMP-2",
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.06873909435187212,
+      "n": 960
+    },
+    {
+      "model": "MERT",
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.0010785614040736474,
+      "n": 550
+    },
+    {
+      "model": "MERT",
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.011832803042735186,
+      "n": 550
+    },
+    {
+      "model": "MERT",
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.005517614008175357,
+      "n": 550
+    },
+    {
+      "model": "MERT",
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.02397264488293204,
+      "n": 550
+    },
+    {
+      "model": "MERT",
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.0006364184619744057,
+      "n": 550
+    },
+    {
+      "model": "MERT",
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.011468666671935334,
+      "n": 550
+    },
+    {
+      "model": "MusicBERT",
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.31503380998472247,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT",
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.05426985727358939,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT",
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.3587603960578721,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT",
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.011119525374170504,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT",
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.3320664595828056,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT",
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.052640390056431965,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT-large",
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.010554938386609865,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT-large",
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.10254219465291799,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT-large",
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.18509083980439692,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT-large",
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.024087443746464553,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT-large",
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.010554638099800586,
+      "n": 960
+    },
+    {
+      "model": "MusicBERT-large",
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.10400251132122676,
+      "n": 960
+    },
+    {
+      "model": "NLP-Baseline",
+      "metric": "fmd",
+      "factor": "tokenizer",
+      "eta_sq": 0.8307565156774285,
+      "n": 960
+    },
+    {
+      "model": "NLP-Baseline",
+      "metric": "fmd",
+      "factor": "preprocess",
+      "eta_sq": 0.01311033327090662,
+      "n": 960
+    },
+    {
+      "model": "NLP-Baseline",
+      "metric": "nfmd_trace",
+      "factor": "tokenizer",
+      "eta_sq": 0.018440329323609592,
+      "n": 960
+    },
+    {
+      "model": "NLP-Baseline",
+      "metric": "nfmd_trace",
+      "factor": "preprocess",
+      "eta_sq": 0.1344470118174261,
+      "n": 960
+    },
+    {
+      "model": "NLP-Baseline",
+      "metric": "nfmd_norm",
+      "factor": "tokenizer",
+      "eta_sq": 0.8616309856146688,
+      "n": 960
+    },
+    {
+      "model": "NLP-Baseline",
+      "metric": "nfmd_norm",
+      "factor": "preprocess",
+      "eta_sq": 0.01246458074690504,
+      "n": 960
+    }
+  ]
+}
