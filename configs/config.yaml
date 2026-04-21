@@ -114,6 +114,10 @@ fmd_metric:
   # Statistical parameters
   use_mean: true
   use_std: true
+  # Covariance estimation method: empirical | ledoit_wolf | basic_shrinkage | oas
+  covariance_method: "empirical"
+  # Regularization epsilon for numerical stability
+  regularization_eps: 1e-4
   # Correlation method
   correlation_method: "pearson"
 

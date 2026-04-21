@@ -568,3 +568,118 @@ def run_sensitivity_analysis(
         variant_summary=summary,
     )
 
+
+# ======================================================================
+# Linear Mixed-Effects Model (LME)
+# ======================================================================
+
+def fit_lme_model(
+    df: pd.DataFrame,
+    response: str = "fmd",
+    fixed_effects: str = "C(tokenizer) + C(model) + C(preprocess)",
+    random_effects: str = "pair",
+    output_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Fit a Linear Mixed-Effects model to FMD data.
+
+    Supplements ANOVA by properly modelling the hierarchical structure:
+    - Fixed effects: tokenizer, model, preprocessing
+    - Random effects: genre pair (and optionally MIDI file)
+
+    Uses statsmodels.formula.api.mixedlm.
+
+    Args:
+        df: DataFrame with columns: fmd, tokenizer, model, preprocess, pair.
+        response: Response variable column name.
+        fixed_effects: Patsy formula string for fixed effects.
+        random_effects: Column name for random intercept grouping.
+        output_dir: If provided, save LME summary to file.
+
+    Returns:
+        Dict with keys: summary_text, aic, bic, log_likelihood,
+        fixed_effects_table (DataFrame), random_effects_variance.
+    """
+    if not _HAS_STATSMODELS:
+        logger.warning("statsmodels not available — cannot fit LME model")
+        return {"error": "statsmodels not installed"}
+
+    from statsmodels.formula.api import mixedlm
+
+    # Ensure preprocess column exists
+    if "preprocess" not in df.columns:
+        if "remove_velocity" in df.columns and "hard_quantization" in df.columns:
+            df = df.copy()
+            df["preprocess"] = df["remove_velocity"].astype(str) + "_" + df["hard_quantization"].astype(str)
+
+    formula = f"{response} ~ {fixed_effects}"
+    logger.info(f"Fitting LME: {formula} | random=~1|{random_effects}")
+
+    try:
+        model = mixedlm(formula, df, groups=df[random_effects])
+        result = model.fit(reml=True)
+
+        summary_text = str(result.summary())
+        logger.info(f"LME fit complete. AIC={result.aic:.2f}, BIC={result.bic:.2f}")
+
+        # Extract fixed effects table
+        fe_table = pd.DataFrame({
+            "coefficient": result.fe_params,
+            "std_err": result.bse_fe,
+            "z": result.tvalues,
+            "p": result.pvalues,
+        })
+
+        # Random effects variance
+        re_var = float(result.cov_re.iloc[0, 0]) if hasattr(result.cov_re, 'iloc') else float(result.cov_re)
+
+        output = {
+            "summary_text": summary_text,
+            "aic": float(result.aic),
+            "bic": float(result.bic),
+            "log_likelihood": float(result.llf),
+            "fixed_effects_table": fe_table,
+            "random_effects_variance": re_var,
+            "n_groups": int(result.nobs),
+            "converged": result.converged,
+        }
+
+        if output_dir:
+            output_dir = Path(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            with open(output_dir / "lme_summary.txt", "w") as f:
+                f.write(summary_text)
+            fe_table.to_csv(output_dir / "lme_fixed_effects.csv")
+            logger.info(f"LME results saved to {output_dir}")
+
+        return output
+
+    except Exception as e:
+        logger.error(f"LME fitting failed: {e}")
+        return {"error": str(e)}
+
+
+def fit_lme_with_interactions(
+    df: pd.DataFrame,
+    response: str = "fmd",
+    random_effects: str = "pair",
+    output_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Fit LME with all two-way interactions between fixed effects.
+
+    Formula: fmd ~ C(tokenizer) * C(model) + C(tokenizer) * C(preprocess) +
+                    C(model) * C(preprocess) | random=~1|pair
+
+    Args:
+        df: DataFrame with FMD data.
+        response: Response variable.
+        random_effects: Grouping variable for random intercept.
+        output_dir: Output directory.
+
+    Returns:
+        Dict with LME results.
+    """
+    fixed = ("C(tokenizer) * C(model) + C(tokenizer) * C(preprocess) + "
+             "C(model) * C(preprocess)")
+    return fit_lme_model(df, response=response, fixed_effects=fixed,
+                         random_effects=random_effects, output_dir=output_dir)
+

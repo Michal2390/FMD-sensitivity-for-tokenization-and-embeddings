@@ -1,0 +1,199 @@
+% ISMIR-style paper: FMD Sensitivity Analysis
+% Compile with: pdflatex paper.tex && bibtex paper && pdflatex paper && pdflatex paper
+
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage[margin=2.5cm]{geometry}
+
+\title{How Sensitive Is Fréchet Music Distance to Pipeline Choices?\\
+A Systematic Study of Tokenization, Embedding Models, and Normalization}
+
+\author{
+  Michał Fereniec \\
+  Warsaw University of Technology, EITI \\
+  \texttt{michal.fereniec@pw.edu.pl}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Fréchet Music Distance (FMD) has been proposed as an objective evaluation metric for generative symbolic music models. However, FMD depends on several upstream pipeline choices---tokenization scheme, embedding model, and preprocessing---whose impact on the metric's behavior has not been systematically studied.
+
+We present a comprehensive sensitivity analysis of FMD across 96 pipeline variants (4~tokenizers $\times$ 6~embedding models $\times$ 4~preprocessing configurations), evaluated on 5{,}760 FMD observations from the Lakh MIDI Dataset (4~genres, 6~genre pairs, 10$\times$ repeated subsampling). Our analysis employs three-way factorial ANOVA with interactions, bootstrap confidence intervals, permutation tests, linear mixed-effects models, and cross-dataset validation on MidiCaps ($\rho = 0.975$).
+
+Key findings:
+(1)~The embedding model choice dominates FMD variance ($\eta^2 = 0.96$), making tokenizer and preprocessing effects negligible in raw FMD.
+(2)~This dominance is largely a \emph{scale artefact}: after trace-normalization (nFMD), the tokenizer effect increases 14$\times$ (from $\eta^2 = 0.001$ to $0.014$--$0.041$).
+(3)~Tokenizer sensitivity is model-dependent: MusicBERT shows $\eta^2(\text{tok}) = 0.36$ under nFMD, while CLaMP models are insensitive.
+(4)~We propose Normalized FMD (nFMD) for fair cross-model comparison and validate it with generative baselines (Markov chain, random sequences).
+(5)~Shrinkage covariance estimators (Ledoit-Wolf, OAS) reduce FMD overestimation at small sample sizes without altering the sensitivity pattern.
+
+We release all code, data, and analysis scripts for full reproducibility.
+\end{abstract}
+
+% ======================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Evaluating generative symbolic music models requires metrics that capture musical quality beyond surface-level statistics. The Fréchet Music Distance (FMD)~\citep{retkowski2025fmd}, inspired by FID~\citep{heusel2017gans} and FAD~\citep{kilgour2018fad}, compares distributions of learned embeddings between reference and generated music. While FMD shows promise, its sensitivity to upstream pipeline choices---tokenization, embedding model, and preprocessing---remains unexplored.
+
+This matters because practitioners must make pipeline decisions \emph{before} computing FMD, and if these choices substantially alter the metric, comparisons across papers become unreliable. We systematically quantify this sensitivity.
+
+\paragraph{Contributions.}
+\begin{enumerate}
+    \item A factorial sensitivity analysis of FMD across 96 pipeline variants with rigorous statistical methodology (ANOVA, LME, bootstrap CI, permutation tests).
+    \item The discovery that FMD's apparent model-dominance ($\eta^2 = 0.96$) is partly a scale artefact, revealed by normalized FMD (nFMD).
+    \item Per-model tokenizer sensitivity profiles showing MusicBERT is highly tokenizer-sensitive ($\eta^2 = 0.36$) while CLaMP models are not.
+    \item Validation with generative baselines (Markov chain, random) and shrinkage covariance estimators.
+    \item Full open-source release of code, data, and analysis pipeline.
+\end{enumerate}
+
+% ======================================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Fréchet Distance Metrics.}
+The Fréchet Inception Distance (FID)~\citep{heusel2017gans} compares real and generated image distributions using Inception-v3 embeddings. The Fréchet Audio Distance (FAD)~\citep{kilgour2018fad} adapts this for audio using VGGish. Recent work highlights the sensitivity of these metrics to the choice of reference model~\citep{gui2024adapting,tailleur2024correlation}.
+
+\paragraph{Symbolic Music Evaluation.}
+Existing metrics focus on low-level attributes: pitch class entropy~\citep{wu2020jazz}, scale consistency~\citep{mogren2016crnngan}, or the MusPy toolkit~\citep{dong2020muspy}. FMD~\citep{retkowski2025fmd} addresses the gap by comparing learned embedding distributions, using CLaMP~\citep{wu2023clamp} and CLaMP~2~\citep{wu2024clamp2} encoders.
+
+\paragraph{Tokenization for Symbolic Music.}
+MidiTok~\citep{fradet2024miditok} provides standardized implementations of REMI, TSD, Octuple, and MIDI-Like tokenizers. The impact of tokenization on downstream tasks has been studied for music generation but not for evaluation metrics.
+
+% ======================================================================
+\section{Method}
+\label{sec:method}
+
+\subsection{Fréchet Music Distance}
+
+Given reference embeddings $\{x_i\}_{i=1}^N$ and test embeddings $\{y_j\}_{j=1}^M$, we fit multivariate Gaussians $\mathcal{N}(\mu_r, \Sigma_r)$ and $\mathcal{N}(\mu_t, \Sigma_t)$ and compute:
+\begin{equation}
+\text{FMD} = \|\mu_r - \mu_t\|^2 + \text{Tr}\!\left(\Sigma_r + \Sigma_t - 2(\Sigma_r \Sigma_t)^{1/2}\right)
+\end{equation}
+
+\subsection{Normalized FMD (nFMD)}
+
+We propose two normalization strategies to enable fair cross-model comparison:
+\begin{align}
+\text{nFMD}_{\text{trace}} &= \frac{\text{FMD}}{\text{Tr}(\Sigma_r) + \text{Tr}(\Sigma_t)} \\
+\text{nFMD}_{\text{norm}} &= \frac{\text{FMD}}{(\|\mu_r\| + \|\mu_t\|)^2}
+\end{align}
+
+\subsection{Covariance Estimation}
+
+We compare four estimators: empirical (MLE), Ledoit-Wolf shrinkage~\citep{ledoit2004well}, basic shrinkage, and Oracle Approximating Shrinkage (OAS)~\citep{chen2010shrinkage}.
+
+\subsection{Statistical Framework}
+
+\begin{itemize}
+    \item \textbf{Three-way ANOVA} with interactions: tokenizer $\times$ model $\times$ preprocessing
+    \item \textbf{Linear Mixed-Effects models}: fixed effects for pipeline factors, random intercepts for genre pair
+    \item \textbf{Bootstrap CI} for $\eta^2$ (5{,}000 resamples, percentile method)
+    \item \textbf{Permutation tests} (5{,}000 permutations)
+    \item \textbf{Holm--Bonferroni correction} for multiple comparisons
+\end{itemize}
+
+% ======================================================================
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Data}
+
+\textbf{Lakh MIDI Dataset}: 4 genres (rock, jazz, electronic, country), $\sim$119 files per genre, matched via Tagtraum CD2 genre annotations.
+
+\textbf{MidiCaps}: Independent validation dataset with genre tags.
+
+\subsection{Pipeline Variants}
+
+\begin{itemize}
+    \item \textbf{Tokenizers} (4): REMI, TSD, Octuple, MIDI-Like
+    \item \textbf{Embedding models} (6): CLaMP-1, CLaMP-2, MusicBERT, MusicBERT-large, MERT, NLP-Baseline
+    \item \textbf{Preprocessing} (4): original, no velocity, hard quantization, combined
+\end{itemize}
+
+Total: $4 \times 6 \times 4 = 96$ variants $\times$ 6 genre pairs $\times$ 10 repeats $= 5{,}760$ FMD observations.
+
+\subsection{Generative Baselines}
+
+\begin{itemize}
+    \item \textbf{Markov chain}: First-order pitch transition model trained on real MIDI
+    \item \textbf{Random}: Uniformly random note sequences (negative control)
+\end{itemize}
+
+% ======================================================================
+\section{Results}
+\label{sec:results}
+
+% TODO: Insert tables and figures from results/plots/paper/
+
+\subsection{Raw FMD: Model Dominance}
+
+% Table: Three-way ANOVA results
+% Figure: multi_summary_4panel.png
+
+\subsection{Normalized FMD Reveals Hidden Tokenizer Effects}
+
+% Table: η² comparison raw vs nFMD
+% Figure: nfmd_eta_sq_comparison.png
+
+\subsection{Per-Model Tokenizer Sensitivity}
+
+% Table: Per-model η²(tokenizer) under nFMD_trace
+% Figure: nfmd_per_model_heatmap.png
+
+\subsection{Generative Model Evaluation}
+
+% Table: Ranking stability across metrics
+% Figure: generative_eval_barplot.png
+
+\subsection{Covariance Estimator Impact}
+
+% Table: η² by covariance method
+% Figure: shrinkage_eta_sq_fmd.png
+
+\subsection{Cross-Dataset Validation}
+
+% Spearman ρ = 0.975
+
+% ======================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+Our results have several implications for FMD users:
+
+\begin{enumerate}
+    \item \textbf{Report the embedding model.} Model choice explains $>$96\% of FMD variance; comparing FMD values across different models is meaningless without normalization.
+    \item \textbf{Use nFMD for cross-model comparison.} Trace-normalization reduces the model effect from $\eta^2 = 0.96$ to $0.71$, revealing meaningful tokenizer effects.
+    \item \textbf{Tokenizer choice matters for MLM models.} MusicBERT users should carefully select tokenizers (REMI or TSD recommended).
+    \item \textbf{Contrastive models are robust to tokenization.} CLaMP-based FMD is stable across tokenizer choices.
+    \item \textbf{Shrinkage estimators help at small sample sizes} but do not change the overall sensitivity pattern.
+\end{enumerate}
+
+% ======================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented the first systematic sensitivity analysis of Fréchet Music Distance across 96 pipeline variants. The key finding is that FMD's apparent model-dominance is partly a scale artefact: normalized FMD reveals that tokenizer sensitivity is model-dependent, with MusicBERT being highly sensitive ($\eta^2 = 0.36$) while CLaMP models are robust. We propose nFMD as a standard for fair cross-model evaluation and provide practical pipeline recommendations.
+
+% ======================================================================
+\section*{Acknowledgements}
+
+This work was conducted as part of the WIMU (Music Information Retrieval) course at Warsaw University of Technology.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
+

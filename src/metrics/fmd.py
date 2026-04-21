@@ -15,6 +15,15 @@ from scipy.spatial.distance import cdist
 from pathlib import Path
 import json
 
+# Shrinkage covariance estimators
+try:
+    from sklearn.covariance import LedoitWolf, ShrunkCovariance, OAS
+    _HAS_SKLEARN_COV = True
+except ImportError:
+    _HAS_SKLEARN_COV = False
+
+COVARIANCE_METHODS = ("empirical", "ledoit_wolf", "basic_shrinkage", "oas")
+
 
 class FrechetMusicDistance:
     """
@@ -27,6 +36,12 @@ class FrechetMusicDistance:
 
     This is mathematically equivalent to the Wasserstein-2 distance
     between two Gaussians, and is the same formula used in FID/FAD.
+
+    Supports multiple covariance estimation methods (Retkowski et al. 2025):
+      - empirical (default, MLE via np.cov)
+      - ledoit_wolf (Ledoit-Wolf shrinkage)
+      - basic_shrinkage (sklearn ShrunkCovariance)
+      - oas (Oracle Approximating Shrinkage)
     """
 
     def __init__(self, config: Dict):
@@ -40,7 +55,42 @@ class FrechetMusicDistance:
         self.use_mean = config["fmd_metric"].get("use_mean", True)
         self.use_std = config["fmd_metric"].get("use_std", True)
         self.epsilon = float(config["fmd_metric"].get("regularization_eps", 1e-4))
-        logger.info("FrechetMusicDistance initialized (standard Fréchet formula)")
+        self.covariance_method = config["fmd_metric"].get("covariance_method", "empirical")
+        if self.covariance_method not in COVARIANCE_METHODS:
+            logger.warning(f"Unknown covariance method '{self.covariance_method}', falling back to 'empirical'")
+            self.covariance_method = "empirical"
+        if self.covariance_method != "empirical" and not _HAS_SKLEARN_COV:
+            logger.warning("sklearn not available for shrinkage estimators, falling back to 'empirical'")
+            self.covariance_method = "empirical"
+        logger.info(f"FrechetMusicDistance initialized (covariance={self.covariance_method})")
+
+    def _estimate_covariance(self, embeddings: np.ndarray) -> np.ndarray:
+        """Estimate covariance matrix using configured method.
+
+        Args:
+            embeddings: (N, D) array
+
+        Returns:
+            (D, D) covariance matrix
+        """
+        d = embeddings.shape[1]
+        if embeddings.shape[0] <= 1:
+            return np.zeros((d, d))
+
+        if self.covariance_method == "empirical":
+            cov = np.cov(embeddings.T)
+        elif self.covariance_method == "ledoit_wolf":
+            cov = LedoitWolf().fit(embeddings).covariance_
+        elif self.covariance_method == "basic_shrinkage":
+            cov = ShrunkCovariance().fit(embeddings).covariance_
+        elif self.covariance_method == "oas":
+            cov = OAS().fit(embeddings).covariance_
+        else:
+            cov = np.cov(embeddings.T)
+
+        if d == 1:
+            cov = np.array([[float(cov)]])
+        return cov
 
     def compute_fmd(self, embeddings1: np.ndarray, embeddings2: np.ndarray) -> float:
         """
@@ -73,21 +123,9 @@ class FrechetMusicDistance:
         mean1 = np.mean(embeddings1, axis=0)
         mean2 = np.mean(embeddings2, axis=0)
 
-        # Compute covariance matrices
-        if embeddings1.shape[0] > 1:
-            cov1 = np.cov(embeddings1.T)
-        else:
-            cov1 = np.zeros((d, d))
-
-        if embeddings2.shape[0] > 1:
-            cov2 = np.cov(embeddings2.T)
-        else:
-            cov2 = np.zeros((d, d))
-
-        # Handle 1D case where cov returns a scalar
-        if d == 1:
-            cov1 = np.array([[float(cov1)]])
-            cov2 = np.array([[float(cov2)]])
+        # Compute covariance matrices (using configured estimator)
+        cov1 = self._estimate_covariance(embeddings1)
+        cov2 = self._estimate_covariance(embeddings2)
 
         # Component 1: Squared L2 distance between means
         mean_diff_sq = np.sum((mean1 - mean2) ** 2)
@@ -163,18 +201,8 @@ class FrechetMusicDistance:
         mean1 = np.mean(embeddings1, axis=0)
         mean2 = np.mean(embeddings2, axis=0)
 
-        if embeddings1.shape[0] > 1:
-            cov1 = np.cov(embeddings1.T)
-        else:
-            cov1 = np.zeros((d, d))
-        if embeddings2.shape[0] > 1:
-            cov2 = np.cov(embeddings2.T)
-        else:
-            cov2 = np.zeros((d, d))
-
-        if d == 1:
-            cov1 = np.array([[float(cov1)]])
-            cov2 = np.array([[float(cov2)]])
+        cov1 = self._estimate_covariance(embeddings1)
+        cov2 = self._estimate_covariance(embeddings2)
 
         mean_diff_sq = float(np.sum((mean1 - mean2) ** 2))
         trace_cov1 = float(np.trace(cov1))

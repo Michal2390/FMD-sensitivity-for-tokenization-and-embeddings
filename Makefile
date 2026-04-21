@@ -1,4 +1,4 @@
-.PHONY: help install dev-install format lint type-check test clean run run-multi run-cross-val run-ablation run-interaction run-power run-all docs
+.PHONY: help install dev-install format lint type-check test clean run run-multi run-cross-val run-ablation run-interaction run-power run-nfmd run-generative run-shrinkage run-lme run-all paper docs
 
 help:
 	@echo "FMD Sensitivity Analysis - Available Commands"
@@ -66,6 +66,25 @@ run-all:
 	python scripts/run_multi_genre_analysis.py
 	python scripts/run_cross_dataset_validation.py
 	python scripts/run_sample_size_ablation.py
+	python scripts/run_nfmd_analysis.py
+	python scripts/run_generative_eval.py
+	python scripts/run_shrinkage_comparison.py
+	python scripts/run_lme_analysis.py
+
+run-nfmd:
+	python scripts/run_nfmd_analysis.py
+
+run-generative:
+	python scripts/run_generative_eval.py
+
+run-shrinkage:
+	python scripts/run_shrinkage_comparison.py
+
+run-lme:
+	python scripts/run_lme_analysis.py
+
+paper:
+	cd paper && pdflatex paper.tex && bibtex paper && pdflatex paper.tex && pdflatex paper.tex
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
