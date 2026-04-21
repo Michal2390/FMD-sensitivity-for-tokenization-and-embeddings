@@ -1,0 +1,64 @@
+                              Mixed Linear Model Regression Results
+==================================================================================================
+Model:                          MixedLM               Dependent Variable:               nfmd_trace
+No. Observations:               5760                  Method:                           REML      
+No. Groups:                     6                     Scale:                            0.0027    
+Min. group size:                960                   Log-Likelihood:                   8684.2994 
+Max. group size:                960                   Converged:                        Yes       
+Mean group size:                960.0                                                             
+--------------------------------------------------------------------------------------------------
+                                                        Coef.  Std.Err.   z    P>|z| [0.025 0.975]
+--------------------------------------------------------------------------------------------------
+Intercept                                                0.133    0.009 15.091 0.000  0.116  0.150
+C(tokenizer)[T.Octuple]                                  0.004    0.006  0.744 0.457 -0.007  0.016
+C(tokenizer)[T.REMI]                                     0.004    0.006  0.699 0.484 -0.007  0.015
+C(tokenizer)[T.TSD]                                      0.028    0.006  4.873 0.000  0.017  0.039
+C(model)[T.CLaMP-2]                                      0.035    0.006  5.614 0.000  0.023  0.047
+C(model)[T.MERT]                                         0.001    0.006  0.174 0.862 -0.011  0.013
+C(model)[T.MusicBERT]                                    0.051    0.006  8.223 0.000  0.039  0.063
+C(model)[T.MusicBERT-large]                              0.128    0.006 20.551 0.000  0.116  0.140
+C(model)[T.NLP-Baseline]                                -0.000    0.006 -0.068 0.946 -0.013  0.012
+C(preprocess)[T.False_True]                              0.003    0.006  0.595 0.552 -0.008  0.015
+C(preprocess)[T.True_False]                              0.001    0.006  0.195 0.846 -0.010  0.012
+C(preprocess)[T.True_True]                               0.001    0.006  0.216 0.829 -0.010  0.013
+C(tokenizer)[T.Octuple]:C(model)[T.CLaMP-2]             -0.031    0.007 -4.601 0.000 -0.044 -0.018
+C(tokenizer)[T.REMI]:C(model)[T.CLaMP-2]                -0.020    0.007 -3.010 0.003 -0.033 -0.007
+C(tokenizer)[T.TSD]:C(model)[T.CLaMP-2]                 -0.045    0.007 -6.823 0.000 -0.058 -0.032
+C(tokenizer)[T.Octuple]:C(model)[T.MERT]                -0.009    0.007 -1.292 0.196 -0.022  0.004
+C(tokenizer)[T.REMI]:C(model)[T.MERT]                   -0.009    0.007 -1.423 0.155 -0.023  0.004
+C(tokenizer)[T.TSD]:C(model)[T.MERT]                    -0.021    0.007 -3.140 0.002 -0.034 -0.008
+C(tokenizer)[T.Octuple]:C(model)[T.MusicBERT]           -0.025    0.007 -3.752 0.000 -0.038 -0.012
+C(tokenizer)[T.REMI]:C(model)[T.MusicBERT]               0.021    0.007  3.119 0.002  0.008  0.034
+C(tokenizer)[T.TSD]:C(model)[T.MusicBERT]                0.012    0.007  1.765 0.077 -0.001  0.025
+C(tokenizer)[T.Octuple]:C(model)[T.MusicBERT-large]      0.005    0.007  0.799 0.424 -0.008  0.018
+C(tokenizer)[T.REMI]:C(model)[T.MusicBERT-large]        -0.002    0.007 -0.278 0.781 -0.015  0.011
+C(tokenizer)[T.TSD]:C(model)[T.MusicBERT-large]          0.016    0.007  2.455 0.014  0.003  0.029
+C(tokenizer)[T.Octuple]:C(model)[T.NLP-Baseline]        -0.009    0.007 -1.372 0.170 -0.022  0.004
+C(tokenizer)[T.REMI]:C(model)[T.NLP-Baseline]            0.002    0.007  0.259 0.795 -0.011  0.015
+C(tokenizer)[T.TSD]:C(model)[T.NLP-Baseline]            -0.020    0.007 -3.062 0.002 -0.033 -0.007
+C(tokenizer)[T.Octuple]:C(preprocess)[T.False_True]     -0.003    0.005 -0.592 0.554 -0.014  0.007
+C(tokenizer)[T.REMI]:C(preprocess)[T.False_True]        -0.004    0.005 -0.813 0.416 -0.015  0.006
+C(tokenizer)[T.TSD]:C(preprocess)[T.False_True]         -0.001    0.005 -0.243 0.808 -0.012  0.009
+C(tokenizer)[T.Octuple]:C(preprocess)[T.True_False]      0.002    0.005  0.435 0.663 -0.008  0.013
+C(tokenizer)[T.REMI]:C(preprocess)[T.True_False]         0.006    0.005  1.153 0.249 -0.004  0.017
+C(tokenizer)[T.TSD]:C(preprocess)[T.True_False]         -0.011    0.005 -2.007 0.045 -0.022 -0.000
+C(tokenizer)[T.Octuple]:C(preprocess)[T.True_True]       0.003    0.005  0.620 0.535 -0.007  0.014
+C(tokenizer)[T.REMI]:C(preprocess)[T.True_True]          0.006    0.005  1.095 0.273 -0.005  0.017
+C(tokenizer)[T.TSD]:C(preprocess)[T.True_True]          -0.009    0.005 -1.719 0.086 -0.020  0.001
+C(model)[T.CLaMP-2]:C(preprocess)[T.False_True]         -0.002    0.007 -0.283 0.777 -0.015  0.011
+C(model)[T.MERT]:C(preprocess)[T.False_True]            -0.006    0.007 -0.876 0.381 -0.019  0.007
+C(model)[T.MusicBERT]:C(preprocess)[T.False_True]       -0.001    0.007 -0.091 0.927 -0.014  0.012
+C(model)[T.MusicBERT-large]:C(preprocess)[T.False_True] -0.000    0.007 -0.064 0.949 -0.013  0.013
+C(model)[T.NLP-Baseline]:C(preprocess)[T.False_True]     0.000    0.007  0.010 0.992 -0.013  0.013
+C(model)[T.CLaMP-2]:C(preprocess)[T.True_False]         -0.003    0.007 -0.409 0.682 -0.016  0.010
+C(model)[T.MERT]:C(preprocess)[T.True_False]            -0.003    0.007 -0.483 0.629 -0.016  0.010
+C(model)[T.MusicBERT]:C(preprocess)[T.True_False]       -0.008    0.007 -1.270 0.204 -0.021  0.005
+C(model)[T.MusicBERT-large]:C(preprocess)[T.True_False] -0.011    0.007 -1.724 0.085 -0.025  0.002
+C(model)[T.NLP-Baseline]:C(preprocess)[T.True_False]    -0.023    0.007 -3.519 0.000 -0.036 -0.010
+C(model)[T.CLaMP-2]:C(preprocess)[T.True_True]          -0.004    0.007 -0.544 0.587 -0.017  0.009
+C(model)[T.MERT]:C(preprocess)[T.True_True]             -0.010    0.007 -1.433 0.152 -0.023  0.004
+C(model)[T.MusicBERT]:C(preprocess)[T.True_True]        -0.008    0.007 -1.187 0.235 -0.021  0.005
+C(model)[T.MusicBERT-large]:C(preprocess)[T.True_True]  -0.012    0.007 -1.734 0.083 -0.025  0.002
+C(model)[T.NLP-Baseline]:C(preprocess)[T.True_True]     -0.024    0.007 -3.541 0.000 -0.037 -0.011
+Group Var                                                0.000    0.004                           
+==================================================================================================

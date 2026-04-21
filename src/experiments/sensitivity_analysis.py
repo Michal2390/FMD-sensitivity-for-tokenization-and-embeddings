@@ -611,6 +611,9 @@ def fit_lme_model(
             df = df.copy()
             df["preprocess"] = df["remove_velocity"].astype(str) + "_" + df["hard_quantization"].astype(str)
 
+    # Drop NaN in response column before fitting
+    df = df.dropna(subset=[response]).reset_index(drop=True)
+
     formula = f"{response} ~ {fixed_effects}"
     logger.info(f"Fitting LME: {formula} | random=~1|{random_effects}")
 

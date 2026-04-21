@@ -1,0 +1,25 @@
+                Mixed Linear Model Regression Results
+======================================================================
+Model:                  MixedLM     Dependent Variable:     nfmd_trace
+No. Observations:       5760        Method:                 REML      
+No. Groups:             6           Scale:                  0.0028    
+Min. group size:        960         Log-Likelihood:         8719.5162 
+Max. group size:        960         Converged:              Yes       
+Mean group size:        960.0                                         
+----------------------------------------------------------------------
+                            Coef.  Std.Err.   z    P>|z| [0.025 0.975]
+----------------------------------------------------------------------
+Intercept                    0.144    0.008 18.587 0.000  0.129  0.159
+C(tokenizer)[T.Octuple]     -0.006    0.002 -3.273 0.001 -0.010 -0.003
+C(tokenizer)[T.REMI]         0.004    0.002  2.295 0.022  0.001  0.008
+C(tokenizer)[T.TSD]          0.013    0.002  6.592 0.000  0.009  0.017
+C(model)[T.CLaMP-2]          0.009    0.002  3.696 0.000  0.004  0.014
+C(model)[T.MERT]            -0.013    0.002 -5.540 0.000 -0.018 -0.009
+C(model)[T.MusicBERT]        0.049    0.002 20.335 0.000  0.044  0.054
+C(model)[T.MusicBERT-large]  0.127    0.002 52.895 0.000  0.122  0.132
+C(model)[T.NLP-Baseline]    -0.019    0.002 -7.952 0.000 -0.024 -0.014
+C(preprocess)[T.False_True] -0.000    0.002 -0.132 0.895 -0.004  0.004
+C(preprocess)[T.True_False] -0.008    0.002 -3.907 0.000 -0.011 -0.004
+C(preprocess)[T.True_True]  -0.008    0.002 -4.143 0.000 -0.012 -0.004
+Group Var                    0.000    0.004                           
+======================================================================

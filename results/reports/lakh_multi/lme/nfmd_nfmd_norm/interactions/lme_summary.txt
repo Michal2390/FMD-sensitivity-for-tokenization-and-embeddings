@@ -1,0 +1,64 @@
+                               Mixed Linear Model Regression Results
+===================================================================================================
+Model:                           MixedLM               Dependent Variable:               nfmd_norm 
+No. Observations:                5760                  Method:                           REML      
+No. Groups:                      6                     Scale:                            0.0001    
+Min. group size:                 960                   Log-Likelihood:                   18877.9880
+Max. group size:                 960                   Converged:                        Yes       
+Mean group size:                 960.0                                                             
+---------------------------------------------------------------------------------------------------
+                                                        Coef.  Std.Err.    z    P>|z| [0.025 0.975]
+---------------------------------------------------------------------------------------------------
+Intercept                                                0.004    0.001   2.931 0.003  0.001  0.006
+C(tokenizer)[T.Octuple]                                  0.000    0.001   0.384 0.701 -0.002  0.002
+C(tokenizer)[T.REMI]                                     0.005    0.001   5.460 0.000  0.003  0.007
+C(tokenizer)[T.TSD]                                      0.009    0.001   9.170 0.000  0.007  0.011
+C(model)[T.CLaMP-2]                                      0.028    0.001  26.699 0.000  0.026  0.030
+C(model)[T.MERT]                                         0.020    0.001  19.155 0.000  0.018  0.022
+C(model)[T.MusicBERT]                                   -0.001    0.001  -0.731 0.465 -0.003  0.001
+C(model)[T.MusicBERT-large]                              0.001    0.001   0.501 0.617 -0.002  0.003
+C(model)[T.NLP-Baseline]                                 0.004    0.001   3.832 0.000  0.002  0.006
+C(preprocess)[T.False_True]                              0.000    0.001   0.450 0.653 -0.001  0.002
+C(preprocess)[T.True_False]                             -0.000    0.001  -0.082 0.935 -0.002  0.002
+C(preprocess)[T.True_True]                              -0.000    0.001  -0.155 0.876 -0.002  0.002
+C(tokenizer)[T.Octuple]:C(model)[T.CLaMP-2]             -0.024    0.001 -21.306 0.000 -0.026 -0.022
+C(tokenizer)[T.REMI]:C(model)[T.CLaMP-2]                 0.026    0.001  23.018 0.000  0.024  0.028
+C(tokenizer)[T.TSD]:C(model)[T.CLaMP-2]                  0.012    0.001  10.491 0.000  0.010  0.014
+C(tokenizer)[T.Octuple]:C(model)[T.MERT]                -0.002    0.001  -1.947 0.052 -0.004  0.000
+C(tokenizer)[T.REMI]:C(model)[T.MERT]                   -0.006    0.001  -5.448 0.000 -0.008 -0.004
+C(tokenizer)[T.TSD]:C(model)[T.MERT]                    -0.007    0.001  -6.348 0.000 -0.009 -0.005
+C(tokenizer)[T.Octuple]:C(model)[T.MusicBERT]           -0.001    0.001  -1.045 0.296 -0.003  0.001
+C(tokenizer)[T.REMI]:C(model)[T.MusicBERT]              -0.006    0.001  -5.366 0.000 -0.008 -0.004
+C(tokenizer)[T.TSD]:C(model)[T.MusicBERT]               -0.008    0.001  -7.144 0.000 -0.010 -0.006
+C(tokenizer)[T.Octuple]:C(model)[T.MusicBERT-large]     -0.001    0.001  -1.050 0.293 -0.003  0.001
+C(tokenizer)[T.REMI]:C(model)[T.MusicBERT-large]        -0.005    0.001  -4.858 0.000 -0.008 -0.003
+C(tokenizer)[T.TSD]:C(model)[T.MusicBERT-large]         -0.007    0.001  -6.553 0.000 -0.010 -0.005
+C(tokenizer)[T.Octuple]:C(model)[T.NLP-Baseline]         0.002    0.001   1.725 0.085 -0.000  0.004
+C(tokenizer)[T.REMI]:C(model)[T.NLP-Baseline]           -0.011    0.001  -9.439 0.000 -0.013 -0.008
+C(tokenizer)[T.TSD]:C(model)[T.NLP-Baseline]            -0.010    0.001  -8.959 0.000 -0.012 -0.008
+C(tokenizer)[T.Octuple]:C(preprocess)[T.False_True]     -0.000    0.001  -0.463 0.643 -0.002  0.001
+C(tokenizer)[T.REMI]:C(preprocess)[T.False_True]        -0.001    0.001  -0.826 0.409 -0.003  0.001
+C(tokenizer)[T.TSD]:C(preprocess)[T.False_True]         -0.000    0.001  -0.340 0.734 -0.002  0.001
+C(tokenizer)[T.Octuple]:C(preprocess)[T.True_False]      0.002    0.001   2.249 0.024  0.000  0.004
+C(tokenizer)[T.REMI]:C(preprocess)[T.True_False]         0.001    0.001   0.744 0.457 -0.001  0.002
+C(tokenizer)[T.TSD]:C(preprocess)[T.True_False]         -0.003    0.001  -3.298 0.001 -0.005 -0.001
+C(tokenizer)[T.Octuple]:C(preprocess)[T.True_True]       0.002    0.001   2.410 0.016  0.000  0.004
+C(tokenizer)[T.REMI]:C(preprocess)[T.True_True]          0.001    0.001   0.822 0.411 -0.001  0.003
+C(tokenizer)[T.TSD]:C(preprocess)[T.True_True]          -0.003    0.001  -3.001 0.003 -0.005 -0.001
+C(model)[T.CLaMP-2]:C(preprocess)[T.False_True]         -0.000    0.001  -0.043 0.965 -0.002  0.002
+C(model)[T.MERT]:C(preprocess)[T.False_True]            -0.001    0.001  -0.850 0.395 -0.003  0.001
+C(model)[T.MusicBERT]:C(preprocess)[T.False_True]       -0.000    0.001  -0.051 0.959 -0.002  0.002
+C(model)[T.MusicBERT-large]:C(preprocess)[T.False_True] -0.000    0.001  -0.047 0.962 -0.002  0.002
+C(model)[T.NLP-Baseline]:C(preprocess)[T.False_True]    -0.000    0.001  -0.001 0.999 -0.002  0.002
+C(model)[T.CLaMP-2]:C(preprocess)[T.True_False]         -0.012    0.001 -10.565 0.000 -0.014 -0.010
+C(model)[T.MERT]:C(preprocess)[T.True_False]            -0.000    0.001  -0.312 0.755 -0.003  0.002
+C(model)[T.MusicBERT]:C(preprocess)[T.True_False]       -0.000    0.001  -0.113 0.910 -0.002  0.002
+C(model)[T.MusicBERT-large]:C(preprocess)[T.True_False] -0.000    0.001  -0.200 0.842 -0.002  0.002
+C(model)[T.NLP-Baseline]:C(preprocess)[T.True_False]    -0.001    0.001  -0.533 0.594 -0.003  0.002
+C(model)[T.CLaMP-2]:C(preprocess)[T.True_True]          -0.012    0.001 -10.729 0.000 -0.014 -0.010
+C(model)[T.MERT]:C(preprocess)[T.True_True]             -0.001    0.001  -1.253 0.210 -0.004  0.001
+C(model)[T.MusicBERT]:C(preprocess)[T.True_True]        -0.000    0.001  -0.142 0.887 -0.002  0.002
+C(model)[T.MusicBERT-large]:C(preprocess)[T.True_True]  -0.000    0.001  -0.244 0.807 -0.002  0.002
+C(model)[T.NLP-Baseline]:C(preprocess)[T.True_True]     -0.001    0.001  -0.523 0.601 -0.003  0.002
+Group Var                                                0.000    0.000                            
+===================================================================================================
