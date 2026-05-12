@@ -66,6 +66,23 @@ class EmbeddingModel(ABC):
     def get_embedding_dim(self) -> int:
         raise NotImplementedError
 
+    def _deterministic_fallback_embedding(self, tokens: List[int]) -> np.ndarray:
+        """Stable fallback embedding used when the real encoder is unavailable."""
+        seed = hash((self.model_name, tuple(tokens[:64]), len(tokens))) % (2**31)
+        rng = np.random.default_rng(seed)
+        return rng.standard_normal(self.get_embedding_dim()).astype(np.float32)
+
+    def get_diagnostics(self) -> Dict[str, object]:
+        """Return lightweight runtime diagnostics for audit/reporting."""
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "embedding_dim": self.get_embedding_dim(),
+            "is_real_model": False,
+            "uses_fallback": False,
+            "status": "unknown",
+        }
+
 
 class _TextEncoderModel(EmbeddingModel):
     """Base for models that encode token sequences as text via a HF tokenizer+model."""
@@ -116,7 +133,7 @@ class _TextEncoderModel(EmbeddingModel):
 
     def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
         if self.model is None:
-            return np.random.randn(self.embedding_dim).astype(np.float32)
+            return self._deterministic_fallback_embedding(tokens)
         try:
             text = self._tokens_to_text(tokens)
             inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512, padding=True)
@@ -127,11 +144,11 @@ class _TextEncoderModel(EmbeddingModel):
             return embedding[0].astype(np.float32)
         except Exception as e:
             logger.error(f"Error encoding with {self.model_name}: {e}")
-            return np.random.randn(self.embedding_dim).astype(np.float32)
+            return self._deterministic_fallback_embedding(tokens)
 
     def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
         if self.model is None:
-            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
+            return np.array([self._deterministic_fallback_embedding(seq) for seq in token_sequences], dtype=np.float32)
         try:
             texts = [self._tokens_to_text(seq) for seq in token_sequences]
             inputs = self.tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=512)
@@ -142,10 +159,22 @@ class _TextEncoderModel(EmbeddingModel):
             return embeddings.astype(np.float32)
         except Exception as e:
             logger.error(f"Error batch encoding with {self.model_name}: {e}")
-            return np.random.randn(len(token_sequences), self.embedding_dim).astype(np.float32)
+            return np.array([self._deterministic_fallback_embedding(seq) for seq in token_sequences], dtype=np.float32)
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
+
+    def get_diagnostics(self) -> Dict[str, object]:
+        is_real = bool(self._use_real_model)
+        has_model = self.model is not None
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "embedding_dim": self.embedding_dim,
+            "is_real_model": is_real,
+            "uses_fallback": bool(has_model and not is_real),
+            "status": "real" if is_real else ("fallback_proxy" if has_model else "dummy_deterministic"),
+        }
 
 
 class MusicBERTModel(_TextEncoderModel):
@@ -300,7 +329,7 @@ class MERTModel(EmbeddingModel):
 
     def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
         if self.model is None:
-            return np.random.randn(self.embedding_dim).astype(np.float32)
+            return self._deterministic_fallback_embedding(tokens)
 
         if self._processor is not None and midi_data is not None:
             audio = self._midi_to_audio(midi_data)
@@ -320,7 +349,7 @@ class MERTModel(EmbeddingModel):
                 logger.debug(f"MERT noise-fallback encoding failed: {e}")
 
         logger.warning("MERT: all encoding methods failed, returning random embedding")
-        return np.random.randn(self.embedding_dim).astype(np.float32)
+        return self._deterministic_fallback_embedding(tokens)
 
     def encode_batch(
         self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None
@@ -337,6 +366,20 @@ class MERTModel(EmbeddingModel):
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
+
+    def get_diagnostics(self) -> Dict[str, object]:
+        is_real = bool(self._use_real_model)
+        has_model = self.model is not None
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "embedding_dim": self.embedding_dim,
+            "is_real_model": is_real,
+            "uses_fallback": bool(has_model and not is_real),
+            "status": "real" if is_real else ("fallback_proxy" if has_model else "dummy_deterministic"),
+            "processor_available": self._processor is not None,
+            "sample_rate": int(self._sample_rate),
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -446,8 +489,7 @@ class CLaMP1Model(EmbeddingModel):
 
     def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
         if not self._loaded:
-            rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
-            return rng.standard_normal(self.embedding_dim).astype(np.float32)
+            return self._deterministic_fallback_embedding(tokens)
 
         patches = self._midi_tokens_to_patches(tokens).to(self.device)
         with torch.no_grad():
@@ -461,6 +503,17 @@ class CLaMP1Model(EmbeddingModel):
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
+
+    def get_diagnostics(self) -> Dict[str, object]:
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "embedding_dim": self.embedding_dim,
+            "is_real_model": bool(self._loaded),
+            "uses_fallback": not bool(self._loaded),
+            "status": "real" if self._loaded else "dummy_deterministic",
+            "output_normalized": True,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -569,8 +622,7 @@ class CLaMP2Model(EmbeddingModel):
 
     def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
         if not self._loaded:
-            rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
-            return rng.standard_normal(self.embedding_dim).astype(np.float32)
+            return self._deterministic_fallback_embedding(tokens)
 
         patches = self._tokens_to_mtf_patches(tokens).to(self.device)
         with torch.no_grad():
@@ -584,6 +636,17 @@ class CLaMP2Model(EmbeddingModel):
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
+
+    def get_diagnostics(self) -> Dict[str, object]:
+        return {
+            "model_name": self.model_name,
+            "device": self.device,
+            "embedding_dim": self.embedding_dim,
+            "is_real_model": bool(self._loaded),
+            "uses_fallback": not bool(self._loaded),
+            "status": "real" if self._loaded else "dummy_deterministic",
+            "output_normalized": True,
+        }
 
 
 class EmbeddingFactory:
@@ -628,6 +691,21 @@ class EmbeddingExtractor:
         self.use_cache = config["embeddings"].get("cache_embeddings", True)
         self.memory_cache = {} if self.use_cache else None
         logger.info(f"EmbeddingExtractor initialized with models: {list(self.models.keys())}")
+
+    def get_model_diagnostics(self) -> Dict[str, Dict[str, object]]:
+        """Expose model-loading/runtime diagnostics for audit experiments."""
+        diagnostics: Dict[str, Dict[str, object]] = {}
+        for model_name, model in self.models.items():
+            try:
+                diagnostics[model_name] = model.get_diagnostics()
+            except Exception as exc:
+                diagnostics[model_name] = {
+                    "model_name": model_name,
+                    "status": f"diagnostics_failed: {exc}",
+                    "is_real_model": False,
+                    "uses_fallback": True,
+                }
+        return diagnostics
 
     def _get_cache_key(self, model_name: str, token_hash: str) -> str:
         return f"{model_name}_{token_hash}"

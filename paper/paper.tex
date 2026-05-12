@@ -14,7 +14,7 @@
 \usepackage[margin=2.5cm]{geometry}
 
 \title{How Sensitive Is Fréchet Music Distance to Pipeline Choices?\\
-A Systematic Study of Tokenization, Embedding Models, and Normalization}
+A Systematic Study of Tokenization, Embedding Geometry, and Exploratory Calibration}
 
 \author{
   Michał Fereniec \\
@@ -30,14 +30,14 @@ A Systematic Study of Tokenization, Embedding Models, and Normalization}
 \begin{abstract}
 The Fréchet Music Distance (FMD) has been proposed as an objective evaluation metric for generative symbolic music models. However, FMD depends on several upstream pipeline choices---tokenization scheme, embedding model, and preprocessing---whose impact on the metric's behavior has not been systematically studied.
 
-We present a comprehensive sensitivity analysis of FMD across 96 pipeline variants (4~tokenizers $\times$ 6~embedding models $\times$ 4~preprocessing configurations), evaluated on 5{,}760 FMD observations from the Lakh MIDI Dataset (4~genres, 6~genre pairs, 10$\times$ repeated subsampling). Our analysis employs three-way factorial ANOVA with interactions, bootstrap confidence intervals, permutation tests, linear mixed-effects models, and cross-dataset validation on MidiCaps ($\rho = 0.975$).
+We present a comprehensive sensitivity analysis of FMD across 96 pipeline variants (4~tokenizers $\times$ 6~embedding models $\times$ 4~preprocessing configurations), evaluated on 5{,}760 FMD observations from the Lakh MIDI Dataset (4~genres, 6~genre pairs, 10$\times$ repeated subsampling). Our analysis employs three-way factorial ANOVA with interactions, bootstrap confidence intervals, permutation tests, linear mixed-effects models, an embedding-geometry audit, and cross-dataset validation on MidiCaps ($\rho = 0.975$).
 
 Key findings:
 (1)~The embedding model choice dominates FMD variance ($\eta^2 = 0.96$), making tokenizer and preprocessing effects negligible in raw FMD.
-(2)~This dominance is largely a \emph{scale artefact}: after trace-normalization (nFMD), the tokenizer effect increases 14$\times$ (from $\eta^2 = 0.001$ to $0.014$--$0.041$).
-(3)~Tokenizer sensitivity is model-dependent: MusicBERT shows $\eta^2(\text{tok}) = 0.36$ under nFMD, while CLaMP models are insensitive.
-(4)~We propose Normalized FMD (nFMD) for fair cross-model comparison and validate it with generative baselines (Markov chain, random sequences).
-(5)~Shrinkage covariance estimators (Ledoit-Wolf, OAS) reduce FMD overestimation at small sample sizes without altering the sensitivity pattern.
+(2)~Architecture audit results indicate that part of this dominance is linked to embedding geometry, including differences in norm scale, covariance trace, and representation anisotropy.
+(3)~Simple normalizations (nFMD) reduce part of the cross-model spread and reveal model-dependent tokenizer effects: MusicBERT shows $\eta^2(\text{tok}) = 0.36$ under nFMD, while CLaMP models remain comparatively insensitive.
+(4)~We further evaluate an exploratory shared-space calibration for symbolic models based on PCA whitening and orthogonal Procrustes alignment; on disjoint holdout anchors, it substantially reduces cross-model spread, but we treat it as a calibration candidate rather than a validated replacement for raw FMD.
+(5)~Shrinkage covariance estimators (Ledoit-Wolf, OAS) reduce FMD overestimation at small sample sizes without altering the overall sensitivity pattern.
 
 We release all code, data, and analysis scripts for full reproducibility.
 \end{abstract}
@@ -48,15 +48,16 @@ We release all code, data, and analysis scripts for full reproducibility.
 
 Evaluating generative symbolic music models requires metrics that capture musical quality beyond surface-level statistics. The Fréchet Music Distance (FMD)~\citep{retkowski2025fmd}, inspired by FID~\citep{heusel2017gans} and FAD~\citep{kilgour2018fad}, compares distributions of learned embeddings between reference and generated music. While FMD shows promise, its sensitivity to upstream pipeline choices---tokenization, embedding model, and preprocessing---remains unexplored.
 
-This matters because practitioners must make pipeline decisions \emph{before} computing FMD, and if these choices substantially alter the metric, comparisons across papers become unreliable. We systematically quantify this sensitivity.
+This matters because practitioners must make pipeline decisions \emph{before} computing FMD, and if these choices substantially alter the metric, comparisons across papers become unreliable. We systematically quantify this sensitivity and ask a more specific question: how much of the observed variation reflects musical differences, and how much reflects differences in embedding-space geometry across architectures?
 
 \paragraph{Contributions.}
 \begin{enumerate}
     \item A factorial sensitivity analysis of FMD across 96 pipeline variants with rigorous statistical methodology (ANOVA, LME, bootstrap CI, permutation tests).
-    \item The discovery that FMD's apparent model-dominance ($\eta^2 = 0.96$) is partly a scale artefact, revealed by normalized FMD (nFMD).
-    \item Per-model tokenizer sensitivity profiles showing MusicBERT is highly tokenizer-sensitive ($\eta^2 = 0.36$) while CLaMP models are not.
-    \item Validation with generative baselines (Markov chain, random) and shrinkage covariance estimators.
-    \item Full open-source release of code, data, and analysis pipeline.
+    \item A bridge-validation protocol for the tokenizer$\rightarrow$embedding interface, including same-song cross-tokenizer PCA/t-SNE panels, nearest-neighbor agreement, and same-song versus different-song cosine comparisons.
+    \item An embedding-geometry audit showing that raw FMD is strongly architecture-dependent, linking metric instability to differences in norm scale, covariance trace, and representation geometry.
+    \item An evaluation of normalized FMD (nFMD) as a calibration hypothesis rather than a validated solution, including per-model tokenizer sensitivity profiles showing that MusicBERT is highly tokenizer-sensitive ($\eta^2 = 0.36$) while CLaMP models are not.
+    \item An exploratory shared comparison space for symbolic embedding models based on PCA whitening and orthogonal Procrustes alignment, tested with disjoint holdout anchors to assess whether it reduces architectural bias while preserving musical discrimination.
+    \item Validation with generative baselines (Markov chain, random), shrinkage covariance estimators, and a full open-source release of code, data, and analysis pipeline.
 \end{enumerate}
 
 % ======================================================================
@@ -85,11 +86,21 @@ Given reference embeddings $\{x_i\}_{i=1}^N$ and test embeddings $\{y_j\}_{j=1}^
 
 \subsection{Normalized FMD (nFMD)}
 
-We propose two normalization strategies to enable fair cross-model comparison:
+We evaluate two simple normalization strategies as calibration hypotheses for reducing scale-driven differences across embedding architectures. These normalizations may attenuate part of the geometric mismatch between models, but they do not by themselves guarantee cross-model comparability:
 \begin{align}
 \text{nFMD}_{\text{trace}} &= \frac{\text{FMD}}{\text{Tr}(\Sigma_r) + \text{Tr}(\Sigma_t)} \\
 \text{nFMD}_{\text{norm}} &= \frac{\text{FMD}}{(\|\mu_r\| + \|\mu_t\|)^2}
 \end{align}
+
+\subsection{Exploratory Shared-Space Calibration}
+
+To further test whether part of the cross-model discrepancy is geometric rather than musical, we introduce an exploratory shared comparison space for symbolic embedding models only. Let $X_m \in \mathbb{R}^{n \times d_m}$ denote matched anchor embeddings for model $m$. We first center each embedding matrix, project it to a shared dimension $k$ with PCA, and whiten the retained components so that each model has approximately isotropic covariance in its reduced space. We then align each whitened space to a reference model $r$ by solving an orthogonal Procrustes problem,
+\begin{equation}
+R_m = \arg\min_{R^\top R = I} \|Z_m R - Z_r\|_F,
+\end{equation}
+where $Z_m$ is the whitened anchor matrix for model $m$. Any embedding $x$ from model $m$ is mapped into the shared space by centering, PCA projection, whitening, and the learned orthogonal rotation.
+
+Whenever enough matched files are available, calibration is fit on a subset of anchor files and evaluated on disjoint holdout anchors. We treat the resulting shared-space FMD as an exploratory calibration procedure, not as a validated replacement for raw FMD.
 
 \subsection{Covariance Estimation}
 
@@ -104,6 +115,12 @@ We compare four estimators: empirical (MLE), Ledoit-Wolf shrinkage~\citep{ledoit
     \item \textbf{Permutation tests} (5{,}000 permutations)
     \item \textbf{Holm--Bonferroni correction} for multiple comparisons
 \end{itemize}
+
+\subsection{Tokenizer-to-Embedding Bridge Validation}
+
+To validate the interface between tokenization and embedding extraction, we run an additional matched-file experiment. For a fixed embedding model and preprocessing configuration, each musical piece is encoded under all available tokenizers. This yields $K$ embeddings per piece, where $K$ is the number of tokenizers. If tokenizer effects are secondary to piece identity, embeddings of the same piece produced from different tokenizers should remain closer to each other than embeddings of different pieces.
+
+We evaluate this hypothesis with three complementary diagnostics: (8A) per-model PCA and t-SNE panels in which each point corresponds to one tokenizer-specific embedding and points are coloured by piece identity, (8B) cross-tokenizer nearest-neighbor accuracy, i.e. whether the nearest embedding from another tokenizer belongs to the same piece, and (8C) a cosine-similarity gap comparing same-song cross-tokenizer similarity against different-song similarity. Together, these tests provide a direct sanity check that the tokenizer$\rightarrow$embedding bridge preserves piece identity rather than scrambling it.
 
 % ======================================================================
 \section{Experimental Setup}
@@ -132,23 +149,37 @@ Total: $4 \times 6 \times 4 = 96$ variants $\times$ 6 genre pairs $\times$ 10 re
     \item \textbf{Random}: Uniformly random note sequences (negative control)
 \end{itemize}
 
+\subsection{Shared-Space Evaluation Protocol}
+
+Exploratory shared-space calibration is restricted to symbolic embedding models with matched anchor files. In our main experiments, calibration is fit separately per tokenizer using a train/holdout split of matched anchors, and evaluation is reported on the holdout portion whenever possible. We compare four variants: raw FMD, whitening only, Procrustes only, and whitening plus Procrustes.
+
+\subsection{Same-Song Cross-Tokenizer Protocol}
+
+For each embedding model, we additionally restrict attention to matched files available under all tokenizers in the default preprocessing condition. We then compare embeddings of the same piece across tokenizers against embeddings of different pieces. The expected qualitative pattern is that each piece forms a local cross-tokenizer cluster in the per-model PCA/t-SNE visualizations, while the quantitative expectation is a positive same-song versus different-song cosine gap and above-chance cross-tokenizer nearest-neighbor accuracy.
+
 % ======================================================================
 \section{Results}
 \label{sec:results}
 
 % TODO: Insert tables and figures from results/plots/paper/
 
-\subsection{Raw FMD: Model Dominance}
+\subsection{Raw FMD: Architecture Dependence}
 
 % Table: Three-way ANOVA results
 % Figure: multi_summary_4panel.png
 
-\subsection{Normalized FMD Reveals Hidden Tokenizer Effects}
+\subsection{Same-Song Cross-Tokenizer Bridge Validation}
+
+% Table: same_song_cross_tokenizer_metrics.csv
+% Figure: lakh_same_song_pca / lakh_same_song_tsne / lakh_same_song_metrics
+% Expectation: local song clusters across tokenizers, positive same-vs-different cosine gap, high cross-tokenizer NN accuracy
+
+\subsection{Normalization Partially Attenuates Cross-Model Spread}
 
 % Table: η² comparison raw vs nFMD
 % Figure: nfmd_eta_sq_comparison.png
 
-\subsection{Per-Model Tokenizer Sensitivity}
+\subsection{Per-Model Tokenizer Sensitivity After Calibration}
 
 % Table: Per-model η²(tokenizer) under nFMD_trace
 % Figure: nfmd_per_model_heatmap.png
@@ -167,6 +198,12 @@ Total: $4 \times 6 \times 4 = 96$ variants $\times$ 6 genre pairs $\times$ 10 re
 
 % Spearman ρ = 0.975
 
+\subsection{Exploratory Shared-Space Calibration}
+
+% Table: architecture_shared_space_pair_audit.csv
+% Figure: architecture_shared_space_spread.png
+% Compare: raw / whitening-only / Procrustes-only / whitening+Procrustes
+
 % ======================================================================
 \section{Discussion}
 \label{sec:discussion}
@@ -174,18 +211,19 @@ Total: $4 \times 6 \times 4 = 96$ variants $\times$ 6 genre pairs $\times$ 10 re
 Our results have several implications for FMD users:
 
 \begin{enumerate}
-    \item \textbf{Report the embedding model.} Model choice explains $>$96\% of FMD variance; comparing FMD values across different models is meaningless without normalization.
-    \item \textbf{Use nFMD for cross-model comparison.} Trace-normalization reduces the model effect from $\eta^2 = 0.96$ to $0.71$, revealing meaningful tokenizer effects.
-    \item \textbf{Tokenizer choice matters for MLM models.} MusicBERT users should carefully select tokenizers (REMI or TSD recommended).
-    \item \textbf{Contrastive models are robust to tokenization.} CLaMP-based FMD is stable across tokenizer choices.
-    \item \textbf{Shrinkage estimators help at small sample sizes} but do not change the overall sensitivity pattern.
+    \item \textbf{The tokenizer$\rightarrow$embedding bridge should be validated directly.} Same-song cross-tokenizer diagnostics help determine whether a model preserves piece identity across tokenizations or instead reacts primarily to the adapter representation itself.
+    \item \textbf{Always report the embedding model and avoid direct raw cross-model comparisons.} Model choice explains $>$96\% of raw FMD variance, indicating that part of the measured distance reflects embedding geometry rather than only musical variation.
+    \item \textbf{Interpret nFMD as a calibration hypothesis, not as a solved replacement.} Trace-normalization reduces the model effect from $\eta^2 = 0.96$ to $0.71$ and reveals meaningful tokenizer effects, but it does not by itself validate cross-model comparability.
+    \item \textbf{Within-model comparisons remain the safest interpretation.} Tokenizer effects are most informative when studied inside a fixed architecture; in particular, MusicBERT appears substantially more tokenizer-sensitive than CLaMP-based models.
+    \item \textbf{Shared-space calibration is promising but still exploratory.} Whitening plus orthogonal Procrustes substantially reduces holdout cross-model spread among symbolic models, suggesting that some of the discrepancy is geometric, but it does not establish semantic equivalence across architectures.
+    \item \textbf{Shrinkage estimators help at small sample sizes} but do not change the broader sensitivity pattern.
 \end{enumerate}
 
 % ======================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented the first systematic sensitivity analysis of Fréchet Music Distance across 96 pipeline variants. The key finding is that FMD's apparent model-dominance is partly a scale artefact: normalized FMD reveals that tokenizer sensitivity is model-dependent, with MusicBERT being highly sensitive ($\eta^2 = 0.36$) while CLaMP models are robust. We propose nFMD as a standard for fair cross-model evaluation and provide practical pipeline recommendations.
+We presented the first systematic sensitivity analysis of Fréchet Music Distance across 96 pipeline variants. Beyond the FMD results themselves, we argue that the tokenizer$\rightarrow$embedding bridge must be validated explicitly: same-song cross-tokenizer PCA/t-SNE panels, nearest-neighbor agreement, and same-versus-different cosine gaps provide a practical sanity check that embeddings preserve piece identity across tokenizations. Our central result remains that raw FMD is strongly architecture-dependent: a substantial part of the observed variation is linked to embedding-space geometry rather than only musical differences. Normalized FMD reduces part of this dependence and reveals model-dependent tokenizer sensitivity, but should be interpreted as a calibration hypothesis rather than a validated replacement for raw FMD. We further show that an exploratory shared-space calibration based on PCA whitening and orthogonal Procrustes can substantially reduce cross-model spread among symbolic embedding models on holdout anchors. At present, however, the safest practical recommendation is to prioritize within-model analyses and treat cross-model FMD comparisons as exploratory unless additional calibration is introduced and validated.
 
 % ======================================================================
 \section*{Acknowledgements}
@@ -196,4 +234,6 @@ This work was conducted as part of the WIMU (Music Information Retrieval) course
 \bibliography{references}
 
 \end{document}
+
+
 

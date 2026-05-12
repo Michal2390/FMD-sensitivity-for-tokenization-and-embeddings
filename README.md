@@ -71,6 +71,8 @@ MusicBERT produces embeddings with **3× higher norms** than CLaMP-2 (~15 vs ~2.
 
 > **Raw FMD values cannot be directly compared across embedding models of different architectures.** Normalization or model-specific baselines are required for fair comparison.
 
+More precisely: normalization, split-half baselines, or shared-space calibration may help, but they should be treated as **calibration strategies to test**, not as automatically valid replacements for raw FMD.
+
 ### 🔬 Generalizability Across Genre Pairs
 
 The η² decomposition is remarkably consistent across all genre pairs (CV = 0.00 for model):
@@ -110,10 +112,11 @@ All main effects confirmed with multiple approaches:
 | Maximum genre separability | Any tokenizer + MusicBERT-large | Highest absolute FMD, most discriminative |
 | Tokenizer-sensitive evaluation | **REMI or TSD + MusicBERT** | **η²(tok)=0.36 after nFMD** — tokenizer matters most here |
 | Stable across genres | Octuple + CLaMP-1 | Lowest CV across pairs |
-| Fair cross-model comparison | **Use nFMD_trace** | Raw FMD varies 12.8× by model scale |
+| Safe default for interpretation | **Compare within one embedding model** | Avoids architectural non-comparability in raw FMD |
+| Exploratory cross-model calibration | **Use nFMD, split-half baselines, or shared-space alignment only cautiously** | Raw FMD varies strongly by model scale; architecture audit is required |
 | ⚠️ Avoid | MIDI-Like + MusicBERT | Lowest eff. dim (11), inflated FMD |
 | ⚠️ Avoid | MERT for symbolic MIDI | Returns degenerate embeddings for non-audio input |
-| ⚠️ Caution | Comparing raw FMD across model architectures | Scale-dependent — use nFMD instead |
+| ⚠️ Caution | Comparing raw FMD across model architectures | Scale- and geometry-dependent — do not assume direct comparability |
 
 ---
 
@@ -248,9 +251,9 @@ Validated whether FMD correctly ranks: **real < Markov < random** (expected qual
 
 ---
 
-## New: Normalized FMD (nFMD) — Scale-Invariant Metric ✅ VALIDATED
+## New: Normalized FMD (nFMD) — Exploratory Calibration Hypothesis
 
-We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is not comparable across embedding models of different architectures. Three normalization strategies are implemented in `src/metrics/fmd.py`:
+We propose **Normalized FMD (nFMD)** as an exploratory calibration step to address the key finding that raw FMD is not directly comparable across embedding models of different architectures. Three normalization strategies are implemented in `src/metrics/fmd.py`:
 
 | Method | Formula | Intuition |
 |--------|---------|-----------|
@@ -258,7 +261,7 @@ We propose **Normalized FMD (nFMD)** to address the key finding that raw FMD is 
 | **Norm** | nFMD = FMD / (‖μ₁‖ + ‖μ₂‖)² | Compensates for quadratic mean-norm scaling |
 | **Z-score** | nFMD = (FMD − μ_baseline) / σ_baseline | Calibrates against within-genre baseline |
 
-### 🔥 Full 6-Model nFMD Validation (5350 observations)
+### 🔥 Full 6-Model nFMD Calibration Study (5350 observations)
 
 Normalization reveals hidden tokenizer effects masked by model scale:
 
@@ -269,7 +272,7 @@ Normalization reveals hidden tokenizer effects masked by model scale:
 | **pair** | 0.0067 | **0.0959** | 0.0066 | ↑ 14× — genre matters more |
 | **preprocess** | 0.0011 | 0.0038 | 0.0053 | ↑ 4× |
 
-> **Key insight: Normalization increases the tokenizer effect 14× — from negligible (η²=0.001) to small-medium (η²=0.014–0.041), proving the raw FMD model dominance was partly a scale artefact.**
+> **Key insight: Normalization increases the tokenizer effect 14× — from negligible (η²=0.001) to small-medium (η²=0.014–0.041), suggesting that part of the raw FMD model dominance was geometric/scale-driven.** This is encouraging, but it does **not** by itself validate cross-model comparability.
 
 ### 🎯 Per-Model Tokenizer Sensitivity (nFMD_trace)
 
@@ -295,6 +298,31 @@ Which models are actually sensitive to tokenization after removing the scale eff
 | MusicBERT | 0.1477 | 0.001662 | 0.000209 | 14.84 |
 
 > **Raw FMD varies 12.8× across models; after trace-normalization, only 1.9×.**
+
+## New: Embedding Architecture Audit + Shared Comparison Space
+
+To understand whether cross-model FMD is interpretable at all, the project now includes a dedicated audit in `src/experiments/embedding_architecture_audit.py` and a runner in `scripts/run_embedding_architecture_audit.py`.
+
+### What the audit measures
+
+- **runtime model integrity** — whether a real model was loaded or a fallback/proxy was used,
+- **embedding geometry** — mean norm, covariance trace, effective dimensionality, cosine structure,
+- **split-half baselines** — within-distribution FMD / nFMD noise floor,
+- **signal-to-baseline ratios** — whether cross-genre signal exceeds intrinsic model noise,
+- **cross-model spread** — how much the same music comparison changes depending only on model choice.
+
+### Exploratory new contribution: shared comparison space
+
+For symbolic models, we additionally implement a candidate bias-reduction method:
+
+1. center matched samples per model,
+2. reduce to a common dimension with PCA/SVD,
+3. whiten each reduced space,
+4. align to a reference model with **orthogonal Procrustes**.
+
+Whenever enough matched files are available, the alignment is **fit on anchor samples and evaluated on disjoint holdout samples**. This is important: without holdout evaluation, shared-space results can be overly optimistic.
+
+> We treat this as a **scientifically interesting exploratory method**, not as a validated replacement for FMD. If it consistently reduces cross-model spread on held-out data while preserving signal-over-baseline, it becomes a serious candidate for a new debiasing method.
 
 ## Embedding Models (6 Models, 3 Architecture Families)
 
@@ -416,7 +444,13 @@ python scripts/run_multi_genre_analysis.py   # 4 genres × 96 variants × 10 rep
 ```bash
 python scripts/run_nfmd_analysis.py          # nFMD validation: raw vs normalized η² (6 models, ~3h)
 ```
-Computes nFMD_trace and nFMD_norm for all 96 variants, runs ANOVA on all three metrics, per-model η² breakdown, and generates comparison plots. Results in `results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md`.
+Computes nFMD_trace and nFMD_norm for all 96 variants, runs ANOVA on all three metrics, per-model η² breakdown, and generates comparison plots. Results in `results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md`. Interpret nFMD as a **hypothesis-generating calibration**, not a final fix.
+
+### Embedding Architecture Audit
+```bash
+python scripts/run_embedding_architecture_audit.py --max-files 120
+```
+Audits model integrity, embedding geometry, split-half baselines, cross-model spread, and an **exploratory shared-space calibration** for symbolic models. Shared-space alignment is evaluated on disjoint holdout samples whenever enough matched files are available. Results in `results/reports/architecture_audit/ARCHITECTURE_AUDIT_REPORT.md`.
 
 ### Sample-Size Sensitivity (Power Analysis)
 ```bash
@@ -492,12 +526,17 @@ python scripts/run_ablation_study.py
 | [`CROSS_VALIDATION_REPORT.md`](results/reports/cross_validation/CROSS_VALIDATION_REPORT.md) | Cross-dataset generalizability (3-model, ρ=0.975) |
 | [`NFMD_ANALYSIS_REPORT.md`](results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md) | **nFMD validation: raw vs normalized η² comparison (6-model)** |
 | [`GENERATIVE_EVAL_REPORT.md`](results/reports/generative_eval/GENERATIVE_EVAL_REPORT.md) | **Generative ranking validity (real < Markov < random)** |
+| [`ARCHITECTURE_AUDIT_REPORT.md`](results/reports/architecture_audit/ARCHITECTURE_AUDIT_REPORT.md) | **Embedding geometry audit + exploratory shared-space calibration** |
 | `lme/raw_fmd_fmd/*/lme_summary.txt` | **LME mixed models: main effects & interactions with genre as random effect** |
 | `shrinkage_comparison/shrinkage_eta_sq.csv` | **Covariance shrinkage robustness (4 estimators)** |
 | `multi_genre_fmd.csv` | Raw 5760 FMD observations |
 | `nfmd_multi_genre.csv` | **5350 nFMD observations with trace/norm components** |
 | `nfmd_eta_sq_comparison.csv` | **η² comparison: raw FMD vs nFMD_trace vs nFMD_norm** |
 | `nfmd_per_model_eta_sq.csv` | **Per-model η² breakdown (tok/preprocess within each model)** |
+| `architecture_cell_stats.csv` | **Per-cell geometry statistics and split-half baselines** |
+| `architecture_pair_audit.csv` | **Pairwise raw/normalized FMD plus signal-to-baseline ratios** |
+| `architecture_shared_space_pair_audit.csv` | **Exploratory held-out shared-space pair audit for symbolic models** |
+| `architecture_shared_space_calibration.csv` | **Tokenizer-level whitening+Procrustes calibration metadata** |
 | `eta_sq_per_pair.csv` | η² consistency across pairs |
 | `interaction_cell_stats.csv` | Per-cell embedding diagnostics |
 | `cross_dataset_fmd.csv` | Combined FMD from all sources |

@@ -9,6 +9,8 @@ Generates:
 - CDF/ECDF plot: FMD distributions per model
 - Bootstrap CI error bars per variant
 - Grouped bar chart intra- vs inter-genre cosine similarity
+- Same-song cross-tokenizer PCA / t-SNE panels per model
+- Same-song cross-tokenizer metric summary
 - Scatter FMD vs token entropy with regression line
 - ANOVA summary table as figure
 - Permutation test results
@@ -53,6 +55,14 @@ def _parse_variant(variant_str: str) -> Dict[str, str]:
             k, v = segment.split("=", 1)
             parts[k] = v
     return parts
+
+
+def _facet_scatter_genre(data: pd.DataFrame, x: str, y: str, **kwargs) -> None:
+    sns.scatterplot(data=data, x=x, y=y, ax=plt.gca(), **kwargs)
+
+
+def _facet_scatter_song(data: pd.DataFrame, x: str, y: str, **kwargs) -> None:
+    sns.scatterplot(data=data, x=x, y=y, ax=plt.gca(), **kwargs)
 
 
 def generate_lakh_plots(config: Dict) -> Dict[str, str]:
@@ -185,6 +195,7 @@ def generate_lakh_plots(config: Dict) -> Dict[str, str]:
         if eta_sq:
             factors = list(eta_sq.keys())
             values = [eta_sq[f] for f in factors]
+            p_values = []
 
             # If partial η² available, show side-by-side
             if partial_eta_sq:
@@ -302,7 +313,7 @@ def generate_lakh_plots(config: Dict) -> Dict[str, str]:
             if sample_variants:
                 sub = tsne_df[tsne_df["variant"].isin(sample_variants)]
                 g = sns.FacetGrid(sub, col="tok", col_wrap=2, height=4, sharex=False, sharey=False)
-                g.map_dataframe(sns.scatterplot, x="tsne1", y="tsne2", hue="genre",
+                g.map_dataframe(_facet_scatter_genre, x="tsne1", y="tsne2", hue="genre",
                                 style="genre", palette="Set1", alpha=0.7, s=30)
                 g.add_legend()
                 g.figure.suptitle("t-SNE: Genre Embeddings by Tokenizer", y=1.02)
@@ -373,6 +384,98 @@ def generate_lakh_plots(config: Dict) -> Dict[str, str]:
                 outputs["lakh_anova_table"] = _save(fig, plots_dir / "lakh_anova_table")
         except Exception as exc:
             logger.warning(f"ANOVA table figure failed: {exc}")
+
+    # ------------------------------------------------------------------
+    # 12. Same-song cross-tokenizer metrics (8B / 8C)
+    # ------------------------------------------------------------------
+    same_song_csv = report_dir / "same_song_cross_tokenizer_metrics.csv"
+    if same_song_csv.exists():
+        try:
+            same_df = pd.read_csv(same_song_csv)
+            if not same_df.empty:
+                metric_long = same_df.melt(
+                    id_vars=["model"],
+                    value_vars=[
+                        "same_song_cross_tokenizer_cosine_mean",
+                        "different_song_cosine_mean",
+                        "cross_tokenizer_nn_accuracy",
+                    ],
+                    var_name="metric",
+                    value_name="value",
+                )
+                metric_labels = {
+                    "same_song_cross_tokenizer_cosine_mean": "same-song cosine",
+                    "different_song_cosine_mean": "different-song cosine",
+                    "cross_tokenizer_nn_accuracy": "NN accuracy",
+                }
+                metric_long["metric"] = metric_long["metric"].map(metric_labels)
+
+                fig, ax = plt.subplots(figsize=(9, 5))
+                sns.barplot(data=metric_long, x="model", y="value", hue="metric", ax=ax, palette="Set2")
+                ax.set_title("Same-Song Cross-Tokenizer Consistency by Model")
+                ax.set_xlabel("Embedding model")
+                ax.set_ylabel("Score")
+                ax.set_ylim(0.0, 1.05)
+                outputs["lakh_same_song_metrics"] = _save(fig, plots_dir / "lakh_same_song_cross_tokenizer_metrics")
+
+                fig2, ax2 = plt.subplots(figsize=(11, max(2.5, 0.6 * len(same_df) + 1)))
+                ax2.axis("off")
+                display_df = same_df.copy()
+                for col in display_df.columns:
+                    if col != "model":
+                        display_df[col] = display_df[col].round(3)
+                table = ax2.table(
+                    cellText=display_df.values,
+                    colLabels=display_df.columns,
+                    cellLoc="center",
+                    loc="center",
+                )
+                table.auto_set_font_size(False)
+                table.set_fontsize(8)
+                table.scale(1.2, 1.4)
+                ax2.set_title("Same-Song Cross-Tokenizer Metrics", fontsize=12, pad=16)
+                outputs["lakh_same_song_metrics_table"] = _save(fig2, plots_dir / "lakh_same_song_cross_tokenizer_metrics_table")
+        except Exception as exc:
+            logger.warning(f"Same-song cross-tokenizer metrics plot failed: {exc}")
+
+    # ------------------------------------------------------------------
+    # 13. Same-song cross-tokenizer PCA / t-SNE panels (8A)
+    # ------------------------------------------------------------------
+    for csv_name, x_col, y_col, out_key, title in [
+        ("same_song_cross_tokenizer_pca.csv", "pc1", "pc2", "lakh_same_song_pca", "PCA: same song across tokenizers"),
+        ("same_song_cross_tokenizer_tsne.csv", "tsne1", "tsne2", "lakh_same_song_tsne", "t-SNE: same song across tokenizers"),
+    ]:
+        path = report_dir / csv_name
+        if not path.exists():
+            continue
+        try:
+            proj_df = pd.read_csv(path)
+            if proj_df.empty or "model" not in proj_df.columns:
+                continue
+            model_count = proj_df["model"].nunique()
+            g = sns.FacetGrid(
+                proj_df,
+                col="model",
+                col_wrap=min(3, max(1, model_count)),
+                height=4,
+                sharex=False,
+                sharey=False,
+            )
+            g.map_dataframe(
+                _facet_scatter_song,
+                x=x_col,
+                y=y_col,
+                hue="song_key",
+                style="tokenizer",
+                palette="husl",
+                alpha=0.8,
+                s=45,
+            )
+            g.add_legend()
+            g.figure.suptitle(title, y=1.02)
+            outputs[out_key] = _save(g.figure, plots_dir / out_key)
+        except Exception as exc:
+            logger.warning(f"Same-song cross-tokenizer projection plot failed for {csv_name}: {exc}")
 
     # ------------------------------------------------------------------
     if not outputs:

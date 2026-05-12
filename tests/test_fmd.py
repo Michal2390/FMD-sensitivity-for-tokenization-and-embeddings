@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from metrics.fmd import FrechetMusicDistance, FMDRanking
+from metrics.fmd import FrechetMusicDistance, FMDRanking, NormalizedFMD
 
 
 @pytest.fixture
@@ -72,6 +72,36 @@ class TestFrechetMusicDistance:
 
         assert isinstance(fmd, float), "FMD should return a float"
         assert fmd >= 0, "FMD should be non-negative"
+
+    def test_split_half_baseline_returns_expected_keys(self, fmd_calculator):
+        """Split-half baseline should expose both raw and normalized statistics."""
+        embeddings = np.random.randn(40, 16)
+
+        baseline = fmd_calculator.compute_split_half_baseline(embeddings, n_splits=5, seed=7)
+
+        for key in [
+            "fmd_mean",
+            "fmd_std",
+            "nfmd_trace_mean",
+            "nfmd_trace_std",
+            "nfmd_norm_mean",
+            "nfmd_norm_std",
+        ]:
+            assert key in baseline
+            assert baseline[key] >= 0
+
+    def test_normalized_fmd_zscore_uses_split_half_baseline(self, config):
+        """Z-score mode should calibrate from a split-half baseline and return a float."""
+        nfmd = NormalizedFMD(config, method="zscore")
+        reference = np.random.randn(40, 8)
+        test = np.random.randn(40, 8) + 0.25
+
+        mean, std = nfmd.compute_baseline(reference, n_splits=6, seed=13)
+        value = nfmd.compute(reference, test)
+
+        assert mean >= 0
+        assert std > 0
+        assert isinstance(value, float)
 
 
 class TestFMDRanking:

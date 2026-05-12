@@ -285,6 +285,57 @@ class FrechetMusicDistance:
 
         return result
 
+    def compute_split_half_baseline(
+        self,
+        embeddings: np.ndarray,
+        n_splits: int = 20,
+        seed: int = 42,
+    ) -> Dict[str, float]:
+        """Estimate intrinsic within-distribution FMD/nFMD noise via split halves."""
+        x = np.asarray(embeddings, dtype=float)
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
+
+        n = x.shape[0]
+        half = n // 2
+        if half < 2:
+            logger.warning("Too few samples for split-half baseline; returning zeros")
+            return {
+                "fmd_mean": 0.0,
+                "fmd_std": 0.0,
+                "nfmd_trace_mean": 0.0,
+                "nfmd_trace_std": 0.0,
+                "nfmd_norm_mean": 0.0,
+                "nfmd_norm_std": 0.0,
+                "n_splits": 0,
+                "n_samples": int(n),
+            }
+
+        rng = np.random.default_rng(seed)
+        fmd_values = []
+        nfmd_trace_values = []
+        nfmd_norm_values = []
+
+        for _ in range(n_splits):
+            idx = rng.permutation(n)
+            left = x[idx[:half]]
+            right = x[idx[half : 2 * half]]
+            result = self.compute_nfmd(left, right)
+            fmd_values.append(float(result["fmd"]))
+            nfmd_trace_values.append(float(result["nfmd_trace"]))
+            nfmd_norm_values.append(float(result["nfmd_norm"]))
+
+        return {
+            "fmd_mean": float(np.mean(fmd_values)),
+            "fmd_std": float(np.std(fmd_values)),
+            "nfmd_trace_mean": float(np.mean(nfmd_trace_values)),
+            "nfmd_trace_std": float(np.std(nfmd_trace_values)),
+            "nfmd_norm_mean": float(np.mean(nfmd_norm_values)),
+            "nfmd_norm_std": float(np.std(nfmd_norm_values)),
+            "n_splits": int(n_splits),
+            "n_samples": int(n),
+        }
+
     @staticmethod
     def _cov_trace_eigenvalue(cov1: np.ndarray, cov2: np.ndarray) -> float:
         """Fallback: compute Tr(Σ₁+Σ₂-2·(Σ₁Σ₂)^½) via eigenvalue decomposition.
@@ -445,7 +496,6 @@ class NormalizedFMD:
         Returns:
             (baseline_mean, baseline_std)
         """
-        rng = np.random.default_rng(seed)
         n = embeddings.shape[0]
         if n < 10:
             logger.warning("Too few samples for baseline; using (0, 1)")
@@ -453,15 +503,13 @@ class NormalizedFMD:
             self._baseline_std = 1.0
             return (0.0, 1.0)
 
-        fmd_values: List[float] = []
-        half = n // 2
-        for _ in range(n_splits):
-            idx = rng.permutation(n)
-            a, b = embeddings[idx[:half]], embeddings[idx[half : half * 2]]
-            fmd_values.append(self.fmd_calc.compute_fmd(a, b))
-
-        self._baseline_mean = float(np.mean(fmd_values))
-        self._baseline_std = float(np.std(fmd_values))
+        baseline = self.fmd_calc.compute_split_half_baseline(
+            embeddings,
+            n_splits=n_splits,
+            seed=seed,
+        )
+        self._baseline_mean = float(baseline["fmd_mean"])
+        self._baseline_std = float(baseline["fmd_std"])
         if self._baseline_std < 1e-12:
             self._baseline_std = 1.0  # avoid division by zero
 

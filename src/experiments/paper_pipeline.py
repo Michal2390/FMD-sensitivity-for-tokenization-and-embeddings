@@ -276,7 +276,7 @@ class PaperExperimentRunner:
                 tokens = tokenizer.encode_midi_object(midi_data)
                 if not tokens:
                     continue
-                vec = self.embeddings.extract_embeddings([tokens], variant.model)[0]
+                vec = self.embeddings.extract_embeddings([tokens], variant.model, midi_data_list=[midi_data])[0]
                 vectors.append(vec)
                 real_count += 1
             except Exception as exc:
@@ -1005,6 +1005,7 @@ class PaperExperimentRunner:
         pairwise_rows: List[Dict] = []
         embeddings_cache: Dict[str, Dict[str, np.ndarray]] = {}  # variant → {genre: emb}
         token_seqs_cache: Dict[str, Dict[str, List[List[int]]]] = {}  # variant → {genre: [[int]]}
+        sample_ids_cache: Dict[str, Dict[str, List[str]]] = {}  # variant → {genre: [sample_id]}
         fmd_per_variant: Dict[str, float] = {}
 
         total_steps = len(variants)
@@ -1014,11 +1015,13 @@ class PaperExperimentRunner:
 
             variant_embs: Dict[str, np.ndarray] = {}
             variant_tokens: Dict[str, List[List[int]]] = {}
+            variant_sample_ids: Dict[str, List[str]] = {}
 
             for ds_name, genre_label in [(ds_a, genre_a), (ds_b, genre_b)]:
                 midi_files = self._list_dataset_midis(ds_name)
                 vectors: List[np.ndarray] = []
                 seqs: List[List[int]] = []
+                sample_ids: List[str] = []
                 for midi_path in midi_files:
                     try:
                         midi_data = self._preprocess_midi_file(midi_path, variant)
@@ -1029,7 +1032,8 @@ class PaperExperimentRunner:
                         if not tokens:
                             continue
                         seqs.append(tokens)
-                        vec = self.embeddings.extract_embeddings([tokens], variant.model)[0]
+                        sample_ids.append(midi_path.name)
+                        vec = self.embeddings.extract_embeddings([tokens], variant.model, midi_data_list=[midi_data])[0]
                         vectors.append(vec)
                     except Exception as exc:
                         logger.warning(f"Skip {midi_path}: {exc}")
@@ -1037,12 +1041,14 @@ class PaperExperimentRunner:
                 if vectors:
                     variant_embs[genre_label] = np.vstack(vectors)
                     variant_tokens[genre_label] = seqs
+                    variant_sample_ids[genre_label] = sample_ids
                     logger.info(f"  {genre_label}: {len(vectors)} embeddings")
                 else:
                     logger.warning(f"  {genre_label}: 0 embeddings!")
 
             embeddings_cache[variant.name] = variant_embs
             token_seqs_cache[variant.name] = variant_tokens
+            sample_ids_cache[variant.name] = variant_sample_ids
 
             emb_a = variant_embs.get(genre_a)
             emb_b = variant_embs.get(genre_b)
@@ -1130,6 +1136,7 @@ class PaperExperimentRunner:
         diag_outputs = run_embedding_diagnostics(
             embeddings_by_variant=embeddings_cache,
             token_sequences_by_variant=token_seqs_cache,
+            sample_ids_by_variant=sample_ids_cache,
             fmd_per_variant=fmd_per_variant,
             genre_a=genre_a,
             genre_b=genre_b,

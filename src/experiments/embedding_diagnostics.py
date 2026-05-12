@@ -3,6 +3,7 @@
 Implements:
 - PCA / t-SNE visualisation of embeddings per genre × variant
 - Intra- vs inter-genre cosine similarity per variant
+- Cross-tokenizer same-song stability diagnostics (PCA/t-SNE + NN metrics)
 - Token-level statistics (sequence length, entropy, type distribution)
 - Feature importance (per-dimension variance across variants)
 - Correlation between token statistics and FMD values
@@ -13,7 +14,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -21,12 +22,16 @@ from loguru import logger
 from scipy import stats as sp_stats
 
 # Optional imports for dimensionality reduction
+PCA = None
+TSNE = None
 try:
     from sklearn.decomposition import PCA
     from sklearn.manifold import TSNE
 
     _HAS_SKLEARN = True
 except ImportError:
+    PCA = None
+    TSNE = None
     _HAS_SKLEARN = False
     logger.warning("scikit-learn not available – PCA/t-SNE diagnostics disabled")
 
@@ -120,6 +125,12 @@ def intra_inter_cosine(
     }
 
 
+def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Cosine similarity between two vectors."""
+    denom = float(np.linalg.norm(a) * np.linalg.norm(b) + 1e-12)
+    return float(np.dot(a, b) / denom)
+
+
 # ======================================================================
 # Dimensionality reduction
 # ======================================================================
@@ -153,6 +164,231 @@ def compute_tsne(
         learning_rate="auto",
     )
     return tsne.fit_transform(embeddings)
+
+
+def _parse_variant_name(variant_name: str) -> Dict[str, str]:
+    """Parse compact variant label into components."""
+    parts: Dict[str, str] = {}
+    for segment in str(variant_name).split("|"):
+        if "=" in segment:
+            key, value = segment.split("=", 1)
+            parts[key] = value
+    return parts
+
+
+def _build_same_song_records(
+    embeddings_by_variant: Dict[str, Dict[str, np.ndarray]],
+    sample_ids_by_variant: Optional[Dict[str, Dict[str, List[str]]]],
+    preferred_vel: str = "on",
+    preferred_quant: str = "off",
+) -> List[Dict[str, object]]:
+    """Collect matched same-song embeddings across tokenizers for each model.
+
+    Returns row-wise records restricted to a common preprocessing setting when
+    available (default: vel=on, quant=off). Each record corresponds to one
+    sample embedding produced by one tokenizer for one embedding model.
+    """
+    if not sample_ids_by_variant:
+        return []
+
+    grouped: Dict[Tuple[str, str, str], Dict[str, Dict[str, Dict[str, np.ndarray]]]] = {}
+    observed_preproc: Dict[str, List[Tuple[str, str]]] = {}
+
+    for variant_name, genre_embs in embeddings_by_variant.items():
+        meta = _parse_variant_name(variant_name)
+        model = meta.get("model")
+        tokenizer = meta.get("tok")
+        vel = meta.get("vel")
+        quant = meta.get("quant")
+        if not model or not tokenizer or vel is None or quant is None:
+            continue
+
+        observed_preproc.setdefault(model, []).append((vel, quant))
+        key = (model, vel, quant)
+        by_genre = grouped.setdefault(key, {})
+
+        sample_map = sample_ids_by_variant.get(variant_name, {})
+        for genre, emb_array in genre_embs.items():
+            sample_ids = sample_map.get(genre, [])
+            if emb_array is None or len(sample_ids) != len(emb_array):
+                continue
+            genre_map = by_genre.setdefault(genre, {})
+            tok_map = genre_map.setdefault(tokenizer, {})
+            for sample_id, vec in zip(sample_ids, emb_array):
+                tok_map[str(sample_id)] = vec
+
+    records: List[Dict[str, object]] = []
+    selected_preproc: Dict[str, Tuple[str, str]] = {}
+    for model, combos in observed_preproc.items():
+        combo_set = set(combos)
+        if (preferred_vel, preferred_quant) in combo_set:
+            selected_preproc[model] = (preferred_vel, preferred_quant)
+        else:
+            selected_preproc[model] = sorted(combo_set)[0]
+
+    for (model, vel, quant), genre_maps in grouped.items():
+        if selected_preproc.get(model) != (vel, quant):
+            continue
+        for genre, tok_maps in genre_maps.items():
+            if len(tok_maps) < 2:
+                continue
+            tokenizers = sorted(tok_maps.keys())
+            common_ids = set(tok_maps[tokenizers[0]].keys())
+            for tok in tokenizers[1:]:
+                common_ids &= set(tok_maps[tok].keys())
+            for sample_id in sorted(common_ids):
+                song_key = f"{genre}/{sample_id}"
+                for tok in tokenizers:
+                    vec = tok_maps[tok][sample_id]
+                    records.append(
+                        {
+                            "model": model,
+                            "tokenizer": tok,
+                            "vel": vel,
+                            "quant": quant,
+                            "genre": genre,
+                            "sample_id": sample_id,
+                            "song_key": song_key,
+                            "embedding": np.asarray(vec, dtype=np.float32),
+                        }
+                    )
+    return records
+
+
+def cross_tokenizer_same_song_metrics(
+    embeddings_by_variant: Dict[str, Dict[str, np.ndarray]],
+    sample_ids_by_variant: Optional[Dict[str, Dict[str, List[str]]]],
+) -> Tuple[pd.DataFrame, List[Dict[str, object]]]:
+    """Summarise whether the same song stays close across tokenizers.
+
+    Returns
+    -------
+    metrics_df : per-model summary with same-song and different-song cosine stats
+    records : row-wise embedding records for downstream PCA/t-SNE plotting
+    """
+    records = _build_same_song_records(embeddings_by_variant, sample_ids_by_variant)
+    if not records:
+        return pd.DataFrame(), []
+
+    metrics_rows: List[Dict[str, object]] = []
+    by_model: Dict[str, List[Dict[str, object]]] = {}
+    for rec in records:
+        by_model.setdefault(str(rec["model"]), []).append(rec)
+
+    for model, model_records in by_model.items():
+        same_scores: List[float] = []
+        diff_scores: List[float] = []
+        nn_correct = 0
+        nn_total = 0
+        tokenizer_set = sorted({str(r["tokenizer"]) for r in model_records})
+        tokenizer_count = len(tokenizer_set)
+        song_keys = sorted({str(r["song_key"]) for r in model_records})
+
+        for idx, rec in enumerate(model_records):
+            emb = np.asarray(rec["embedding"], dtype=np.float32)
+            same_candidates = [
+                other for j, other in enumerate(model_records)
+                if j != idx and other["song_key"] == rec["song_key"] and other["tokenizer"] != rec["tokenizer"]
+            ]
+            diff_candidates = [
+                other for other in model_records if other["song_key"] != rec["song_key"]
+            ]
+
+            same_sims = [_cosine_similarity(emb, np.asarray(other["embedding"], dtype=np.float32)) for other in same_candidates]
+            diff_sims = [_cosine_similarity(emb, np.asarray(other["embedding"], dtype=np.float32)) for other in diff_candidates]
+
+            if same_sims:
+                same_scores.extend(same_sims)
+            if diff_sims:
+                diff_scores.append(float(np.mean(diff_sims)))
+
+            cross_tok_candidates = [
+                other for other in model_records if other["tokenizer"] != rec["tokenizer"]
+            ]
+            if cross_tok_candidates:
+                nn_total += 1
+                best = max(
+                    cross_tok_candidates,
+                    key=lambda other: _cosine_similarity(emb, np.asarray(other["embedding"], dtype=np.float32)),
+                )
+                if best["song_key"] == rec["song_key"]:
+                    nn_correct += 1
+
+        same_mean = float(np.mean(same_scores)) if same_scores else float("nan")
+        diff_mean = float(np.mean(diff_scores)) if diff_scores else float("nan")
+        metrics_rows.append(
+            {
+                "model": model,
+                "n_tokenizers": int(tokenizer_count),
+                "n_common_songs": int(len(song_keys)),
+                "same_song_cross_tokenizer_cosine_mean": same_mean,
+                "same_song_cross_tokenizer_cosine_std": float(np.std(same_scores)) if same_scores else float("nan"),
+                "different_song_cosine_mean": diff_mean,
+                "different_song_cosine_std": float(np.std(diff_scores)) if diff_scores else float("nan"),
+                "cosine_gap": float(same_mean - diff_mean) if np.isfinite(same_mean) and np.isfinite(diff_mean) else float("nan"),
+                "cross_tokenizer_nn_accuracy": float(nn_correct / nn_total) if nn_total else float("nan"),
+            }
+        )
+
+    return pd.DataFrame(metrics_rows), records
+
+
+def cross_tokenizer_projection_records(
+    records: List[Dict[str, object]],
+    seed: int = 42,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Create per-model PCA and t-SNE 2D projections for same-song records."""
+    if not records or not _HAS_SKLEARN:
+        return pd.DataFrame(), pd.DataFrame()
+
+    pca_rows: List[Dict[str, object]] = []
+    tsne_rows: List[Dict[str, object]] = []
+    by_model: Dict[str, List[Dict[str, object]]] = {}
+    for rec in records:
+        by_model.setdefault(str(rec["model"]), []).append(rec)
+
+    for model, model_records in by_model.items():
+        embeddings = np.vstack([np.asarray(r["embedding"], dtype=np.float32) for r in model_records])
+        if embeddings.shape[0] < 3:
+            continue
+        try:
+            pca_proj, var_ratio = compute_pca(embeddings, n_components=2)
+            for row, (x, y) in zip(model_records, pca_proj):
+                pca_rows.append(
+                    {
+                        "model": model,
+                        "tokenizer": row["tokenizer"],
+                        "genre": row["genre"],
+                        "sample_id": row["sample_id"],
+                        "song_key": row["song_key"],
+                        "pc1": float(x),
+                        "pc2": float(y),
+                        "pc1_var": float(var_ratio[0]) if len(var_ratio) > 0 else float("nan"),
+                        "pc2_var": float(var_ratio[1]) if len(var_ratio) > 1 else float("nan"),
+                    }
+                )
+        except Exception as exc:
+            logger.warning(f"Cross-tokenizer PCA failed for {model}: {exc}")
+
+        if embeddings.shape[0] >= 10:
+            try:
+                tsne_proj = compute_tsne(embeddings, seed=seed)
+                for row, (x, y) in zip(model_records, tsne_proj):
+                    tsne_rows.append(
+                        {
+                            "model": model,
+                            "tokenizer": row["tokenizer"],
+                            "genre": row["genre"],
+                            "sample_id": row["sample_id"],
+                            "song_key": row["song_key"],
+                            "tsne1": float(x),
+                            "tsne2": float(y),
+                        }
+                    )
+            except Exception as exc:
+                logger.warning(f"Cross-tokenizer t-SNE failed for {model}: {exc}")
+
+    return pd.DataFrame(pca_rows), pd.DataFrame(tsne_rows)
 
 
 # ======================================================================
@@ -206,7 +442,7 @@ def fmd_token_correlation(
     """Spearman correlation between FMD and a token-level statistic."""
     if len(fmd_values) < 3:
         return {"rho": float("nan"), "p": float("nan")}
-    rho, p = sp_stats.spearmanr(fmd_values, token_stat_values)
+    rho, p = sp_stats.spearmanr(list(fmd_values), list(token_stat_values))
     return {"rho": float(rho), "p": float(p)}
 
 
@@ -217,12 +453,13 @@ def fmd_token_correlation(
 def run_embedding_diagnostics(
     embeddings_by_variant: Dict[str, Dict[str, np.ndarray]],
     token_sequences_by_variant: Optional[Dict[str, Dict[str, List[List[int]]]]] = None,
+    sample_ids_by_variant: Optional[Dict[str, Dict[str, List[str]]]] = None,
     fmd_per_variant: Optional[Dict[str, float]] = None,
     genre_a: str = "rock",
     genre_b: str = "classical",
-    output_dir: Path | str = "results/reports/lakh",
+    output_dir: Union[Path, str] = "results/reports/lakh",
     seed: int = 42,
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """Run full embedding diagnostics suite.
 
     Parameters
@@ -231,6 +468,8 @@ def run_embedding_diagnostics(
         ``{variant_name: {genre: array (N, D)}}``
     token_sequences_by_variant :
         ``{variant_name: {genre: [[int, …], …]}}`` (optional)
+    sample_ids_by_variant :
+        ``{variant_name: {genre: [sample_id, …]}}`` (optional)
     fmd_per_variant :
         ``{variant_name: float}`` (optional, for correlation)
     genre_a, genre_b : genre labels
@@ -264,6 +503,29 @@ def run_embedding_diagnostics(
         cosine_df.to_csv(path, index=False)
         outputs["cosine_csv"] = str(path)
         logger.info(f"Cosine similarity: {len(cosine_rows)} variants → {path}")
+
+    # ------------------------------------------------------------------
+    # 1b. Same-song cross-tokenizer stability (8A / 8B / 8C)
+    # ------------------------------------------------------------------
+    same_song_df, same_song_records = cross_tokenizer_same_song_metrics(
+        embeddings_by_variant=embeddings_by_variant,
+        sample_ids_by_variant=sample_ids_by_variant,
+    )
+    if not same_song_df.empty:
+        path = output_dir / "same_song_cross_tokenizer_metrics.csv"
+        same_song_df.to_csv(path, index=False)
+        outputs["same_song_cross_tokenizer_csv"] = str(path)
+
+    if same_song_records:
+        pca_same_df, tsne_same_df = cross_tokenizer_projection_records(same_song_records, seed=seed)
+        if not pca_same_df.empty:
+            path = output_dir / "same_song_cross_tokenizer_pca.csv"
+            pca_same_df.to_csv(path, index=False)
+            outputs["same_song_cross_tokenizer_pca_csv"] = str(path)
+        if not tsne_same_df.empty:
+            path = output_dir / "same_song_cross_tokenizer_tsne.csv"
+            tsne_same_df.to_csv(path, index=False)
+            outputs["same_song_cross_tokenizer_tsne_csv"] = str(path)
 
     # ------------------------------------------------------------------
     # 2. PCA / t-SNE (per variant — safe since emb_a, emb_b share dim)

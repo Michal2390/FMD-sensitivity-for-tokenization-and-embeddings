@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Normalized FMD (nFMD) analysis — scale-invariant sensitivity study.
+"""Normalized FMD (nFMD) analysis — exploratory scale-calibration study.
 
 Reads the existing multi-genre FMD CSV, re-extracts embeddings to compute
 nFMD components, then repeats the ANOVA/η² analysis on normalized values.
 
-Key question: Does η²(model) drop dramatically after normalization,
-revealing hidden tokenizer/preprocessing effects?
+Key question: Does η²(model) drop after normalization, suggesting that part of
+the raw model effect was geometric/scale-driven rather than purely musical?
 """
 
 from __future__ import annotations
@@ -391,7 +391,7 @@ def main():
     logger.info("\n=== Step 5: Generating report ===")
     report = []
     report.append("# Normalized FMD (nFMD) Analysis")
-    report.append(f"\n**Scale-invariant FMD enables fair cross-model comparison.**")
+    report.append(f"\n**nFMD is treated here as a calibration hypothesis, not a validated replacement for raw FMD.**")
     report.append(f"\n## Design")
     report.append(f"- **Input:** {len(df)} FMD observations (NaN-filtered)")
     report.append(f"- **Metrics:** raw FMD, nFMD_trace (FMD/Tr), nFMD_norm (FMD/‖μ‖²)")
@@ -419,10 +419,10 @@ def main():
 
     report.append(f"\n## Conclusions")
     report.append(f"""
-1. Raw FMD is dominated by model scale (η²≈0.96) — this is a **scale artefact**.
-2. After trace-normalization, the model effect should decrease substantially.
-3. Per-model analysis reveals which models are actually sensitive to tokenization.
-4. nFMD enables **fair cross-model comparison** of pipeline choices.
+1. Raw FMD is strongly dominated by model choice (η²≈0.96); part of this may reflect embedding geometry rather than only musical structure.
+2. Trace/norm normalization can reduce this dominance, but this alone does **not** prove cross-model comparability.
+3. Per-model analysis remains valuable: it reveals which models are actually sensitive to tokenization.
+4. nFMD should therefore be interpreted as an **exploratory calibration hypothesis** to be checked against architecture audits and model-specific baselines.
 """)
 
     report_path = OUTPUT_DIR / "NFMD_ANALYSIS_REPORT.md"
