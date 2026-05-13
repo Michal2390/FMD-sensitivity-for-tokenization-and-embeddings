@@ -40,17 +40,25 @@ class EmbeddingModel(ABC):
         self.config = config
         self.model_name = model_name
         requested_device = str(config["embeddings"].get("device", "cpu")).lower()
+        cuda_available = torch.cuda.is_available()
+        logger.info(f"DEBUG: torch.cuda.is_available() = {cuda_available}, requested_device = {requested_device}")
+        
         if requested_device == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        elif requested_device == "cuda" and not torch.cuda.is_available():
-            logger.warning("CUDA requested but not available; falling back to CPU")
-            self.device = "cpu"
+            self.device = "cuda" if cuda_available else "cpu"
+        elif requested_device == "cuda":
+            self.device = "cuda"
+            if not cuda_available:
+                logger.warning("CUDA requested and forced (not checking availability)")
         else:
             self.device = requested_device
 
         if self.device == "cuda":
-            gpu_name = torch.cuda.get_device_name(0)
-            logger.info(f"Initialized {model_name} on CUDA GPU: {gpu_name}")
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+                logger.info(f"Initialized {model_name} on CUDA GPU: {gpu_name}")
+            except Exception as e:
+                logger.warning(f"Failed to get GPU name: {e}, using CUDA anyway")
+                logger.info(f"Initialized {model_name} on device: cuda")
         else:
             logger.info(f"Initialized {model_name} on device: {self.device}")
         logger.info("Embedding stage runs inference only (no neural network training)")

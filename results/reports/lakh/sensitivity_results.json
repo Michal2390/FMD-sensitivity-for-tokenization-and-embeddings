@@ -1,48 +1,84 @@
 {
   "eta_squared": {
-    "tokenizer": 0.21326361904010263,
-    "model": 0.018288070181743356,
-    "preprocess": 0.0524233808907672
+    "tokenizer": 0.019543601851822277,
+    "model": 0.7282085895572447,
+    "preprocess": 0.0065634061428930055
   },
   "partial_eta_squared": {
-    "tokenizer": 0.2132636190401026,
-    "model": 0.01828807018174336,
-    "preprocess": 0.05242338089076721
+    "tokenizer": 0.019543601851822277,
+    "model": 0.7282085895572447,
+    "preprocess": 0.0065634061428930055
+  },
+  "eta_sq_bootstrap_ci": {
+    "tokenizer": {
+      "point": 0.019543601851822277,
+      "ci_lower": 0.00341122262492907,
+      "ci_upper": 0.14183628561630135
+    },
+    "model": {
+      "point": 0.7282085895572447,
+      "ci_lower": 0.5384570660030934,
+      "ci_upper": 0.9999874881032336
+    },
+    "preprocess": {
+      "point": 0.0065634061428930055,
+      "ci_lower": 0.0029178721434678133,
+      "ci_upper": 0.10865274671167242
+    },
+    "tokenizer:model": {
+      "point": 0.84450166788835,
+      "ci_lower": 0.7311482630054066,
+      "ci_upper": 0.9999976534896152
+    }
   },
   "kruskal_wallis_tokenizer": {
-    "H": 4.558823529411766,
-    "p": 0.2071029946283659
+    "H": 0.2320343030829007,
+    "p": 0.9722593375890767
   },
   "kruskal_wallis_model": {
-    "H": 0.8205882352941267,
-    "p": 0.3650082357961647
+    "H": 86.76793855840208,
+    "p": 3.205284726649155e-17
   },
   "cohens_d": {
-    "tok_MIDI-Like vs Octuple": -0.8632735015759877,
-    "tok_MIDI-Like vs REMI": 0.6480511003952134,
-    "tok_MIDI-Like vs TSD": -0.09510432051705117,
-    "tok_Octuple vs REMI": 1.1191992782499316,
-    "tok_Octuple vs TSD": 0.6613446671733484,
-    "tok_REMI vs TSD": -0.6098212109763502,
-    "mod_CLaMP-1 vs CLaMP-2": 0.26430631480072897
+    "tok_MIDI-Like vs Octuple": -0.002617294837793313,
+    "tok_MIDI-Like vs REMI": -0.28890625440746753,
+    "tok_MIDI-Like vs TSD": -0.0010314329765977871,
+    "tok_Octuple vs REMI": -0.2862488877307047,
+    "tok_Octuple vs TSD": 0.0015828538738813763,
+    "tok_REMI vs TSD": 0.2876513232014014,
+    "mod_CLaMP-1 vs CLaMP-2": -1.6329487848945887,
+    "mod_CLaMP-1 vs MERT": -371.958530654652,
+    "mod_CLaMP-1 vs MusicBERT": -8.915972854132493,
+    "mod_CLaMP-1 vs MusicBERT-large": -0.5497138845505759,
+    "mod_CLaMP-1 vs NLP-Baseline": -2.2390276577456216,
+    "mod_CLaMP-2 vs MERT": -371.91118481133026,
+    "mod_CLaMP-2 vs MusicBERT": -8.820311642484194,
+    "mod_CLaMP-2 vs MusicBERT-large": -0.5495788553837411,
+    "mod_CLaMP-2 vs NLP-Baseline": -1.0034424980304608,
+    "mod_MERT vs MusicBERT": 359.8122398144625,
+    "mod_MERT vs MusicBERT-large": 1.9594361952728763,
+    "mod_MERT vs NLP-Baseline": 371.8488800594542,
+    "mod_MusicBERT vs MusicBERT-large": -0.5354149472771429,
+    "mod_MusicBERT vs NLP-Baseline": 8.708698292228041,
+    "mod_MusicBERT-large vs NLP-Baseline": 0.5494259171614283
   },
   "permutation_tests": {
     "tokenizer": {
-      "observed_F": 2.5300221173777797,
-      "permutation_p": 0.07378524295140972,
+      "observed_F": 0.6112838108740705,
+      "permutation_p": 0.5876824635072986,
       "n_permutations": 5000
     },
     "model": {
-      "observed_F": 0.5588626243483363,
-      "permutation_p": 0.45930813837232554,
+      "observed_F": 48.227258509301365,
+      "permutation_p": 0.0001999600079984003,
       "n_permutations": 5000
     },
     "preprocess": {
-      "observed_F": 0.5163539057915743,
-      "permutation_p": 0.6664667066586683,
+      "observed_F": 0.2026075842450829,
+      "permutation_p": 0.8882223555288942,
       "n_permutations": 5000
     }
   },
-  "n_variants": 32,
-  "n_rows": 32
+  "n_variants": 96,
+  "n_rows": 96
 }

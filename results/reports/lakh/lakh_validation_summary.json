@@ -3,33 +3,26 @@
     "rock",
     "jazz"
   ],
-  "n_variants": 32,
-  "n_valid": 32,
+  "n_variants": 96,
+  "n_valid": 96,
   "fmd_range": {
-    "min": 0.0535790473222732,
-    "max": 0.2696066200733185
+    "min": 0.00780469411984086,
+    "max": 1726.28369140625
   },
   "eta_squared": {
-    "tokenizer": 0.21326361904010263,
-    "model": 0.018288070181743356,
-    "preprocess": 0.0524233808907672
+    "tokenizer": 0.019543601851822277,
+    "model": 0.7282085895572447,
+    "preprocess": 0.0065634061428930055
   },
   "diagnostics_outputs": {
-    "cosine_csv": "results/reports/lakh/cosine_similarity.csv",
-    "pca_csv": "results/reports/lakh/pca_projections.csv",
-    "tsne_csv": "results/reports/lakh/tsne_projections.csv",
-    "top_dims_json": "results/reports/lakh/top_varying_dimensions.json",
-    "token_stats_csv": "results/reports/lakh/token_statistics.csv",
-    "fmd_token_corr_json": "results/reports/lakh/fmd_token_correlations.json"
-  },
-  "partial_eta_squared": {
-    "tokenizer": 0.2132636190401026,
-    "model": 0.01828807018174336,
-    "preprocess": 0.05242338089076721
-  },
-  "fmd_stats": {
-    "mean": 0.1560403448529541,
-    "std": 0.060473278539394625,
-    "median": 0.15027626603841776
+    "cosine_csv": "results\\reports\\lakh\\cosine_similarity.csv",
+    "same_song_cross_tokenizer_csv": "results\\reports\\lakh\\same_song_cross_tokenizer_metrics.csv",
+    "same_song_cross_tokenizer_pca_csv": "results\\reports\\lakh\\same_song_cross_tokenizer_pca.csv",
+    "same_song_cross_tokenizer_tsne_csv": "results\\reports\\lakh\\same_song_cross_tokenizer_tsne.csv",
+    "pca_csv": "results\\reports\\lakh\\pca_projections.csv",
+    "tsne_csv": "results\\reports\\lakh\\tsne_projections.csv",
+    "top_dims_json": "results\\reports\\lakh\\top_varying_dimensions.json",
+    "token_stats_csv": "results\\reports\\lakh\\token_statistics.csv",
+    "fmd_token_corr_json": "results\\reports\\lakh\\fmd_token_correlations.json"
   }
 }

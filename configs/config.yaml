@@ -15,33 +15,6 @@ data:
     - name: "pop909"
       url: "https://github.com/music-x-lab/POP909-Dataset"
       version: "1.0"
-    - name: "jazz"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "rock"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "classical"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "pop"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "rap"
-      url: "local-generated"
-      version: "starter-v1"
-    - name: "lakh_rock"
-      url: "lakh-genre-subset"
-      version: "lmd_matched"
-    - name: "lakh_jazz"
-      url: "lakh-genre-subset"
-      version: "lmd_matched"
-    - name: "lakh_electronic"
-      url: "lakh-genre-subset"
-      version: "lmd_matched"
-    - name: "lakh_country"
-      url: "lakh-genre-subset"
-      version: "lmd_matched"
 
 # Preprocessing Configuration
 preprocessing:
@@ -78,67 +51,45 @@ tokenization:
 # Embedding Model Configuration
 embeddings:
   models:
-    - name: "MusicBERT"
-      model_name: "musicbert"
-      hf_model_name: "manoskary/musicbert"
-      format_type: "token_text"  # Symbolic music BERT (768-dim, vocab=540)
-    - name: "MusicBERT-large"
-      model_name: "musicbert-large"
-      hf_model_name: "manoskary/musicbert-large"
-      format_type: "token_text"  # Larger symbolic music BERT (1024-dim, vocab=540)
-    - name: "MERT"
-      model_name: "mert"
-      hf_model_name: "m-a-p/MERT-v1-95M"
-      format_type: "audio"  # Audio-based model (MIDI→audio→embedding, 768-dim)
-    - name: "NLP-Baseline"
-      model_name: "nlp-baseline"
-      hf_model_name: "sentence-transformers/all-mpnet-base-v2"
-      format_type: "token_text"  # General NLP baseline control (768-dim)
     - name: "CLaMP-1"
-      model_name: "clamp1"
-      hf_model_name: "sander-wood/clamp-small-512"
-      format_type: "music_patches"  # ABC bar-patching music encoder (768-dim)
+      model_name: "clamp-1"
+      hf_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+      format_type: "abc"  # Abstract text format
     - name: "CLaMP-2"
-      model_name: "clamp2"
-      hf_model_name: "sander-wood/clamp2"
-      format_type: "midi_patches"  # MTF patch-based music encoder (768-dim)
+      model_name: "clamp-2"
+      hf_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+      format_type: "midi"  # Direct MIDI structure
   # Embedding extraction settings
   batch_size: 32
-  device: "auto"  # auto -> CUDA when available, otherwise CPU
-  cache_embeddings: true
+  device: "cpu"  # Safe default for local runs
   cache_dir: "data/embeddings/cache"  # Directory for caching extracted embeddings
 
 # FMD Metric Configuration
 fmd_metric:
   metric_name: "Frechet Music Distance"
-  # Statistical parameters
   use_mean: true
   use_std: true
-  # Covariance estimation method: empirical | ledoit_wolf | basic_shrinkage | oas
-  covariance_method: "empirical"
-  # Regularization epsilon for numerical stability
-  regularization_eps: 1e-4
   # Correlation method
   correlation_method: "pearson"
 
 # Experiments Configuration
 experiments:
   exp1_tokenization_sensitivity:
-    name: "Tokenization Sensitivity"
+  device: "cuda"  # or "cpu" if CUDA not available
     description: "Study FMD sensitivity to tokenization choice"
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
       - tokenizer: "TSD"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
       - tokenizer: "Octuple"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
       - tokenizer: "MIDI-Like"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
 
   exp2_model_sensitivity:
@@ -147,16 +98,10 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "MusicBERT"
+        model: "CLaMP-1"
         dataset: "maestro"
       - tokenizer: "REMI"
-        model: "MusicBERT-large"
-        dataset: "maestro"
-      - tokenizer: "REMI"
-        model: "MERT"
-        dataset: "maestro"
-      - tokenizer: "REMI"
-        model: "NLP-Baseline"
+        model: "CLaMP-2"
         dataset: "maestro"
 
   exp3_expression_ablation:
@@ -165,11 +110,11 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
         remove_velocity: false
       - tokenizer: "REMI"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
         remove_velocity: true
 
@@ -179,11 +124,11 @@ experiments:
     enabled: true
     variants:
       - tokenizer: "REMI"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
         hard_quantization: false
       - tokenizer: "REMI"
-        model: "MusicBERT"
+        model: "CLaMP-2"
         dataset: "maestro"
         hard_quantization: true
 
@@ -192,21 +137,14 @@ experiments:
     description: "Test FMD consistency across different music genres"
     enabled: true
     pairs:
-      - ("jazz", "rock")
-      - ("jazz", "classical")
-      - ("jazz", "pop")
-      - ("jazz", "rap")
-      - ("rock", "classical")
-      - ("rock", "pop")
-      - ("rock", "rap")
-      - ("classical", "pop")
-      - ("classical", "rap")
-      - ("rap", "pop")
       - ("maestro", "pop909")
       - ("maestro", "midicaps")
       - ("pop909", "midicaps")
+      - ("jazz", "rock")
+      - ("classical", "pop")
+      - ("rap", "pop")
     tokenizer: "REMI"
-    model: "MusicBERT"
+    model: "CLaMP-2"
 
 # Evaluation Configuration
 evaluation:
@@ -221,10 +159,6 @@ evaluation:
 # Logging Configuration
 logging:
   level: "INFO"
-  log_file: "logs/experiment.log"
-  console_output: true
-
-# Results Configuration
 results:
   plots_dir: "results/plots"
   reports_dir: "results/reports"
@@ -236,12 +170,8 @@ results:
 # Paper-oriented benchmark configuration
 paper:
   seed: 42
-  max_files_per_dataset: 120
+  max_files_per_dataset: 8
   synthetic_fallback_samples: 12
-  compare_all_pairs: true
-  # synthetic | strict (invalid rows) | hard_strict (immediate exception)
-  fallback_mode: "hard_strict"
-  progress_log_every: 20
   # Leave empty to use all tokenizers/models from config sections above
   tokenizers: []
   models: []
@@ -251,91 +181,19 @@ paper:
       order: ["maestro", "midicaps", "pop909"]
     - reference: "pop909"
       order: ["pop909", "midicaps", "maestro"]
-  # Option B: standalone alias mapping file.
-  genre_mapping_file: "configs/genre_mapping.yaml"
+  genre_aliases:
+    classical: "classical"
+    pop: "pop"
+    jazz: "jazz"
+    rock: "rock"
+    rap: "rap"
+    maestro: "maestro"
+    midicaps: "midicaps"
+    pop909: "pop909"
   special_pairs:
     - ("jazz", "rock")
-    - ("jazz", "classical")
-    - ("jazz", "pop")
-    - ("jazz", "rap")
-    - ("rock", "classical")
-    - ("rock", "pop")
-    - ("rock", "rap")
     - ("classical", "pop")
-    - ("classical", "rap")
     - ("rap", "pop")
-  top_variants_per_pair: 5
-  bootstrap_ci:
-    enabled: true
-    n_resamples: 80
-    confidence: 0.95
-    seed: 42
   publication_plots:
     enabled: true
     top_variants: 8
-
-# Lakh MIDI validation configuration
-lakh:
-  # URL to Lakh MIDI Clean (matched subset)
-  lmd_matched_url: "http://hog.ee.columbia.edu/craffel/lmd/lmd_matched.tar.gz"
-  # Tagtraum genre annotations for Million Song Dataset
-  tagtraum_url: "https://www.tagtraum.com/genres/msd_tagtraum_cd2.cls.zip"
-  tagtraum_file: "data/raw/lakh/msd_tagtraum_cd2.cls"
-  lmd_matched_dir: "data/raw/lakh/lmd_matched"
-  genres:
-    - "rock"
-    - "jazz"
-    - "electronic"
-    - "country"
-  genre_pairs:
-    - ["rock", "jazz"]
-    - ["rock", "electronic"]
-    - ["rock", "country"]
-    - ["jazz", "country"]
-  max_per_genre: 500
-  seed: 42
-  # Sample size ablation study
-  sample_size_ablation:
-    enabled: true
-    sizes: [50, 100, 200, 500]
-    n_repeats: 10  # repeat each size for stability
-  # Bootstrap settings for Lakh validation (higher precision for publication)
-  bootstrap:
-    enabled: true
-    n_resamples: 200
-    confidence: 0.95
-    seed: 42
-  # Output directory for Lakh validation reports
-  output_dir: "results/reports/lakh"
-  plots_dir: "results/plots/paper"
-
-# Cross-dataset validation configuration
-cross_validation:
-  # Tagtraum CD1 (alternative annotator for cross-annotation validation)
-  tagtraum_cd1:
-    url: "https://www.tagtraum.com/genres/msd_tagtraum_cd1.cls.zip"
-    file: "data/raw/lakh/msd_tagtraum_cd1.cls"
-    max_per_genre: 500  # take as many as available
-
-  # MidiCaps dataset (independent MIDI files with genre tags)
-  midicaps:
-    hf_repo: "amaai-lab/MidiCaps"
-    data_dir: "data/raw/midicaps"
-    metadata_file: "data/raw/midicaps/train.json"
-    genres:
-      - "rock"
-      - "jazz"
-      - "electronic"
-      - "country"
-    max_per_genre: 120
-    seed: 42
-    # Custom tag overrides (merged with built-in MIDICAPS_GENRE_MAP)
-    genre_map: {}
-
-  # Cross-validation experiment settings
-  subsample_size: 100
-  n_repeats: 10
-  seed: 42
-  output_dir: "results/reports/cross_validation"
-  plots_dir: "results/plots/paper"
-

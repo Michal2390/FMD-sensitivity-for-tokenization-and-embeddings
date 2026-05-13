@@ -1,82 +1,202 @@
 [
   {
-    "dim": 99,
-    "variance": 0.16453298926353455
+    "dim": 28,
+    "variance": 9.204376220703125,
+    "embedding_size": 768
   },
   {
-    "dim": 47,
-    "variance": 0.1280040591955185
+    "dim": 565,
+    "variance": 2.117201328277588,
+    "embedding_size": 768
   },
   {
-    "dim": 215,
-    "variance": 0.12194398045539856
+    "dim": 659,
+    "variance": 1.8331267833709717,
+    "embedding_size": 768
   },
   {
-    "dim": 312,
-    "variance": 0.10400695353746414
+    "dim": 546,
+    "variance": 1.5499848127365112,
+    "embedding_size": 768
   },
   {
-    "dim": 158,
-    "variance": 0.10293292999267578
+    "dim": 671,
+    "variance": 1.4996417760849,
+    "embedding_size": 768
   },
   {
-    "dim": 332,
-    "variance": 0.10194478929042816
+    "dim": 657,
+    "variance": 1.2990648746490479,
+    "embedding_size": 768
   },
   {
-    "dim": 259,
-    "variance": 0.09869442880153656
+    "dim": 173,
+    "variance": 1.2093831300735474,
+    "embedding_size": 768
   },
   {
-    "dim": 346,
-    "variance": 0.0882914811372757
+    "dim": 49,
+    "variance": 0.9445153474807739,
+    "embedding_size": 768
   },
   {
-    "dim": 131,
-    "variance": 0.0795978531241417
+    "dim": 279,
+    "variance": 0.8828023076057434,
+    "embedding_size": 768
   },
   {
-    "dim": 209,
-    "variance": 0.0756135806441307
+    "dim": 436,
+    "variance": 0.8684123158454895,
+    "embedding_size": 768
   },
   {
-    "dim": 282,
-    "variance": 0.07314807921648026
+    "dim": 418,
+    "variance": 0.8187469244003296,
+    "embedding_size": 768
   },
   {
-    "dim": 43,
-    "variance": 0.07293901592493057
+    "dim": 593,
+    "variance": 0.8047670125961304,
+    "embedding_size": 768
   },
   {
-    "dim": 167,
-    "variance": 0.07202940434217453
+    "dim": 190,
+    "variance": 0.8029758334159851,
+    "embedding_size": 768
   },
   {
-    "dim": 358,
-    "variance": 0.07198265939950943
+    "dim": 638,
+    "variance": 0.7996668815612793,
+    "embedding_size": 768
   },
   {
-    "dim": 269,
-    "variance": 0.06981784850358963
+    "dim": 193,
+    "variance": 0.7933311462402344,
+    "embedding_size": 768
   },
   {
-    "dim": 356,
-    "variance": 0.06868258118629456
+    "dim": 221,
+    "variance": 0.7908474206924438,
+    "embedding_size": 768
   },
   {
-    "dim": 189,
-    "variance": 0.06821122765541077
+    "dim": 724,
+    "variance": 0.7894434332847595,
+    "embedding_size": 768
   },
   {
-    "dim": 150,
-    "variance": 0.06568779051303864
+    "dim": 354,
+    "variance": 0.745280921459198,
+    "embedding_size": 768
   },
   {
-    "dim": 51,
-    "variance": 0.06380660831928253
+    "dim": 364,
+    "variance": 0.7351888418197632,
+    "embedding_size": 768
   },
   {
-    "dim": 206,
-    "variance": 0.06346705555915833
+    "dim": 393,
+    "variance": 0.6975094079971313,
+    "embedding_size": 768
+  },
+  {
+    "dim": 56,
+    "variance": 0.5426972508430481,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 796,
+    "variance": 0.3906680941581726,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 140,
+    "variance": 0.3542720377445221,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 97,
+    "variance": 0.2900293171405792,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 272,
+    "variance": 0.25904980301856995,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 29,
+    "variance": 0.25826409459114075,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 273,
+    "variance": 0.2456005960702896,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 248,
+    "variance": 0.2365342676639557,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 468,
+    "variance": 0.2258368581533432,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 351,
+    "variance": 0.20713920891284943,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 669,
+    "variance": 0.20530211925506592,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 309,
+    "variance": 0.201981320977211,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 383,
+    "variance": 0.20147277414798737,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 471,
+    "variance": 0.19791042804718018,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 692,
+    "variance": 0.19262416660785675,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 252,
+    "variance": 0.18960997462272644,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 908,
+    "variance": 0.18930673599243164,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 911,
+    "variance": 0.18836072087287903,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 519,
+    "variance": 0.18715184926986694,
+    "embedding_size": 1024
+  },
+  {
+    "dim": 990,
+    "variance": 0.17874887585639954,
+    "embedding_size": 1024
   }
 ]
