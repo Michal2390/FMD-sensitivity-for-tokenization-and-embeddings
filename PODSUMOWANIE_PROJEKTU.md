@@ -25,9 +25,9 @@ Krótko: badanie czułości Frechet Music Distance (FMD) względem wyboru tokeni
 
 ---
 
-## Kluczowe tabelki (z README)
+## Analiza wyników — co wpływa na FMD?
 
-### Efekty (6-model analysis) — η² i interpretacja
+### 📊 Główne czynniki: Model dominuje (96%)
 
 | Source | η² | F | Interpretation |
 |--------|-----:|----:|----------------|
@@ -37,10 +37,15 @@ Krótko: badanie czułości Frechet Music Distance (FMD) względem wyboru tokeni
 | Tokenizer (main) | 0.0010 | 59.51 | Negligible |
 | Preprocessing | 0.0010 | 60.14 | Negligible |
 
-**Wniosek:** Model dominuje — tokenizer i preprocessing mają marginalne znaczenie.
+![η² decomposition](results/plots/simple/01_eta_squared_effects.png)
 
+**Wniosek:** Model determinuje ~96% różnic w FMD. Wybór tokenizera czy preprocessingu to mniej niż 0.1%. To główny sygnał projektu.
 
-### Hierarchia modeli wg czułości na rozróżnianie gatunków (Cohen's d vs CLaMP-2)
+---
+
+## Ranking modeli — który najlepiej mierzy różnice gatunkowe?
+
+### 📊 Hierarchia embeddingów
 
 | Model | Architecture | Cohen's d vs CLaMP‑2 | Interpretation |
 |-------|-------------|---------------------:|-----------------|
@@ -51,10 +56,15 @@ Krótko: badanie czułości Frechet Music Distance (FMD) względem wyboru tokeni
 | CLaMP-2 | Contrastive | (reference) | Lowest |
 | MERT | Audio SSL | 0.00 | ⚠️ Anomalous / defective on symbolic MIDI |
 
-**Wniosek:** MusicBERT > NLP-Baseline > CLaMP; MERT niezdatny do MIDI.
+![Model hierarchy](results/plots/simple/02_model_hierarchy.png)
 
+**Wniosek:** MusicBERT-large (FMD≈16) dominuje. MusicBERT (≈8) poniżej. CLaMP (~2.5) znacznie słabszy. MERT całkowicie niezdatny do MIDI symbolicznego.
 
-### Zakresy FMD wg par gatunków (6-model)
+---
+
+## Porównanie gatunków — czy wszystkie pary są równo trudne?
+
+### 📊 FMD dla różnych par gatunków
 
 | Genre Pair | Mean FMD | Std | N |
 |------------|---------:|----:|---:|
@@ -65,35 +75,15 @@ Krótko: badanie czułości Frechet Music Distance (FMD) względem wyboru tokeni
 | jazz ↔ electronic | 5.396 | 7.029 | 960 |
 | electronic ↔ country | 5.717 | 7.375 | 960 |
 
-**Wniosek:** Różnice między parami (~37%) są mniejsze niż między modelami (~960%).
+![Genre pair comparison](results/plots/simple/03_genre_pair_comparison.png)
 
+**Wniosek:** Wszystkie pary dają podobne FMD (4.2–5.7, różnica ~37%). Efekt wyboru pary jest marginalny w stosunku do modelu (~960%).
 
-### Rekomendacje praktyczne (skrót)
+---
 
-| Cel | Rekomendowany pipeline | Rationale |
-|-----|-----------------------|-----------|
-| Najdrobniejsza rozdzielczość (niski baseline) | REMI + CLaMP-2 | Niskie nFMD, wysoka efektywna dimenzja, dobra separacja gatunków |
-| Maksymalna separowalność gatunków | dowolny tokenizer + MusicBERT-large | Najwyższe absolutne FMD |
-| Ocena wrażliwości tokenizera | REMI lub TSD + MusicBERT | η²(tok)=0.36 po nFMD — tokenizer ma znaczenie |
-| Stabilność między gatunkami | Octuple + CLaMP-1 | Najniższe CV między parami |
-| Porównania między modelami | Użyć nFMD_trace | Surowe FMD różnią się ~12.8× między modelami; nFMD zmniejsza do ~1.9× |
-| Unikać | MIDI‑Like + MusicBERT; MERT dla symbolic MIDI |
+## Czułość tokenizera — czy każdy model reaguje tak samo?
 
-**Wniosek:** Wybór modelu determinuje wydajność; tokenizer ma znaczenie tylko dla MusicBERT.
-
-
-### Wpływ normalizacji (nFMD) — skrót
-
-| Factor | η²(raw FMD) | η²(nFMD_trace) | η²(nFMD_norm) |
-|--------|------------:|---------------:|--------------:|
-| model | 0.9617 | 0.7079 | 0.6534 |
-| tokenizer | 0.0010 | 0.0142 | 0.0414 |
-| pair (genre) | 0.0067 | 0.0959 | 0.0066 |
-
-**Wniosek:** nFMD_trace zmniejsza dominację modelu z 96% do 71% — tokenizer staje się widoczny.
-
-
-### Wrażliwość tokenizera per model (nFMD_trace)
+### 📊 Wrażliwość na tokenizer per model (nFMD_trace)
 
 | Model | η²(tokenizer) | η²(preprocess) | Interpretacja |
 |-------|--------------:|---------------:|---------------|
@@ -104,67 +94,97 @@ Krótko: badanie czułości Frechet Music Distance (FMD) względem wyboru tokeni
 | NLP-Baseline | 0.0184 | 0.1344 | 🟢 Wrażliwy raczej na preprocessing |
 | MERT | 0.0055 | 0.0240 | 🟢 Niewrażliwy (audio-based, ignoruje tokeny) |
 
-**Wniosek:** MusicBERT (36%) >> CLaMP-2 (8%) — architektura text-based wynosi.
+![Tokenizer sensitivity](results/plots/simple/04_tokenizer_sensitivity.png)
 
+**Wniosek:** MusicBERT (η²=0.359) jest 6× bardziej czuły na tokenizer niż CLaMP-2 (η²=0.084). Architektura text-based → większa zależność od tokenizacji. CLaMP prawie ją ignoruje.
 
 ---
 
-## Najważniejsze wykresy (wersja czytelna)
+## Rola tokenizera — porównanie wszystkich czterech
 
-Poniższe wykresy pokazują główne wnioski w przystępny sposób:
-
-### 1) Co naprawdę wpływa na FMD?
-
-![η² decomposition](results/plots/simple/01_eta_squared_effects.png)
-
-Model dominuje z ~96% wariancji. Tokenizer i preprocessing to <1% — ale po normalizacji (nFMD_trace) tokenizer staje się widoczny!
-
-
-### 2) Ranking modeli — który embedduje najlepiej?
-
-![Model hierarchy](results/plots/simple/02_model_hierarchy.png)
-
-MusicBERT-large prowadzi (FMD ≈ 11.7), potem MusicBERT (≈ 8.1). CLaMP-2 i CLaMP-1 znacznie poniżej (~2.5). MERT nie nadaje się do MIDI.
-
-
-### 3) Różnice między parami gatunków
-
-![Genre pair comparison](results/plots/simple/03_genre_pair_comparison.png)
-
-Wszystkie pary są porównywalne (FMD 4.2–5.7). Dobór pary ma mały wpływ w stosunku do modelu.
-
-
-### 4) Czułość tokenizera — zależy od modelu!
-
-![Tokenizer sensitivity](results/plots/simple/04_tokenizer_sensitivity.png)
-
-MusicBERT (η²=0.36) jest bardzo czuły na wybór tokenizera. CLaMP (~0.06) ignoruje go prawie całkowicie.
-
-
-### 5) Jak normalizacja zmienia obraz?
-
-![Normalization impact](results/plots/simple/05_normalization_impact.png)
-
-Raw FMD kamufluje tokenizer (η²=0.001). nFMD_trace go ujawnia (η²=0.014). Dlatego normalizacja jest ważna!
-
-
-### 6) Porównanie tokenizatorów (w kontekście nFMD)
+### 📊 FMD dla każdego tokenizera
 
 ![Tokenizer comparison](results/plots/simple/06_tokenizer_comparison.png)
 
-REMI i TSD dają najniższe FMD (wąskie zakresy). MIDI-Like trochę wyżej. Ale efekt zależy od modelu (zob. wykres 4).
-
+**Wniosek:** REMI i TSD dają niższe FMD (wąskie zakresy). MIDI-Like wyższe. Ale **efekt silnie zależy od modelu** — dla CLaMP różnicy prawie nie widać, dla MusicBERT są duże.
 
 ---
 
+## Praktyczne rekomendacje
+
+### 💡 Pipelines dla różnych zastosowań
+
+| Cel | Rekomendowany pipeline | Rationale |
+|-----|-----------------------|-----------|
+| Najdrobniejsza rozdzielczość (niski baseline) | REMI + CLaMP-2 | Niskie FMD, wysoka efektywna dimenzja, dobra separacja gatunków |
+| Maksymalna separowalność gatunków | dowolny tokenizer + MusicBERT-large | Najwyższe absolutne FMD |
+| Ocena wrażliwości tokenizera | REMI lub TSD + MusicBERT | η²(tok)=0.36 po nFMD — tokenizer ma znaczenie |
+| Stabilność między gatunkami | Octuple + CLaMP-1 | Najniższe CV między parami |
+| Porównania między modelami | Użyć nFMD_trace | Surowe FMD różnią się ~12.8× między modelami; nFMD zmniejsza do ~1.9× |
+| Unikać | MIDI‑Like + MusicBERT; MERT dla symbolic MIDI | Niskie wydajności lub artefakty |
+
+**Wniosek:** Najpierw dobierz model, potem tokenizer.
+
+---
+
+## Czym jest normalizacja FMD (nFMD) i dlaczego jest ważna?
+
+### Problem: Surowe FMD są skalowo zależne
+
+Różne modele zwracają embeddingi o różnych normach. Na przykład:
+- **MusicBERT**: średnia norma wektora ≈ 15
+- **CLaMP**: średnia norma wektora ≈ 5
+- **MERT**: średnia norma wektora ≈ 3
+
+To powoduje, że surowe wartości FMD nieporównywalnie się skalują między modelami (~12.8× różnicy), a nie rzeczywiste różnice w rozkładach.
+
+### Rozwiązanie: normalizacja (nFMD)
+
+Stosujemy kilka metod normalizacji zaimplementowanych w `src/metrics/fmd.py`:
+
+#### 1) **Trace normalization (nFMD_trace)** — rekomendowana
+
+- **Wzór:** nFMD_trace = FMD / (Tr(Σ1) + Tr(Σ2))
+- **Intuicja:** dzieli surowe FMD przez całkowitą wariancję obu rozkładów, kompensując różnice w amplitudzie
+- **Kiedy:** do porównań między modelami (używana domyślnie w analizach)
+
+#### 2) **Norm normalization (nFMD_norm)**
+
+- **Wzór:** nFMD_norm = FMD / (||μ1|| + ||μ2||)^2
+- **Intuicja:** normalizuje przez kwadraty norm średnich wektorów
+- **Kiedy:** gdy problem to głównie różnice w średnich (mean-scale)
+
+#### 3) **Z-score normalization (nFMD_z)**
+
+- **Wzór:** nFMD_z = (FMD - μ_baseline) / σ_baseline
+- **Intuicja:** kalibruje względem baseline'u (np. tego samego gatunku)
+- **Kiedy:** do interpretacji względnej (ile "odchyleń standardowych" od baseline'u)
+
+### 📊 Efekt normalizacji
+
+| Factor | η²(raw FMD) | η²(nFMD_trace) | η²(nFMD_norm) |
+|--------|------------:|---------------:|--------------:|
+| model | 0.9617 | 0.7079 | 0.6534 |
+| tokenizer | 0.0010 | 0.0142 | 0.0414 |
+| pair (genre) | 0.0067 | 0.0959 | 0.0066 |
+
+![Normalization impact](results/plots/simple/05_normalization_impact.png)
+
+**Wniosek:**
+- Raw FMD: model dominuje 96%, tokenizer niewidoczny (0.1%)
+- Po nFMD_trace: model spada do 71%, **tokenizer staje się widoczny (1.4%)**
+- Normalizacja ujawnia rzeczywisty wpływ tokenizera, redukując artefakty skalowe
+
+**Praktyka:** Zawsze używaj nFMD do porównań międzymodelowych. Surowe FMD są mylące.
 
 ---
 
 ## Gdzie szukać pełnych wyników
 
-- Raport nFMD: `results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md` (generowany przez `scripts/run_nfmd_analysis.py`).
-- Pliki z wykresami: `results/plots/paper/` (wybrane powyżej).
-- Dane tabelaryczne: `results/reports/lakh/variant_summary.csv`, `results/reports/lakh_multi/`.
+- Raport nFMD: `results/reports/lakh_multi/NFMD_ANALYSIS_REPORT.md` (generowany przez `scripts/run_nfmd_analysis.py`)
+- Wykresy proste: `results/plots/simple/` (wygenerowane przez `scripts/generate_simple_charts.py`)
+- Pliki z wykresami papierowych: `results/plots/paper/`
+- Dane tabelaryczne: `results/reports/lakh/variant_summary.csv`, `results/reports/lakh_multi/`
 
 ---
 
@@ -182,56 +202,33 @@ python scripts\run_multi_genre_analysis.py   # pełne multi-genre (dłużej)
 python scripts\run_nfmd_analysis.py          # nFMD analysis (~3h)
 ```
 
+Wygenerowanie wykresów:
+
+```powershell
+python scripts\generate_simple_charts.py  # Generuje wykresy do results/plots/simple/
+```
+
 Pełna instrukcja uruchamiania: `docs/INSTRUKCJA_URUCHAMIANIA.md`.
 
 ---
 
-## Proponowane następne kroki (porządkowanie repo)
+## Implementacja nFMD — szczegóły techniczne
 
-1. Wyeksportować najważniejsze wykresy do `results/summary/` i zaktualizować odnośniki w tym pliku.
-2. Dodać krótki skrypt generujący `docs/PODSUMOWANIE_PROJEKTU.md` automatycznie z najnowszych artefaktów (statyczny snapshot).
-3. Oznaczyć modele, które zwracają degenerowane embeddingi (MERT) i dodać test jednostkowy sprawdzający wariancję embeddingów dla inputu MIDI.
+Normalizacja FMD jest implementowana w `src/metrics/fmd.py`:
+
+- Funkcja `compute_nfmd()` — oblicza nFMD_trace, nFMD_norm i nFMD_z dla pary rozkładów
+- Klasa `NormalizedFMD` — wrapper do standardowego interfejsu scipy
+- Funkcja `compute_fmd_components()` — rozkład FMD na składową średnią i kowariancji
+
+**Bezpieczeństwo numeryczne:**
+- Regularyzacja epsilon dodawana do diagonali macierzy kowariancji (unika instabilności)
+- Fallback na eigen-decomposition w przypadku problemów z sqrtm
+- Bezpieczne dzielenie — zwraca 0.0 jeśli mianownik zbyt mały
 
 ---
 
-Plik wygenerowany automatycznie: `PODSUMOWANIE_PROJEKTU.md` w katalogu głównym repozytorium — jeśli chcesz, mogę usunąć starą wersję w `docs/` lub zaktualizować odnośnienia w README.
+## Proponowane następne kroki
 
----
-
-##  Normalizacja FMD (nFMD) — szczegóły i zasada działania
-
-Celem normalizacji jest usunięcie artefaktu skali wynikającego z różnej normy wektorów embeddingów dla różnych architektur, tak aby porównania między modelami odzwierciedlały faktyczne różnice w rozkładach, a nie tylko różnice w amplitudzie wektorów.
-
-Zaimplementowane metody (w `src/metrics/fmd.py` — funkcja `compute_nfmd` i klasa `NormalizedFMD`):
-
-1) Trace (nFMD_trace)
-
-- Wzór: nFMD_trace = FMD / (Tr(Σ1) + Tr(Σ2))
-- Intuicja: dzieli surowe FMD przez sumę śladów kowariancji (całkowitą wariancję) obu rozkładów embeddingów, kompensując różnice w wewnętrznym rozrzucie (scale/variance).
-- Zastosowanie: rekomendowane do porównań międzymodelowych (użyte jako domyślna normalizacja w analizach porównawczych).
-
-2) Norm (nFMD_norm)
-
-- Wzór: nFMD_norm = FMD / (||μ1|| + ||μ2||)^2
-- Intuicja: normalizuje przez kwadrat sumy norm średnich wektorów, co kompensuje fakt, że składnik ||μ1 - μ2||^2 skaluje kwadratowo z normami wektorów.
-- Zastosowanie: przydatne, gdy problem wynika głównie z różnic w średnich (mean-scale).
-
-3) Z-score (nFMD_z)
-
-- Wzór: nFMD_z = (FMD - μ_baseline) / σ_baseline
-- Intuicja: kalibruje FMD względem baseline'u (np. rozkładu FMD dla podziału tego samego gatunku), zwracając ile odchyleń standardowych wynosi obserwowana różnica.
-- Wymaga: wcześniejszego obliczenia μ_baseline i σ_baseline (np. z wewnątrzgatunkowych porównań).
-
-Aspekty implementacyjne i bezpieczeństwo numeryczne:
-
-- Przy obliczaniu pierwiastka macierzowego (sqrtm) i pracą z kowariancjami stosowana jest niewielka regularizacja (epsilon) dodawana do diagonalnych elementów, by uniknąć niestabilności numerycznych.
-- Jeśli mianownik normalizacji jest ekstremalnie mały, implementacja bezpiecznie zwraca 0.0 zamiast powodować błąd dzielenia przez zero.
-- W przypadku problemów z obliczeniem sqrtm stosowany jest fallback oparty na wartości własnych (eigen-decomposition), co daje stabilne wyniki.
-
-Rekomendacje praktyczne:
-
-- Do porównań między różnymi architekturami embeddingów: stosować nFMD_trace.
-- Do analizy wpływu tokenizera wewnątrz pojedynczego modelu: nFMD_norm lub nFMD_trace (oba ujawnią różne aspekty).
-- Do kalibracji i interpretacji względnych efektów względem modelowego baseline'u: nFMD_z.
-
-Więcej: implementacja i testy znajdują się w `src/metrics/fmd.py` (metody: `compute_nfmd`, `NormalizedFMD`, `compute_fmd_components`).
+1. Wyeksportować najważniejsze wykresy do `results/summary/` i zaktualizować odnośniki.
+2. Dodać skrypt automatycznie generujący to podsumowanie z najnowszych artefaktów.
+3. Oznaczyć MERT jako niezdatny i dodać test jednostkowy dla degeneracji embeddingów MIDI.
