@@ -96,7 +96,9 @@ Krótko: badanie czułości Frechet Music Distance (FMD) względem wyboru tokeni
 
 ![Tokenizer sensitivity](results/plots/simple/04_tokenizer_sensitivity.png)
 
-**Wniosek:** MusicBERT (η²=0.359) jest 6× bardziej czuły na tokenizer niż CLaMP-2 (η²=0.084). Architektura text-based → większa zależność od tokenizacji. CLaMP prawie ją ignoruje.
+Patrząc na tabelkę powyżej (surowe FMD), widzimy zaskakujący obraz: **NLP-Baseline i CLaMP-2 pokazują się jako bardzo czułe na tokenizer (η²≈0.83)**, podczas gdy MusicBERT (η²≈0.315) i MusicBERT-large (η²≈0.011) są znacznie mniej czułe. To jednak **wynika z artefaktów skalowych między modelami, a nie rzeczywistego wpływu tokenizera**.
+
+Kiedy normalizujemy FMD (nFMD_trace, zobacz ostatnią sekcję), ta hierarchia się całkowicie odwraca — **MusicBERT staje się najwrażliwszy**, podczas gdy CLaMP i NLP-Baseline spadają do marginalnych wartości. To jest doskonały przykład tego, jak **surowe FMD mogą być całkowicie mylące** przy porównywaniu modeli. Po normalizacji widzimy rzeczywisty obraz: **MusicBERT to model, na który tokenizer rzeczywiście ma wpływ**. Dlatego zawsze używaj znormalizowanych metryk do porównań międzymodelowych — surowe wartości mogą Cię wprowadzić w błąd.
 
 ---
 

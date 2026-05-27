@@ -172,6 +172,34 @@ class FMDSensitivityAnalysis:
             self.logger.info(f"Lakh plot {label}: {path}")
         return outputs
 
+    def run_song_benchmark(
+        self,
+        midi_file: str,
+        axis: str = "both",
+        segments: int = 8,
+        tokenizers: list[str] | None = None,
+        models: list[str] | None = None,
+        remove_velocity: bool = False,
+        hard_quantization: bool = False,
+        output_dir: str | None = None,
+    ):
+        """Run a per-song FMD sensitivity benchmark."""
+        runner = PaperExperimentRunner(self.config)
+        result = runner.run_single_song_analysis(
+            midi_path=Path(midi_file),
+            tokenizers=tokenizers,
+            models=models,
+            n_segments=segments,
+            remove_velocity=remove_velocity,
+            hard_quantization=hard_quantization,
+            axis=axis,
+            output_dir=Path(output_dir) if output_dir else None,
+        )
+        self.logger.info(f"Per-song benchmark done for: {midi_file}")
+        for label, path in result.get("outputs", {}).items():
+            self.logger.info(f"Output {label}: {path}")
+        return result
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     """Create CLI parser."""
@@ -187,6 +215,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "lakh",
             "lakh-plots",
             "cross-validate",
+            "song",
             "fetch-data",
             "tests",
             "demo",
@@ -200,6 +229,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "paper-plots: only generate plots from existing paper outputs, "
             "lakh: Lakh MIDI validation (32 variants, rock vs classical), "
             "lakh-plots: generate Lakh validation plots from existing outputs, "
+            "song: per-song FMD sensitivity analysis, "
             "fetch-data: download datasets from configured external sources"
         ),
     )
@@ -214,6 +244,52 @@ def build_arg_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=None,
         help="Optional list of dataset names for --mode fetch-data",
+    )
+    parser.add_argument(
+        "--midi-file",
+        type=str,
+        default=None,
+        help="Path to a single MIDI file for --mode song",
+    )
+    parser.add_argument(
+        "--song-axis",
+        choices=["both", "tokenizer", "model"],
+        default="both",
+        help="Which per-song comparison to run",
+    )
+    parser.add_argument(
+        "--song-segments",
+        type=int,
+        default=8,
+        help="Number of time windows used to build the per-song embedding distributions",
+    )
+    parser.add_argument(
+        "--song-tokenizers",
+        nargs="*",
+        default=None,
+        help="Optional tokenizer subset for --mode song",
+    )
+    parser.add_argument(
+        "--song-models",
+        nargs="*",
+        default=None,
+        help="Optional model subset for --mode song",
+    )
+    parser.add_argument(
+        "--song-output-dir",
+        type=str,
+        default=None,
+        help="Optional output directory for --mode song",
+    )
+    parser.add_argument(
+        "--song-remove-velocity",
+        action="store_true",
+        help="Remove velocity before per-song analysis",
+    )
+    parser.add_argument(
+        "--song-hard-quantization",
+        action="store_true",
+        help="Apply hard quantization before per-song analysis",
     )
     parser.add_argument(
         "--cv-source",
@@ -285,6 +361,22 @@ def main():
             _done(True)
             return
 
+        if args.mode == "song":
+            if not args.midi_file:
+                raise ValueError("--midi-file is required for --mode song")
+            analysis.run_song_benchmark(
+                midi_file=args.midi_file,
+                axis=args.song_axis,
+                segments=args.song_segments,
+                tokenizers=args.song_tokenizers,
+                models=args.song_models,
+                remove_velocity=args.song_remove_velocity,
+                hard_quantization=args.song_hard_quantization,
+                output_dir=args.song_output_dir,
+            )
+            _done(True)
+            return
+
         if args.mode == "lakh":
             analysis.logger.info("[Progress] 100.0% -> lakh")
             analysis.run_lakh_validation()
@@ -352,4 +444,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

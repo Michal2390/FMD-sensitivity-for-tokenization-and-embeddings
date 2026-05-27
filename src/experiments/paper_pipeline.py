@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from hashlib import md5
-from itertools import product
+from itertools import combinations, product
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Tuple
 import csv
@@ -211,6 +211,556 @@ class PaperExperimentRunner:
         midi_data = self.preprocessor.filter_note_range(midi_data)
         midi_data = self.preprocessor.normalize_instruments(midi_data)
         return midi_data
+
+    @staticmethod
+    def _segment_label(path: Path) -> str:
+        text = path.stem.strip().lower()
+        safe = []
+        for ch in text:
+            if ch.isalnum() or ch in {"-", "_"}:
+                safe.append(ch)
+            else:
+                safe.append("_")
+        label = "".join(safe).strip("_")
+        return label or "song"
+
+    @staticmethod
+    def _slice_midi_into_segments(midi_data, n_segments: int) -> List[Dict]:
+        import pretty_midi
+
+        notes = []
+        for instrument in midi_data.instruments:
+            notes.extend(instrument.notes)
+
+        if not notes:
+            return []
+
+        end_time = max(note.end for note in notes)
+        if end_time <= 0:
+            return []
+
+        n_segments = max(1, int(n_segments))
+        edges = np.linspace(0.0, float(end_time), num=n_segments + 1)
+        segments: List[Dict] = []
+
+        for idx in range(len(edges) - 1):
+            start = float(edges[idx])
+            end = float(edges[idx + 1])
+            segment = pretty_midi.PrettyMIDI()
+            note_count = 0
+
+            for instrument in midi_data.instruments:
+                seg_inst = pretty_midi.Instrument(
+                    program=instrument.program,
+                    is_drum=instrument.is_drum,
+                    name=instrument.name,
+                )
+                for note in instrument.notes:
+                    if note.end <= start or note.start >= end:
+                        continue
+                    clipped_start = max(note.start, start) - start
+                    clipped_end = min(note.end, end) - start
+                    if clipped_end <= clipped_start:
+                        continue
+                    seg_inst.notes.append(
+                        pretty_midi.Note(
+                            velocity=int(note.velocity),
+                            pitch=int(note.pitch),
+                            start=float(clipped_start),
+                            end=float(clipped_end),
+                        )
+                    )
+                if seg_inst.notes:
+                    note_count += len(seg_inst.notes)
+                    segment.instruments.append(seg_inst)
+
+            if note_count > 0:
+                segments.append(
+                    {
+                        "index": idx,
+                        "start": start,
+                        "end": end,
+                        "note_count": note_count,
+                        "midi": segment,
+                    }
+                )
+
+        return segments
+
+    def _tokenize_segments(self, segments: List[Dict], tokenizer_name: str) -> Dict[int, List[int]]:
+        tokenizer = self.tokenization.tokenizers[tokenizer_name]
+        tokens_by_index: Dict[int, List[int]] = {}
+        for segment in segments:
+            tokens = tokenizer.encode_midi_object(segment["midi"])
+            if tokens:
+                tokens_by_index[int(segment["index"])] = tokens
+        return tokens_by_index
+
+    def _pairwise_fmd_rows(
+        self,
+        distributions: Dict[str, np.ndarray],
+        axis: str,
+        group_name: str,
+    ) -> Tuple[List[Dict], List[Dict]]:
+        rows: List[Dict] = []
+        summary: List[Dict] = []
+        names = sorted(distributions.keys())
+        values = []
+
+        for left, right in combinations(names, 2):
+            emb_left = distributions[left]
+            emb_right = distributions[right]
+            fmd_value = float(self.fmd.compute_fmd(emb_left, emb_right))
+            rows.append(
+                {
+                    "axis": axis,
+                    "group": group_name,
+                    "left": left,
+                    "right": right,
+                    "fmd": fmd_value,
+                    "n_left": int(emb_left.shape[0]),
+                    "n_right": int(emb_right.shape[0]),
+                }
+            )
+            values.append(fmd_value)
+
+        if values:
+            summary.append(
+                {
+                    "axis": axis,
+                    "group": group_name,
+                    "n_items": len(names),
+                    "n_pairs": len(values),
+                    "mean_fmd": float(np.mean(values)),
+                    "min_fmd": float(np.min(values)),
+                    "max_fmd": float(np.max(values)),
+                    "std_fmd": float(np.std(values)),
+                }
+            )
+        else:
+            summary.append(
+                {
+                    "axis": axis,
+                    "group": group_name,
+                    "n_items": len(names),
+                    "n_pairs": 0,
+                    "mean_fmd": None,
+                    "min_fmd": None,
+                    "max_fmd": None,
+                    "std_fmd": None,
+                }
+            )
+
+        return rows, summary
+
+    def run_single_song_analysis(
+        self,
+        midi_path: Path,
+        tokenizers: Sequence[str] | None = None,
+        models: Sequence[str] | None = None,
+        n_segments: int = 8,
+        remove_velocity: bool = False,
+        hard_quantization: bool = False,
+        axis: str = "both",
+        output_dir: Path | None = None,
+    ) -> Dict:
+        """Analyze one MIDI file by comparing FMD across tokenizers and/or models.
+
+        The song is first preprocessed once, then split into time windows.
+        For tokenization analysis, every selected tokenizer must succeed on a
+        segment for that segment to be kept. For model analysis, the tokenizer
+        is fixed and the resulting token sequences are embedded by each model.
+        """
+        midi_path = Path(midi_path)
+        if not midi_path.exists():
+            raise FileNotFoundError(f"MIDI file not found: {midi_path}")
+
+        if axis not in {"tokenizer", "model", "both"}:
+            raise ValueError("axis must be one of: tokenizer, model, both")
+
+        all_tokenizers = tokenizers or [t["type"] for t in self.config["tokenization"]["tokenizers"]]
+        all_models = models or [m["name"] for m in self.config["embeddings"]["models"]]
+        if not all_tokenizers:
+            raise ValueError("No tokenizers selected for per-song analysis")
+        if not all_models:
+            raise ValueError("No models selected for per-song analysis")
+
+        base_variant = PipelineVariant(
+            tokenizer=all_tokenizers[0],
+            model=all_models[0],
+            remove_velocity=remove_velocity,
+            hard_quantization=hard_quantization,
+        )
+        midi_data = self._preprocess_midi_file(midi_path, base_variant)
+        if midi_data is None:
+            raise RuntimeError(f"Failed to load or preprocess MIDI file: {midi_path}")
+
+        segments = self._slice_midi_into_segments(midi_data, n_segments=n_segments)
+        if len(segments) < 2:
+            raise RuntimeError(
+                f"Not enough usable segments in {midi_path} for per-song analysis (got {len(segments)})"
+            )
+
+        if output_dir is None:
+            output_dir = Path(self.config.get("results", {}).get("reports_dir", "results/reports")) / "per_song"
+        output_dir = Path(output_dir) / self._segment_label(midi_path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        tokenizer_section: Dict | None = None
+        model_section: Dict | None = None
+        segment_rows: List[Dict] = []
+
+        if axis in {"tokenizer", "both"}:
+            tokenizer_rows: List[Dict] = []
+            tokenizer_summary: List[Dict] = []
+            tokenizer_segment_stats: List[Dict] = []
+
+            token_maps: Dict[str, Dict[int, List[int]]] = {
+                tokenizer_name: self._tokenize_segments(segments, tokenizer_name)
+                for tokenizer_name in all_tokenizers
+            }
+            common_indices = [
+                int(segment["index"])
+                for segment in segments
+                if all(int(segment["index"]) in token_maps[tokenizer_name] for tokenizer_name in all_tokenizers)
+            ]
+
+            if len(common_indices) < 2:
+                logger.warning(
+                    f"Tokenizer axis has only {len(common_indices)} common segments across selected tokenizers"
+                )
+            else:
+                for model_name in all_models:
+                    distributions: Dict[str, np.ndarray] = {}
+                    for tokenizer_name in all_tokenizers:
+                        seqs = [token_maps[tokenizer_name][idx] for idx in common_indices]
+                        embeddings = self.embeddings.extract_embeddings(seqs, model_name)
+                        distributions[tokenizer_name] = embeddings
+                        tokenizer_segment_stats.extend(
+                            [
+                                {
+                                    "axis": "tokenizer",
+                                    "group": model_name,
+                                    "tokenizer": tokenizer_name,
+                                    "segment_index": idx,
+                                    "token_count": len(token_maps[tokenizer_name][idx]),
+                                    "embedding_norm": float(np.linalg.norm(embeddings[pos])),
+                                }
+                                for pos, idx in enumerate(common_indices)
+                            ]
+                        )
+
+                    rows, summary = self._pairwise_fmd_rows(distributions, axis="tokenizer", group_name=model_name)
+                    tokenizer_rows.extend(rows)
+                    tokenizer_summary.extend(
+                        [
+                            {
+                                **item,
+                                "model": model_name,
+                                "tokenizers": ",".join(all_tokenizers),
+                                "segments_used": len(common_indices),
+                            }
+                            for item in summary
+                        ]
+                    )
+
+            tokenizer_section = {
+                "available": bool(tokenizer_rows),
+                "rows": tokenizer_rows,
+                "summary": tokenizer_summary,
+                "segment_stats": tokenizer_segment_stats,
+            }
+
+        if axis in {"model", "both"}:
+            model_rows: List[Dict] = []
+            model_summary: List[Dict] = []
+            model_segment_stats: List[Dict] = []
+
+            for tokenizer_name in all_tokenizers:
+                token_maps = {tokenizer_name: self._tokenize_segments(segments, tokenizer_name)}
+                common_indices = [
+                    int(segment["index"])
+                    for segment in segments
+                    if int(segment["index"]) in token_maps[tokenizer_name]
+                ]
+
+                if len(common_indices) < 2:
+                    logger.warning(
+                        f"Model axis for tokenizer={tokenizer_name} has only {len(common_indices)} valid segments"
+                    )
+                    continue
+
+                token_sequences = [token_maps[tokenizer_name][idx] for idx in common_indices]
+                distributions: Dict[str, np.ndarray] = {}
+                for model_name in all_models:
+                    embeddings = self.embeddings.extract_embeddings(token_sequences, model_name)
+                    distributions[model_name] = embeddings
+                    model_segment_stats.extend(
+                        [
+                            {
+                                "axis": "model",
+                                "group": tokenizer_name,
+                                "model": model_name,
+                                "segment_index": idx,
+                                "token_count": len(token_maps[tokenizer_name][idx]),
+                                "embedding_norm": float(np.linalg.norm(embeddings[pos])),
+                            }
+                            for pos, idx in enumerate(common_indices)
+                        ]
+                    )
+
+                rows, summary = self._pairwise_fmd_rows(distributions, axis="model", group_name=tokenizer_name)
+                model_rows.extend(rows)
+                model_summary.extend(
+                    [
+                        {
+                            **item,
+                            "tokenizer": tokenizer_name,
+                            "models": ",".join(all_models),
+                            "segments_used": len(common_indices),
+                        }
+                        for item in summary
+                    ]
+                )
+
+            model_section = {
+                "available": bool(model_rows),
+                "rows": model_rows,
+                "summary": model_summary,
+                "segment_stats": model_segment_stats,
+            }
+
+        csv_tokenizer = output_dir / "per_song_tokenizer_fmd.csv"
+        csv_model = output_dir / "per_song_model_fmd.csv"
+        csv_segment = output_dir / "per_song_segment_stats.csv"
+        csv_tokenizer_stats = output_dir / "per_song_tokenizer_stats.csv"
+        csv_model_stats = output_dir / "per_song_model_stats.csv"
+        md_path = output_dir / "per_song_summary.md"
+        json_path = output_dir / "per_song_summary.json"
+
+        all_segment_rows = []
+        if tokenizer_section:
+            all_segment_rows.extend(tokenizer_section["segment_stats"])
+        if model_section:
+            all_segment_rows.extend(model_section["segment_stats"])
+        segment_rows.extend(all_segment_rows)
+
+        with open(csv_segment, "w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=["axis", "group", "tokenizer", "model", "segment_index", "token_count", "embedding_norm"],
+            )
+            writer.writeheader()
+            writer.writerows(segment_rows)
+
+        # Write tokenizer pairwise FMDs and compute per-tokenizer summary stats
+        tokenizer_stats: List[Dict] = []
+        if tokenizer_section:
+            with open(csv_tokenizer, "w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["axis", "group", "left", "right", "fmd", "n_left", "n_right"],
+                )
+                writer.writeheader()
+                writer.writerows(tokenizer_section["rows"])
+
+            try:
+                trows = [r for r in tokenizer_section.get("rows", []) if r.get("fmd") is not None]
+                if trows:
+                    fmd_by_tok: Dict[str, List[float]] = defaultdict(list)
+                    for r in trows:
+                        left = r.get("left")
+                        right = r.get("right")
+                        fmd_val = float(r.get("fmd"))
+                        fmd_by_tok[left].append(fmd_val)
+                        fmd_by_tok[right].append(fmd_val)
+
+                    stats: List[Dict] = []
+                    for tok, vals in fmd_by_tok.items():
+                        arr = np.array(vals, dtype=float)
+                        stats.append(
+                            {
+                                "tokenizer": tok,
+                                "count_pairs": int(arr.size),
+                                "mean_fmd": float(np.mean(arr)),
+                                "std_fmd": float(np.std(arr)),
+                                "min_fmd": float(np.min(arr)),
+                                "max_fmd": float(np.max(arr)),
+                            }
+                        )
+
+                    if stats:
+                        min_mean = float(min(s["mean_fmd"] for s in stats))
+                        for s in stats:
+                            s["delta_vs_min"] = float(s["mean_fmd"] - min_mean)
+                        stats.sort(key=lambda x: x["mean_fmd"], reverse=True)
+                        tokenizer_stats = stats
+            except Exception as exc:
+                logger.warning(f"Failed to compute tokenizer stats for {midi_path}: {exc}")
+
+            if tokenizer_stats:
+                with open(csv_tokenizer_stats, "w", newline="", encoding="utf-8") as handle:
+                    fieldnames = ["tokenizer", "count_pairs", "mean_fmd", "std_fmd", "min_fmd", "max_fmd", "delta_vs_min"]
+                    writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(tokenizer_stats)
+            else:
+                csv_tokenizer_stats.touch()
+        else:
+            csv_tokenizer.touch()
+            csv_tokenizer_stats.touch()
+
+        # Write model pairwise FMDs and compute per-model summary stats
+        model_stats: List[Dict] = []
+        if model_section:
+            with open(csv_model, "w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=["axis", "group", "left", "right", "fmd", "n_left", "n_right"],
+                )
+                writer.writeheader()
+                writer.writerows(model_section["rows"])
+
+            try:
+                mrows = [r for r in model_section.get("rows", []) if r.get("fmd") is not None]
+                if mrows:
+                    fmd_by_model: Dict[str, List[float]] = defaultdict(list)
+                    for r in mrows:
+                        left = r.get("left")
+                        right = r.get("right")
+                        fmd_val = float(r.get("fmd"))
+                        fmd_by_model[left].append(fmd_val)
+                        fmd_by_model[right].append(fmd_val)
+
+                    stats_m: List[Dict] = []
+                    for model_name, vals in fmd_by_model.items():
+                        arr = np.array(vals, dtype=float)
+                        stats_m.append(
+                            {
+                                "model": model_name,
+                                "count_pairs": int(arr.size),
+                                "mean_fmd": float(np.mean(arr)),
+                                "std_fmd": float(np.std(arr)),
+                                "min_fmd": float(np.min(arr)),
+                                "max_fmd": float(np.max(arr)),
+                            }
+                        )
+
+                    if stats_m:
+                        min_mean_m = float(min(s["mean_fmd"] for s in stats_m))
+                        for s in stats_m:
+                            s["delta_vs_min"] = float(s["mean_fmd"] - min_mean_m)
+                        stats_m.sort(key=lambda x: x["mean_fmd"], reverse=True)
+                        model_stats = stats_m
+            except Exception as exc:
+                logger.warning(f"Failed to compute model stats for {midi_path}: {exc}")
+
+            if model_stats:
+                with open(csv_model_stats, "w", newline="", encoding="utf-8") as handle:
+                    fieldnames = ["model", "count_pairs", "mean_fmd", "std_fmd", "min_fmd", "max_fmd", "delta_vs_min"]
+                    writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(model_stats)
+            else:
+                csv_model_stats.touch()
+        else:
+            csv_model.touch()
+            csv_model_stats.touch()
+
+        summary = {
+            "midi_path": str(midi_path),
+            "axis": axis,
+            "segments_requested": int(n_segments),
+            "segments_built": len(segments),
+            "preprocessing": {
+                "remove_velocity": bool(remove_velocity),
+                "hard_quantization": bool(hard_quantization),
+            },
+            "tokenizers": list(all_tokenizers),
+            "models": list(all_models),
+            "tokenizer_axis": tokenizer_section,
+            "model_axis": model_section,
+            "tokenizer_stats": tokenizer_stats,
+            "model_stats": model_stats,
+            "outputs": {
+                "tokenizer_csv": str(csv_tokenizer),
+                "model_csv": str(csv_model),
+                "segment_csv": str(csv_segment),
+                "tokenizer_stats_csv": str(csv_tokenizer_stats),
+                "model_stats_csv": str(csv_model_stats),
+                "markdown": str(md_path),
+                "json": str(json_path),
+            },
+        }
+
+        with open(json_path, "w", encoding="utf-8") as handle:
+            json.dump(summary, handle, indent=2)
+
+        def _fmt_fmd(value) -> str:
+            return f"{float(value):.4f}" if value is not None else "n/a"
+
+        lines = [
+            "# Per-song FMD sensitivity",
+            "",
+            f"- MIDI file: `{midi_path}`",
+            f"- Segments requested: **{n_segments}**",
+            f"- Segments built: **{len(segments)}**",
+            f"- Preprocessing: velocity={'off' if remove_velocity else 'on'}, quantization={'on' if hard_quantization else 'off'}",
+            "",
+        ]
+
+        if tokenizer_section:
+            lines.extend(["## Tokenizer axis", ""])
+            if tokenizer_section["summary"]:
+                for row in tokenizer_section["summary"]:
+                    lines.append(
+                        f"- model `{row['model']}`: {row['n_pairs']} pairs, "
+                        f"segments={row['segments_used']}, mean FMD={_fmt_fmd(row['mean_fmd'])}"
+                    )
+            else:
+                lines.append("No tokenizer comparisons were possible.")
+            lines.append("")
+
+        # Per-tokenizer summary (mean FMD across pairwise comparisons)
+        if tokenizer_stats:
+            lines.extend(["### Tokenizer mean FMD (per-tokenizer)", ""])
+            for row in tokenizer_stats:
+                lines.append(
+                    f"- tokenizer `{row['tokenizer']}`: pairs={row['count_pairs']}, mean FMD={_fmt_fmd(row['mean_fmd'])}, delta_vs_min={row.get('delta_vs_min', 0):.4f}"
+                )
+            lines.append("")
+        else:
+            lines.append("No tokenizer-level stats available.")
+            lines.append("")
+
+        if model_section:
+            lines.extend(["## Model axis", ""])
+            if model_section["summary"]:
+                for row in model_section["summary"]:
+                    lines.append(
+                        f"- tokenizer `{row['tokenizer']}`: {row['n_pairs']} pairs, "
+                        f"segments={row['segments_used']}, mean FMD={_fmt_fmd(row['mean_fmd'])}"
+                    )
+            else:
+                lines.append("No model comparisons were possible.")
+            lines.append("")
+
+        # Per-model summary (mean FMD across pairwise comparisons)
+        if model_stats:
+            lines.extend(["### Model mean FMD (per-model)", ""])
+            for row in model_stats:
+                lines.append(
+                    f"- model `{row.get('model', row.get('model'))}`: pairs={row['count_pairs']}, mean FMD={_fmt_fmd(row['mean_fmd'])}, delta_vs_min={row.get('delta_vs_min', 0):.4f}"
+                )
+            lines.append("")
+        else:
+            lines.append("No model-level stats available.")
+            lines.append("")
+
+        with open(md_path, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+
+        return summary
 
     def _synthetic_embeddings(self, dataset_name: str, variant: PipelineVariant, dim: int = 512) -> np.ndarray:
         key = f"{dataset_name}|{variant.name}|{self.seed}"

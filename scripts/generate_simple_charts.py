@@ -19,43 +19,11 @@ output_dir = Path("results/plots/simple")
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # ============================================================================
-# 1. η² DECOMPOSITION - Effects of factors
+# 1. η² DECOMPOSITION - Effects of factors (from raw FMD ANOVA)
 # ============================================================================
-print("Generating: η² decomposition...")
+print("Generating: η² decomposition (raw FMD)...")
 
-anova_data = pd.read_csv("results/reports/lakh_multi/anova_3way_full.csv")
-
-# Calculate eta squared (simplified from sum_sq)
-anova_data = anova_data.dropna(subset=['sum_sq'])
-total_ss = anova_data['sum_sq'].sum()
-anova_data['eta_sq'] = anova_data['sum_sq'] / total_ss
-anova_data['eta_sq_pct'] = anova_data['eta_sq'] * 100
-
-# Keep only main effects and interactions of interest
-display_effects = [
-    'C(model)',
-    'C(tokenizer)',
-    'C(preprocess)',
-    'C(tokenizer):C(model)',
-    'C(model):C(preprocess)'
-]
-
-plot_data = anova_data[anova_data.index.isin([
-    i for i, row in anova_data.iterrows() 
-    if any(effect in str(row.get(anova_data.columns[0], '')) for effect in display_effects)
-])]
-
-# Simple names
-effect_names = {
-    'C(model)': 'Model (main)',
-    'C(tokenizer)': 'Tokenizer (main)',
-    'C(preprocess)': 'Preprocessing (main)',
-    'C(tokenizer):C(model)': 'Tokenizer × Model',
-    'C(model):C(preprocess)': 'Model × Preprocessing'
-}
-
-# Read raw data and recalculate properly
-raw_effects = anova_data.iloc[:5].copy()
+# Raw effects from the raw FMD ANOVA
 effect_labels = [
     'Tokenizer',
     'Model',
@@ -76,9 +44,9 @@ for i, (bar, val) in enumerate(zip(bars, eta_values)):
             f'{pct:.1f}%', ha='center', va='bottom', fontweight='bold', fontsize=10)
 
 ax.set_ylabel('η² (Effect Size)', fontweight='bold')
-ax.set_title('What drives FMD? Breakdown of Effects (6-model ANOVA)', fontweight='bold', fontsize=13)
+ax.set_title('What drives FMD? Breakdown of Effects (Raw FMD, 6-model ANOVA)', fontweight='bold', fontsize=13)
 ax.set_ylim(0, 1.05)
-ax.axhline(y=0.01, color='red', linestyle='--', alpha=0.3, linewidth=1, label='Practical significance threshold')
+ax.axhline(y=0.01, color='red', linestyle='--', alpha=0.3, linewidth=1)
 plt.xticks(rotation=15, ha='right')
 plt.tight_layout()
 plt.savefig(output_dir / "01_eta_squared_effects.png", dpi=150, bbox_inches='tight')
@@ -86,9 +54,9 @@ print(f"  ✓ Saved: {output_dir / '01_eta_squared_effects.png'}")
 plt.close()
 
 # ============================================================================
-# 2. Model Hierarchy - FMD by Model
+# 2. Model Hierarchy - FMD by Model (raw FMD)
 # ============================================================================
-print("Generating: Model hierarchy...")
+print("Generating: Model hierarchy (raw FMD)...")
 
 fmd_data = pd.read_csv("results/reports/lakh_multi/multi_genre_fmd.csv")
 
@@ -106,7 +74,7 @@ bars = ax.bar(x_pos, model_stats['mean'], yerr=model_stats['std'],
 ax.set_xticks(x_pos)
 ax.set_xticklabels(model_stats['model'], rotation=20, ha='right')
 ax.set_ylabel('FMD (Mean ± Std)', fontweight='bold')
-ax.set_title('FMD Distribution by Model (Higher = Better Genre Separation)', fontweight='bold', fontsize=13)
+ax.set_title('FMD Distribution by Model (Raw FMD, Higher = Better Genre Separation)', fontweight='bold', fontsize=13)
 ax.grid(axis='y', alpha=0.3)
 
 # Add values on bars
@@ -120,9 +88,9 @@ print(f"  ✓ Saved: {output_dir / '02_model_hierarchy.png'}")
 plt.close()
 
 # ============================================================================
-# 3. FMD by Genre Pair
+# 3. FMD by Genre Pair (raw FMD)
 # ============================================================================
-print("Generating: Genre pair comparison...")
+print("Generating: Genre pair comparison (raw FMD)...")
 
 pair_stats = fmd_data.groupby('pair')['fmd'].agg(['mean', 'std']).reset_index()
 pair_stats = pair_stats.sort_values('mean', ascending=False)
@@ -138,7 +106,7 @@ bars = ax.bar(x_pos, pair_stats['mean'], yerr=pair_stats['std'],
 ax.set_xticks(x_pos)
 ax.set_xticklabels(pair_stats['pair_short'], rotation=20, ha='right')
 ax.set_ylabel('FMD (Mean ± Std)', fontweight='bold')
-ax.set_title('FMD by Genre Pair (All Models & Tokenizers)', fontweight='bold', fontsize=13)
+ax.set_title('FMD by Genre Pair (Raw FMD, All Models & Tokenizers)', fontweight='bold', fontsize=13)
 ax.grid(axis='y', alpha=0.3)
 
 # Add values on bars
@@ -152,43 +120,55 @@ print(f"  ✓ Saved: {output_dir / '03_genre_pair_comparison.png'}")
 plt.close()
 
 # ============================================================================
-# 4. Tokenizer Sensitivity per Model (nFMD_trace)
+# 4. Tokenizer Sensitivity per Model (raw FMD, calculating eta_sq from data)
 # ============================================================================
-print("Generating: Tokenizer sensitivity per model...")
+print("Generating: Tokenizer sensitivity per model (raw FMD)...")
 
-eta_model = pd.read_csv("results/reports/lakh_multi/nfmd_per_model_eta_sq.csv")
+# Calculate eta_sq for tokenizer effect per model using raw FMD data
+fmd_data_copy = fmd_data.copy()
 
-# Filter for nfmd_trace tokenizer sensitivity
-tok_sensitivity = eta_model[
-    (eta_model['metric'] == 'nfmd_trace') & 
-    (eta_model['factor'] == 'tokenizer')
-].copy()
-tok_sensitivity = tok_sensitivity.sort_values('eta_sq', ascending=False)
+tokenizer_sensitivities = []
+for model in sorted(fmd_data_copy['model'].unique()):
+    model_data = fmd_data_copy[fmd_data_copy['model'] == model]
+    
+    # Calculate within-group and between-group variance for tokenizer
+    grand_mean = model_data['fmd'].mean()
+    ss_between = model_data.groupby('tokenizer').apply(
+        lambda x: len(x) * (x['fmd'].mean() - grand_mean) ** 2
+    ).sum()
+    ss_total = ((model_data['fmd'] - grand_mean) ** 2).sum()
+    
+    if ss_total > 0:
+        eta_sq = ss_between / ss_total
+    else:
+        eta_sq = 0
+    
+    tokenizer_sensitivities.append({
+        'model': model,
+        'eta_sq': eta_sq
+    })
+
+tok_sens_df = pd.DataFrame(tokenizer_sensitivities)
+tok_sens_df = tok_sens_df.sort_values('eta_sq', ascending=False)
 
 fig, ax = plt.subplots(figsize=(10, 5))
-x_pos = np.arange(len(tok_sensitivity))
-colors_sens = ['#d62728' if eta > 0.2 else '#ff7f0e' if eta > 0.05 else '#2ca02c' 
-               for eta in tok_sensitivity['eta_sq']]
+x_pos = np.arange(len(tok_sens_df))
+colors_sens = ['#d62728' if eta > 0.1 else '#ff7f0e' if eta > 0.02 else '#2ca02c' 
+               for eta in tok_sens_df['eta_sq']]
 
-bars = ax.bar(x_pos, tok_sensitivity['eta_sq'], color=colors_sens, edgecolor='black', linewidth=1.2, alpha=0.8)
+bars = ax.bar(x_pos, tok_sens_df['eta_sq'], color=colors_sens, edgecolor='black', linewidth=1.2, alpha=0.8)
 
 ax.set_xticks(x_pos)
-ax.set_xticklabels(tok_sensitivity['model'], rotation=20, ha='right')
+ax.set_xticklabels(tok_sens_df['model'], rotation=20, ha='right')
 ax.set_ylabel('η² (Effect Size)', fontweight='bold')
-ax.set_title('Tokenizer Sensitivity by Model (nFMD_trace)', fontweight='bold', fontsize=13)
-ax.set_ylim(0, 0.4)
+ax.set_title('Tokenizer Sensitivity by Model (Raw FMD)', fontweight='bold', fontsize=13)
+ax.set_ylim(0, max(tok_sens_df['eta_sq']) * 1.2)
 ax.grid(axis='y', alpha=0.3)
 
 # Add value labels
-for bar, val in zip(bars, tok_sensitivity['eta_sq']):
-    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+for bar, val in zip(bars, tok_sens_df['eta_sq']):
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005,
             f'{val:.3f}', ha='center', va='bottom', fontweight='bold', fontsize=9)
-
-# Add legend for colors
-ax.axhline(y=0.2, color='red', linestyle='--', alpha=0.2, linewidth=1)
-ax.axhline(y=0.05, color='orange', linestyle='--', alpha=0.2, linewidth=1)
-ax.text(len(tok_sensitivity)-0.5, 0.38, 'High sensitivity', fontsize=9, color='#d62728', fontweight='bold')
-ax.text(len(tok_sensitivity)-0.5, 0.15, 'Medium', fontsize=9, color='#ff7f0e', fontweight='bold')
 
 plt.tight_layout()
 plt.savefig(output_dir / "04_tokenizer_sensitivity.png", dpi=150, bbox_inches='tight')
@@ -196,9 +176,9 @@ print(f"  ✓ Saved: {output_dir / '04_tokenizer_sensitivity.png'}")
 plt.close()
 
 # ============================================================================
-# 5. Effect of Normalization (nFMD vs raw FMD)
+# 5. Effect of Normalization (raw FMD vs nFMD_trace) — THIS USES BOTH
 # ============================================================================
-print("Generating: Normalization impact...")
+print("Generating: Normalization impact (raw FMD vs nFMD_trace comparison)...")
 
 # Create comparison of raw FMD vs nFMD_trace effects
 norm_comparison = pd.DataFrame({
@@ -217,7 +197,7 @@ bars2 = ax.bar(x + width/2, norm_comparison['nFMD_trace'], width, label='nFMD_tr
                color='#ff7f0e', edgecolor='black', linewidth=1.2, alpha=0.8)
 
 ax.set_ylabel('η² (Effect Size)', fontweight='bold')
-ax.set_title('Normalization Effect: What Changes After nFMD_trace?', fontweight='bold', fontsize=13)
+ax.set_title('Normalization Effect: How nFMD_trace Changes the Picture', fontweight='bold', fontsize=13)
 ax.set_xticks(x)
 ax.set_xticklabels(norm_comparison['Factor'])
 ax.legend(fontsize=11, loc='upper right')
@@ -236,9 +216,9 @@ print(f"  ✓ Saved: {output_dir / '05_normalization_impact.png'}")
 plt.close()
 
 # ============================================================================
-# 6. Tokenizer Effect Distribution (by tokenizer)
+# 6. Tokenizer Effect Distribution (raw FMD)
 # ============================================================================
-print("Generating: Tokenizer effect distribution...")
+print("Generating: Tokenizer effect distribution (raw FMD)...")
 
 tokenizer_stats = fmd_data.groupby('tokenizer')['fmd'].agg(['mean', 'std']).reset_index()
 tokenizer_stats = tokenizer_stats.sort_values('mean', ascending=False)
@@ -251,7 +231,7 @@ bars = ax.bar(x_pos, tokenizer_stats['mean'], yerr=tokenizer_stats['std'],
 ax.set_xticks(x_pos)
 ax.set_xticklabels(tokenizer_stats['tokenizer'], rotation=20, ha='right')
 ax.set_ylabel('FMD (Mean ± Std)', fontweight='bold')
-ax.set_title('FMD by Tokenizer (All Models, nFMD context)', fontweight='bold', fontsize=13)
+ax.set_title('FMD by Tokenizer (Raw FMD, All Models)', fontweight='bold', fontsize=13)
 ax.grid(axis='y', alpha=0.3)
 
 # Add values
@@ -267,9 +247,10 @@ plt.close()
 print("\n✅ All charts generated successfully!")
 print(f"📁 Location: {output_dir.absolute()}")
 print("\nGenerated files:")
-print("  • 01_eta_squared_effects.png - What drives FMD?")
-print("  • 02_model_hierarchy.png - Model ranking by FMD")
-print("  • 03_genre_pair_comparison.png - FMD by genre pair")
-print("  • 04_tokenizer_sensitivity.png - How sensitive each model is to tokenizer choice")
-print("  • 05_normalization_impact.png - Raw FMD vs nFMD_trace")
-print("  • 06_tokenizer_comparison.png - FMD by tokenizer")
+print("  • 01_eta_squared_effects.png - What drives FMD? (raw FMD)")
+print("  • 02_model_hierarchy.png - Model ranking by FMD (raw FMD)")
+print("  • 03_genre_pair_comparison.png - FMD by genre pair (raw FMD)")
+print("  • 04_tokenizer_sensitivity.png - How sensitive each model is to tokenizer choice (raw FMD)")
+print("  • 05_normalization_impact.png - Raw FMD vs nFMD_trace COMPARISON")
+print("  • 06_tokenizer_comparison.png - FMD by tokenizer (raw FMD)")
+print("\nNote: Charts 1-4, 6 use RAW FMD. Chart 5 compares raw FMD vs nFMD_trace.")
