@@ -193,7 +193,7 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 
 ## 🚀 Running the Experiments
 
-### Full pipeline (~27 min, CPU):
+### Full pipeline:
 ```bash
 python main.py --mode sensitivity
 ```
