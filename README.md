@@ -11,7 +11,7 @@
   <a href="#"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"></a>
 </p>
 
-> 📖 An empirical study revealing how pipeline configuration choices (embedding model, tokenization, preprocessing) alter what FMD actually measures — with practical recommendations for the music generation community.
+> 📖 An empirical study revealing how pipeline configuration choices (embedding model, tokenization, preprocessing) alter what FMD actually measures - with practical recommendations for the music generation community.
 
 ---
 
@@ -31,12 +31,12 @@ We profiled how 3 FMD configurations react to controlled perturbations of MIDI d
 
 ## 🔄 Motivation and Research Pivot
 
-### ❌ Original Approach: Normalized FMD (nFMD) — Why It Failed
+### ❌ Original Approach: Normalized FMD (nFMD) - Why It Failed
 
-Our initial contribution was **Normalized FMD (nFMD)** — an attempt to make FMD values comparable across different embedding models by normalizing for embedding scale:
+Our initial contribution was **Normalized FMD (nFMD)** - an attempt to make FMD values comparable across different embedding models by normalizing for embedding scale:
 
-- `nFMD_trace = FMD / (Tr(Σ₁) + Tr(Σ₂))` — normalize by total variance
-- `nFMD_norm = FMD / (‖μ₁‖ + ‖μ₂‖)²` — compensate quadratic mean scaling
+- `nFMD_trace = FMD / (Tr(Σ₁) + Tr(Σ₂))` - normalize by total variance
+- `nFMD_norm = FMD / (‖μ₁‖ + ‖μ₂‖)²` - compensate quadratic mean scaling
 
 We observed that raw FMD values differ by **12.8×** across models (e.g., MusicBERT FMD ≈ 8.0 vs CLaMP-2 FMD ≈ 0.6 for the same genre pair) simply due to embedding norm differences.
 
@@ -86,7 +86,7 @@ This produces **directly actionable knowledge:**
 
 | Perturbation | What it removes | Implementation |
 |:-------------|:----------------|:---------------|
-| ✨ `original` | Nothing (baseline) | — |
+| ✨ `original` | Nothing (baseline) | - |
 | 🔇 `no_velocity` | Dynamics/expression | All notes → velocity 64 |
 | 📐 `quantized_time` | Microtiming/swing | Snap to 16th-note grid |
 | ⏱️ `constant_tempo` | Rubato/tempo variation | Remap beats → 120 BPM |
@@ -145,12 +145,12 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 
 | Finding | Details |
 |:--------|:--------|
-| 🔴 **Velocity dominates** | CLaMP-2: FMD = 0.4–0.5 (7–25× noise floor). CLaMP-1: FMD = 0.02 (at noise floor — blind!) |
+| 🔴 **Velocity dominates** | CLaMP-2: FMD = 0.4–0.5 (7–25× noise floor). CLaMP-1: FMD = 0.02 (at noise floor - blind!) |
 | 🟡 **Timing invisible** | FMD ≈ 0.008 for all configs. 16th-note quantization is undetectable |
 | 🟢 **Tempo invisible** | FMD = 0.000. Rubato vs metronomic = identical embeddings |
 | ⚫ **Combined = velocity** | all_combined ≈ no_velocity. One-dimensional sensitivity |
 
-> 💡 **Key insight:** If you claim "lower FMD = more expressive music" — that only holds for velocity with CLaMP-2. Tempo and timing are completely invisible to all tested configurations.
+> 💡 **Key insight:** If you claim "lower FMD = more expressive music" - that only holds for velocity with CLaMP-2. Tempo and timing are completely invisible to all tested configurations.
 
 ---
 
@@ -174,20 +174,20 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 
 | # | Contribution | Key Number |
 |:-:|:-------------|:-----------|
-| 1️⃣ | **Sensitivity profiling methodology** — perturbation-based framework | 3 configs × 5 perturbations |
+| 1️⃣ | **Sensitivity profiling methodology** - perturbation-based framework | 3 configs × 5 perturbations |
 | 2️⃣ | **Only velocity is detected** by FMD (not tempo, not timing) | FMD = 0.0 for tempo |
-| 3️⃣ | **Model determines sensitivity** — CLaMP-2 sees velocity; CLaMP-1 doesn't | 0.51 vs 0.02 |
-| 4️⃣ | **Tokenization affects ranking** — can invert dataset distance ordering | τ = 0.5 |
-| 5️⃣ | **Rejection of nFMD** — negative result preventing dead-end research | η² artefact |
+| 3️⃣ | **Model determines sensitivity** - CLaMP-2 sees velocity; CLaMP-1 doesn't | 0.51 vs 0.02 |
+| 4️⃣ | **Tokenization affects ranking** - can invert dataset distance ordering | τ = 0.5 |
+| 5️⃣ | **Rejection of nFMD** - negative result preventing dead-end research | η² artefact |
 
 ### 🎯 Practical Recommendations
 
 | Goal | ✅ Use | ❌ Avoid | Why |
 |:-----|:-------|:---------|:----|
 | 🎹 Dynamics/expression | CLaMP-2 | CLaMP-1 | FMD = 0.4–0.5 vs 0.02 |
-| 🎼 Harmonic structure | CLaMP-1 | — | Velocity-invariant |
+| 🎼 Harmonic structure | CLaMP-1 | - | Velocity-invariant |
 | 📊 Consistent ranking | CLaMP-2 MTF / CLaMP-1 | CLaMP-2 ABC | τ = 1.0 vs 0.5 |
-| ⏱️ Tempo/timing eval | — | All configs | FMD = 0.0 always |
+| ⏱️ Tempo/timing eval | - | All configs | FMD = 0.0 always |
 
 ---
 
