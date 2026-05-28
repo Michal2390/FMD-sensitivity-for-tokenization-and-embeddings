@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
 from experiments.paper_pipeline import PaperExperimentRunner
 from experiments.publication_plots import generate_publication_plots
+from experiments.sensitivity_profiler import SensitivityProfiler
 from data.manager import DatasetManager
 from run_experiment import ExperimentRunner
 from utils.config import get_logger, load_config, setup_logging
@@ -172,6 +173,34 @@ class FMDSensitivityAnalysis:
             self.logger.info(f"Lakh plot {label}: {path}")
         return outputs
 
+    def run_sensitivity_pivot(self, step: str | None = None):
+        """Run the sensitivity pivot pipeline (professor's 7-step plan).
+
+        Args:
+            step: Optional specific step to run ('self-similarity', 'ranking',
+                  'perturbation', 'bootstrap', 'plots'). If None, runs all steps.
+        """
+        self.logger.info("Running sensitivity pivot pipeline")
+        profiler = SensitivityProfiler(self.config, "configs/sensitivity_pivot.yaml")
+
+        if step is None:
+            result = profiler.run_all()
+            self.logger.info("Sensitivity pivot complete (all steps)")
+            return result
+        elif step == "self-similarity":
+            return profiler.run_self_similarity()
+        elif step == "ranking":
+            return profiler.run_cross_dataset_ranking()
+        elif step == "perturbation":
+            return profiler.run_perturbation_sensitivity()
+        elif step == "bootstrap":
+            return profiler.run_bootstrap_stability()
+        elif step == "plots":
+            profiler.generate_plots()
+            return None
+        else:
+            raise ValueError(f"Unknown step: {step}. Use: self-similarity, ranking, perturbation, bootstrap, plots")
+
     def run_song_benchmark(
         self,
         midi_file: str,
@@ -216,6 +245,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "lakh-plots",
             "cross-validate",
             "song",
+            "sensitivity",
             "fetch-data",
             "tests",
             "demo",
@@ -230,6 +260,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
             "lakh: Lakh MIDI validation (32 variants, rock vs classical), "
             "lakh-plots: generate Lakh validation plots from existing outputs, "
             "song: per-song FMD sensitivity analysis, "
+            "sensitivity: run sensitivity pivot (7-step plan), "
             "fetch-data: download datasets from configured external sources"
         ),
     )
@@ -244,6 +275,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         nargs="*",
         default=None,
         help="Optional list of dataset names for --mode fetch-data",
+    )
+    parser.add_argument(
+        "--sensitivity-step",
+        type=str,
+        default=None,
+        choices=["self-similarity", "ranking", "perturbation", "bootstrap", "plots"],
+        help="Run a specific step of the sensitivity pivot (default: all steps)",
     )
     parser.add_argument(
         "--midi-file",
@@ -358,6 +396,12 @@ def main():
             if not ok:
                 _done(False)
                 raise SystemExit(1)
+            _done(True)
+            return
+
+        if args.mode == "sensitivity":
+            analysis.logger.info("[Progress] 100.0% -> sensitivity pivot")
+            analysis.run_sensitivity_pivot(step=args.sensitivity_step)
             _done(True)
             return
 

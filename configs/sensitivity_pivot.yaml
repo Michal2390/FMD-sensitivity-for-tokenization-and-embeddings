@@ -1,0 +1,91 @@
+# Sensitivity Pivot Configuration
+# Based on professor's 7-step plan (June 2026)
+#
+# 3 configurations:
+#   A: CLaMP-2 + ABC (same architecture, ABC representation)
+#   B: CLaMP-2 + MTF (same architecture, MTF representation → isolates tokenization effect)
+#   C: CLaMP-1 + ABC (different model, same representation → isolates model effect)
+
+# Configurations (model + representation pairs)
+configurations:
+  - name: "CLaMP2-ABC"
+    model: "CLaMP-2"
+    tokenizer: "REMI"          # ABC-style: lossy text representation
+    format_note: "ABC bar-patching via CLaMP-2 encoder"
+  - name: "CLaMP2-MTF"
+    model: "CLaMP-2"
+    tokenizer: "MIDI-Like"     # MTF: full MIDI token fidelity
+    format_note: "MTF patch-based, preserves full MIDI info"
+  - name: "CLaMP1-ABC"
+    model: "CLaMP-1"
+    tokenizer: "REMI"          # ABC bar-patching via CLaMP-1
+    format_note: "ABC bar-patching via CLaMP-1 encoder"
+
+# Datasets with clear stylistic relations
+datasets:
+  - name: "maestro"
+    description: "Classical piano, virtuosic (MAESTRO v3)"
+    path: "data/raw/maestro"
+  - name: "pop909"
+    description: "Pop songs (POP909)"
+    path: "data/raw/pop909"
+  - name: "folk"
+    description: "Folk tunes (Nottingham/Folk)"
+    path: "data/raw/folk"
+  - name: "midicaps_classical"
+    description: "Classical orchestral subset from MidiCaps (optional)"
+    path: "data/raw/midicaps_classical"
+    optional: true
+
+# Expected musicological relations:
+# - MAESTRO ↔ Folk: moderate distance (both acoustic/traditional, different complexity)
+# - MAESTRO ↔ POP909: large distance (classical vs pop)
+# - Folk ↔ POP909: moderate-large distance
+# - MAESTRO ↔ midicaps_classical: small distance (both classical)
+
+# Perturbations (Step 5)
+perturbations:
+  - name: "original"
+    description: "No perturbation (baseline)"
+    remove_velocity: false
+    quantize_time: false
+    constant_tempo: false
+  - name: "no_velocity"
+    description: "Velocity → constant 64 (remove dynamics)"
+    remove_velocity: true
+    quantize_time: false
+    constant_tempo: false
+  - name: "quantized_time"
+    description: "Quantize to 16th notes (remove microtiming)"
+    remove_velocity: false
+    quantize_time: true
+    constant_tempo: false
+  - name: "constant_tempo"
+    description: "Tempo → constant 120 BPM (remove rubato/tempo changes)"
+    remove_velocity: false
+    quantize_time: false
+    constant_tempo: true
+  - name: "all_combined"
+    description: "All perturbations combined (total de-expression)"
+    remove_velocity: true
+    quantize_time: true
+    constant_tempo: true
+
+# Self-similarity check (Step 3)
+self_similarity:
+  n_splits: 2
+  seed: 42
+
+# Bootstrap stability (Step 6)
+bootstrap:
+  n_resamples: 10
+  sample_size: 500
+  seed: 42
+  dataset_pair: ["maestro", "pop909"]
+
+# General settings
+seed: 42
+max_files_per_dataset: 200
+output_dir: "results/reports/sensitivity_pivot"
+plots_dir: "results/plots/sensitivity_pivot"
+

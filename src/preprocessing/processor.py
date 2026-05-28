@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Dict, Optional
 from loguru import logger
+import numpy as np
 import pretty_midi
 
 
@@ -101,6 +102,88 @@ class MIDIPreprocessor:
                     note.end = note.start + quantization_step
 
         logger.debug(f"Hard quantization applied (step: {quantization_step:.4f}s, tempo: {tempo} BPM)")
+        return midi_data
+
+    def normalize_tempo(
+        self, midi_data: pretty_midi.PrettyMIDI, target_bpm: float = 120.0
+    ) -> pretty_midi.PrettyMIDI:
+        """
+        Normalize tempo to a constant BPM, removing rubato and tempo changes.
+
+        Rescales all note timings so that the music plays at a uniform tempo,
+        effectively removing expressive timing variations (rubato, accelerando,
+        ritardando).
+
+        Args:
+            midi_data: PrettyMIDI object
+            target_bpm: Target constant tempo in BPM (default: 120)
+
+        Returns:
+            Modified PrettyMIDI object with constant tempo
+        """
+        # Get the beat times from the original tempo map
+        # PrettyMIDI internally tracks tempo changes; we use get_beats() to get
+        # beat positions in seconds according to the original tempo curve.
+        try:
+            beats = midi_data.get_beats()
+        except Exception:
+            beats = None
+
+        if beats is None or len(beats) < 2:
+            # No meaningful tempo map — just set constant tempo header
+            midi_data._tick_scales = [(0, 60.0 / (target_bpm * midi_data.resolution))]
+            midi_data._update_tick_to_time(midi_data.resolution)
+            logger.debug(f"Constant tempo set to {target_bpm} BPM (no beats to remap)")
+            return midi_data
+
+        # Build a mapping from original time → normalized time
+        # Each beat should be equally spaced at target_bpm
+        target_beat_duration = 60.0 / target_bpm  # seconds per beat
+
+        # Create normalized beat positions
+        normalized_beats = np.arange(len(beats)) * target_beat_duration
+
+        # Linear interpolation function: original_time → normalized_time
+        def remap_time(t: float) -> float:
+            if t <= beats[0]:
+                return normalized_beats[0]
+            if t >= beats[-1]:
+                # Extrapolate linearly beyond last beat
+                extra = t - beats[-1]
+                return normalized_beats[-1] + extra * (target_beat_duration / max(
+                    beats[-1] - beats[-2], 0.001
+                ))
+            # Find the surrounding beats
+            idx = np.searchsorted(beats, t, side='right') - 1
+            idx = min(idx, len(beats) - 2)
+            # Interpolate within the beat interval
+            frac = (t - beats[idx]) / max(beats[idx + 1] - beats[idx], 1e-6)
+            return normalized_beats[idx] + frac * target_beat_duration
+
+        # Remap all note timings
+        for instrument in midi_data.instruments:
+            for note in instrument.notes:
+                new_start = remap_time(note.start)
+                new_end = remap_time(note.end)
+                # Ensure minimum duration
+                if new_end <= new_start:
+                    new_end = new_start + 0.01
+                note.start = new_start
+                note.end = new_end
+
+            # Remap control changes
+            for cc in instrument.control_changes:
+                cc.time = remap_time(cc.time)
+
+            # Remap pitch bends
+            for pb in instrument.pitch_bends:
+                pb.time = remap_time(pb.time)
+
+        # Set constant tempo in the MIDI object
+        midi_data._tick_scales = [(0, 60.0 / (target_bpm * midi_data.resolution))]
+        midi_data._update_tick_to_time(midi_data.resolution)
+
+        logger.debug(f"Tempo normalized to constant {target_bpm} BPM ({len(beats)} beats remapped)")
         return midi_data
 
     def filter_note_range(self, midi_data: pretty_midi.PrettyMIDI) -> pretty_midi.PrettyMIDI:
