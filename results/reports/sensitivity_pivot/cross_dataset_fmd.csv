@@ -1,0 +1,10 @@
+dataset_a,dataset_b,pair,configuration,fmd
+maestro,pop909,maestro_vs_pop909,CLaMP2-ABC,0.2652158737182617
+maestro,pop909,maestro_vs_pop909,CLaMP2-MTF,0.16954785585403442
+maestro,pop909,maestro_vs_pop909,CLaMP1-ABC,0.14473216235637665
+maestro,folk,maestro_vs_folk,CLaMP2-ABC,0.5720872282981873
+maestro,folk,maestro_vs_folk,CLaMP2-MTF,0.4765516221523285
+maestro,folk,maestro_vs_folk,CLaMP1-ABC,0.2937477231025696
+pop909,folk,pop909_vs_folk,CLaMP2-ABC,0.8139728307723999
+pop909,folk,pop909_vs_folk,CLaMP2-MTF,0.30988609790802
+pop909,folk,pop909_vs_folk,CLaMP1-ABC,0.2132146656513214

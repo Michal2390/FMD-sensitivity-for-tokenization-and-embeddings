@@ -1,0 +1,302 @@
+{
+  "configurations": [
+    "CLaMP2-ABC",
+    "CLaMP2-MTF",
+    "CLaMP1-ABC"
+  ],
+  "datasets": [
+    "maestro",
+    "pop909",
+    "folk"
+  ],
+  "perturbations": [
+    "original",
+    "no_velocity",
+    "quantized_time",
+    "constant_tempo",
+    "all_combined"
+  ],
+  "self_similarity": [
+    {
+      "dataset": "maestro",
+      "configuration": "CLaMP2-ABC",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.03928516060113907
+    },
+    {
+      "dataset": "maestro",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.02661903202533722
+    },
+    {
+      "dataset": "maestro",
+      "configuration": "CLaMP1-ABC",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.022093428298830986
+    },
+    {
+      "dataset": "pop909",
+      "configuration": "CLaMP2-ABC",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.0699525773525238
+    },
+    {
+      "dataset": "pop909",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.05569601431488991
+    },
+    {
+      "dataset": "pop909",
+      "configuration": "CLaMP1-ABC",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.03813926875591278
+    },
+    {
+      "dataset": "folk",
+      "configuration": "CLaMP2-ABC",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.03937950357794762
+    },
+    {
+      "dataset": "folk",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.019230861216783524
+    },
+    {
+      "dataset": "folk",
+      "configuration": "CLaMP1-ABC",
+      "n_samples_per_half": 100,
+      "split_half_fmd": 0.059115856885910034
+    }
+  ],
+  "cross_dataset_fmd": [
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "pair": "maestro_vs_pop909",
+      "configuration": "CLaMP2-ABC",
+      "fmd": 0.2652158737182617
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "pair": "maestro_vs_pop909",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.16954785585403442
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "pair": "maestro_vs_pop909",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.14473216235637665
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "folk",
+      "pair": "maestro_vs_folk",
+      "configuration": "CLaMP2-ABC",
+      "fmd": 0.5720872282981873
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "folk",
+      "pair": "maestro_vs_folk",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.4765516221523285
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "folk",
+      "pair": "maestro_vs_folk",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.2937477231025696
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "folk",
+      "pair": "pop909_vs_folk",
+      "configuration": "CLaMP2-ABC",
+      "fmd": 0.8139728307723999
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "folk",
+      "pair": "pop909_vs_folk",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.30988609790802
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "folk",
+      "pair": "pop909_vs_folk",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.2132146656513214
+    }
+  ],
+  "spearman_agreement": [
+    {
+      "config_a": "CLaMP2-ABC",
+      "config_b": "CLaMP2-MTF",
+      "spearman_tau": 0.5,
+      "p_value": 0.6666666666666666,
+      "n_pairs": 3
+    },
+    {
+      "config_a": "CLaMP2-ABC",
+      "config_b": "CLaMP1-ABC",
+      "spearman_tau": 0.5,
+      "p_value": 0.6666666666666666,
+      "n_pairs": 3
+    },
+    {
+      "config_a": "CLaMP2-MTF",
+      "config_b": "CLaMP1-ABC",
+      "spearman_tau": 1.0,
+      "p_value": 0.0,
+      "n_pairs": 3
+    }
+  ],
+  "perturbation_sensitivity": [
+    {
+      "configuration": "CLaMP2-ABC",
+      "perturbation": "no_velocity",
+      "description": "Velocity \u2192 constant 64 (remove dynamics)",
+      "fmd_vs_original": 0.5102646350860596,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-ABC",
+      "perturbation": "quantized_time",
+      "description": "Quantize to 16th notes (remove microtiming)",
+      "fmd_vs_original": 0.007901282981038094,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-ABC",
+      "perturbation": "constant_tempo",
+      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
+      "fmd_vs_original": 0.0,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-ABC",
+      "perturbation": "all_combined",
+      "description": "All perturbations combined (total de-expression)",
+      "fmd_vs_original": 0.5142790079116821,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-MTF",
+      "perturbation": "no_velocity",
+      "description": "Velocity \u2192 constant 64 (remove dynamics)",
+      "fmd_vs_original": 0.40829452872276306,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-MTF",
+      "perturbation": "quantized_time",
+      "description": "Quantize to 16th notes (remove microtiming)",
+      "fmd_vs_original": 0.008018508553504944,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-MTF",
+      "perturbation": "constant_tempo",
+      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
+      "fmd_vs_original": 9.992007221626409e-16,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP2-MTF",
+      "perturbation": "all_combined",
+      "description": "All perturbations combined (total de-expression)",
+      "fmd_vs_original": 0.4080854654312134,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP1-ABC",
+      "perturbation": "no_velocity",
+      "description": "Velocity \u2192 constant 64 (remove dynamics)",
+      "fmd_vs_original": 0.02228890359401703,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP1-ABC",
+      "perturbation": "quantized_time",
+      "description": "Quantize to 16th notes (remove microtiming)",
+      "fmd_vs_original": 0.007034338545054197,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP1-ABC",
+      "perturbation": "constant_tempo",
+      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
+      "fmd_vs_original": 5.551115123125783e-16,
+      "n_original": 200,
+      "n_perturbed": 200
+    },
+    {
+      "configuration": "CLaMP1-ABC",
+      "perturbation": "all_combined",
+      "description": "All perturbations combined (total de-expression)",
+      "fmd_vs_original": 0.026080306619405746,
+      "n_original": 200,
+      "n_perturbed": 200
+    }
+  ],
+  "bootstrap_stability": [
+    {
+      "configuration": "CLaMP2-ABC",
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "n_resamples": 10,
+      "sample_size_a": 200,
+      "sample_size_b": 200,
+      "fmd_mean": 0.2861800640821457,
+      "fmd_std": 0.02533016810796705,
+      "fmd_ci_lower": 0.2533284790813923,
+      "fmd_ci_upper": 0.32923736572265627,
+      "cv": 0.08851129511486945
+    },
+    {
+      "configuration": "CLaMP2-MTF",
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "n_resamples": 10,
+      "sample_size_a": 200,
+      "sample_size_b": 200,
+      "fmd_mean": 0.18400946259498596,
+      "fmd_std": 0.01519516590219042,
+      "fmd_ci_lower": 0.15911637172102927,
+      "fmd_ci_upper": 0.21092803366482257,
+      "cv": 0.0825781766214694
+    },
+    {
+      "configuration": "CLaMP1-ABC",
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "n_resamples": 10,
+      "sample_size_a": 200,
+      "sample_size_b": 200,
+      "fmd_mean": 0.15726102143526077,
+      "fmd_std": 0.013477802468831908,
+      "fmd_ci_lower": 0.14031634777784346,
+      "fmd_ci_upper": 0.17972086146473884,
+      "cv": 0.08570338883612223
+    }
+  ]
+}
