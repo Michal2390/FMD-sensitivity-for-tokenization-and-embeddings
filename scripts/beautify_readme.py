@@ -1,4 +1,9 @@
-# 🎵 FMD Sensitivity to Tokenization and Embedding Configuration
+"""Beautify README.md with emojis and better formatting."""
+import pathlib
+
+readme = pathlib.Path('README.md')
+
+content = """# 🎵 FMD Sensitivity to Tokenization and Embedding Configuration
 
 <p align="center">
   <b>🔬 Sensitivity Profiling of Fréchet Music Distance for Symbolic Music Evaluation</b>
@@ -300,3 +305,8 @@ Legacy modes: `python main.py --mode paper` | `--mode lakh` | `--mode cross-vali
 <p align="center">
   <b>✅ Status: Results Complete</b> | 📅 Last Updated: 2026-05-28
 </p>
+"""
+
+readme.write_text(content)
+print(f"✅ README.md beautified: {len(content)} chars, {content.count(chr(10))} lines")
+
