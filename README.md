@@ -27,6 +27,10 @@ We profiled how 3 FMD configurations react to controlled perturbations of MIDI d
 
 > 🎯 **CLaMP-2 sees velocity; CLaMP-1 is blind to it. No model sees tempo or microtiming. Configuration choice determines what musical aspects FMD actually evaluates.**
 
+<p align="center">
+  <img src="results/plots/sensitivity_pivot/fig6_combined_summary_4panel.png" alt="Combined Summary – 4 Panel Overview" width="900">
+</p>
+
 ---
 
 ## 🔄 Motivation and Research Pivot
@@ -108,6 +112,10 @@ Split-half FMD (should be ≈ 0 if stable):
 
 > ✅ All values near zero (0.019–0.070). **Noise floor established.** Any FMD < 0.07 = sampling noise.
 
+<p align="center">
+  <img src="results/plots/sensitivity_pivot/fig4_self_similarity.png" alt="Self-Similarity Sanity Check" width="600">
+</p>
+
 ---
 
 ### 📈 Step 4: Cross-Dataset Ranking
@@ -128,6 +136,10 @@ Split-half FMD (should be ≈ 0 if stable):
 
 > 🔑 **Key Finding:** Tokenization choice (REMI vs MIDI-Like) can **invert** which datasets FMD considers most similar/different!
 
+<p align="center">
+  <img src="results/plots/sensitivity_pivot/fig2_cross_dataset_ranking.png" alt="Cross-Dataset FMD Ranking" width="700">
+</p>
+
 ---
 
 ### 🔬 Step 5: Perturbation Sensitivity ⭐ MAIN RESULT
@@ -140,6 +152,10 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 | 📐 quantized_time | 0.008 | 0.008 | 0.007 | ⚪ Nothing sees it |
 | ⏱️ constant_tempo | 0.000 | 0.000 | 0.000 | ⚪ Nothing sees it |
 | 💀 all_combined | 0.514 | 0.408 | 0.026 | = velocity alone |
+
+<p align="center">
+  <img src="results/plots/sensitivity_pivot/fig1_perturbation_heatmap.png" alt="Perturbation Sensitivity Heatmap" width="700">
+</p>
 
 #### 🔍 Analysis:
 
@@ -165,6 +181,10 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 | CLaMP1-ABC | 0.157 ± 0.013 | [0.140, 0.180] | 8.6% |
 
 > 📊 All configs equally stable (CV ≈ 8–9%). Non-overlapping CIs confirm robust differences.
+
+<p align="center">
+  <img src="results/plots/sensitivity_pivot/fig3_bootstrap_stability.png" alt="Bootstrap Stability" width="700">
+</p>
 
 ---
 
