@@ -291,9 +291,9 @@ Legacy modes: `python main.py --mode paper` | `--mode lakh` | `--mode cross-vali
 | 🏫 **Institution** | Warsaw University of Technology, EITI |
 | 📚 **Course** | WIMU (Music Information Retrieval) |
 | 👨‍💻 **Authors** | Michał Fereniec, Bartłomiej Sędłak |
-| 👨‍🏫 **Supervisor** | dr inż. Jakub Retkowski |
+| 👨‍🏫 **Supervisor** | mgr inż. Tomasz Radzikowski |
 | 📅 **Duration** | February–June 2026 |
-| 🎤 **Presentation** | June 11, 2026 |
+| 🎤 **Presentation** | May 28, 2026 |
 
 ---
 
