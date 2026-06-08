@@ -1,4 +1,4 @@
-config_a,config_b,spearman_tau,p_value,n_pairs
-CLaMP2-ABC,CLaMP2-MTF,0.5,0.6666666666666666,3
-CLaMP2-ABC,CLaMP1-ABC,0.5,0.6666666666666666,3
-CLaMP2-MTF,CLaMP1-ABC,1.0,0.0,3
+config_a,config_b,spearman_tau,p_value,n_pairs,interpretable
+CLaMP2-MTF,CLaMP2-REMI,0.2571428571428572,,6,False
+CLaMP2-MTF,CLaMP1-ABC,-0.3714285714285715,,6,False
+CLaMP2-REMI,CLaMP1-ABC,-0.08571428571428573,,6,False

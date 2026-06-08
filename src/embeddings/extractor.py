@@ -22,7 +22,18 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from loguru import logger
 from abc import ABC, abstractmethod
+import sys
 from tqdm import tqdm
+
+from embeddings.clamp_formats import (
+    PATCH_SIZE_CLAMP1,
+    PATCH_SIZE_CLAMP2,
+    patches_to_hidden,
+    pretty_midi_to_abc_text,
+    pretty_midi_to_mtf_text,
+    text_to_patch_tensor,
+    tokens_to_symbolic_text,
+)
 
 
 def _resolve_hf_model_id(config: Dict, logical_name: str, default_model_id: str) -> str:
@@ -56,11 +67,23 @@ class EmbeddingModel(ABC):
         logger.info("Embedding stage runs inference only (no neural network training)")
 
     @abstractmethod
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+    def encode(
+        self,
+        tokens: List[int],
+        midi_data=None,
+        input_format: str = "auto",
+        miditok_tokenizer=None,
+    ) -> np.ndarray:
         pass
 
     @abstractmethod
-    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
+    def encode_batch(
+        self,
+        token_sequences: List[List[int]],
+        midi_data_list: Optional[List] = None,
+        input_formats: Optional[List[str]] = None,
+        miditok_tokenizer=None,
+    ) -> np.ndarray:
         pass
 
     def get_embedding_dim(self) -> int:
@@ -114,7 +137,7 @@ class _TextEncoderModel(EmbeddingModel):
     def _tokens_to_text(self, tokens: List[int]) -> str:
         return " ".join([str(t) for t in tokens[:512]])
 
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+    def encode(self, tokens: List[int], midi_data=None, input_format: str = "auto", miditok_tokenizer=None) -> np.ndarray:
         if self.model is None:
             return np.random.randn(self.embedding_dim).astype(np.float32)
         try:
@@ -298,7 +321,7 @@ class MERTModel(EmbeddingModel):
             embedding = hidden.mean(dim=1).cpu().numpy()
         return embedding[0].astype(np.float32)
 
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+    def encode(self, tokens: List[int], midi_data=None, input_format: str = "auto", miditok_tokenizer=None) -> np.ndarray:
         if self.model is None:
             return np.random.randn(self.embedding_dim).astype(np.float32)
 
@@ -418,46 +441,57 @@ class CLaMP1Model(EmbeddingModel):
             self._loaded = True
             logger.info(f"CLaMP-1 loaded from {self.HF_REPO} (dim={self.HIDDEN_SIZE})")
         except Exception as e:
-            logger.warning(f"Failed to load CLaMP-1: {e}. Using deterministic fallback.")
+            logger.error(f"Failed to load CLaMP-1: {e}")
+            raise RuntimeError(f"CLaMP-1 model failed to load: {e}") from e
 
-    def _midi_tokens_to_patches(self, tokens: List[int]) -> torch.Tensor:
-        """Convert token sequence into bar-patch representation.
+    def _build_patches(self, tokens, midi_data, input_format, miditok_tokenizer) -> torch.Tensor:
+        if input_format == "ABC":
+            if midi_data is None:
+                raise ValueError("CLaMP-1 ABC format requires midi_data")
+            text = pretty_midi_to_abc_text(midi_data)
+            return text_to_patch_tensor(text, patch_size=PATCH_SIZE_CLAMP1)
+        if input_format == "REMI" and miditok_tokenizer is not None:
+            text = tokens_to_symbolic_text(tokens, miditok_tokenizer)
+            return text_to_patch_tensor(text, patch_size=PATCH_SIZE_CLAMP1)
+        raise ValueError(f"CLaMP-1 requires input_format ABC or REMI, got '{input_format}'")
 
-        We create a simplified patch representation:
-        Each patch is a multi-hot vector of (pitch, duration_bin) pairs.
-        Tokens are split into groups of DUR_BINS tokens per patch.
-        """
-        patch_size = self.DUR_BINS  # tokens per patch
-        n_patches = min(len(tokens) // max(patch_size, 1) + 1, self.MAX_PATCHES)
-        patches = np.zeros((n_patches, self.PATCH_DIM), dtype=np.float32)
-
-        for p_idx in range(n_patches):
-            start = p_idx * patch_size
-            end = min(start + patch_size, len(tokens))
-            chunk = tokens[start:end]
-            for i, tok in enumerate(chunk):
-                pitch = tok % self.PITCH_BINS
-                dur_bin = i % self.DUR_BINS
-                idx = pitch * self.DUR_BINS + dur_bin
-                if idx < self.PATCH_DIM:
-                    patches[p_idx, idx] = 1.0
-
-        return torch.tensor(patches, dtype=torch.float32).unsqueeze(0)  # (1, N, D)
-
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+    def encode(
+        self,
+        tokens: List[int],
+        midi_data=None,
+        input_format: str = "ABC",
+        miditok_tokenizer=None,
+    ) -> np.ndarray:
         if not self._loaded:
-            rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
-            return rng.standard_normal(self.embedding_dim).astype(np.float32)
+            raise RuntimeError("CLaMP-1 weights not loaded")
 
-        patches = self._midi_tokens_to_patches(tokens).to(self.device)
+        patches = self._build_patches(tokens, midi_data, input_format, miditok_tokenizer)
         with torch.no_grad():
-            hidden = self.music_enc(patches)  # (1, H)
-            embedding = self.music_proj(hidden)  # (1, H)
-            embedding = torch.nn.functional.normalize(embedding, dim=-1)
-        return embedding[0].cpu().numpy().astype(np.float32)
+            return patches_to_hidden(
+                patches,
+                self.music_enc.patch_embedding,
+                self.music_enc.enc,
+                self.music_proj,
+                self.device,
+            )
 
-    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
-        return np.array([self.encode(seq) for seq in token_sequences])
+    def encode_batch(
+        self,
+        token_sequences: List[List[int]],
+        midi_data_list: Optional[List] = None,
+        input_formats: Optional[List[str]] = None,
+        miditok_tokenizer=None,
+    ) -> np.ndarray:
+        formats = input_formats or ["ABC"] * len(token_sequences)
+        return np.array([
+            self.encode(
+                seq,
+                midi_data=midi_data_list[i] if midi_data_list and i < len(midi_data_list) else None,
+                input_format=formats[i] if i < len(formats) else "ABC",
+                miditok_tokenizer=miditok_tokenizer,
+            )
+            for i, seq in enumerate(token_sequences)
+        ])
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
@@ -542,45 +576,59 @@ class CLaMP2Model(EmbeddingModel):
             self._loaded = True
             logger.info(f"CLaMP-2 loaded from {self.HF_REPO} (dim={self.HIDDEN_SIZE})")
         except Exception as e:
-            logger.warning(f"Failed to load CLaMP-2: {e}. Using deterministic fallback.")
+            logger.error(f"Failed to load CLaMP-2: {e}")
+            raise RuntimeError(f"CLaMP-2 model failed to load: {e}") from e
 
-    def _tokens_to_mtf_patches(self, tokens: List[int]) -> torch.Tensor:
-        """Convert token IDs to MTF-style patches.
+    def _build_patches(self, tokens, midi_data, input_format, miditok_tokenizer) -> torch.Tensor:
+        if input_format == "MTF":
+            if midi_data is None:
+                raise ValueError("CLaMP-2 MTF format requires midi_data")
+            text = pretty_midi_to_mtf_text(midi_data)
+            return text_to_patch_tensor(text, patch_size=PATCH_SIZE_CLAMP2)
+        if input_format == "REMI":
+            if miditok_tokenizer is None:
+                raise ValueError("CLaMP-2 REMI format requires miditok_tokenizer")
+            text = tokens_to_symbolic_text(tokens, miditok_tokenizer)
+            return text_to_patch_tensor(text, patch_size=PATCH_SIZE_CLAMP2)
+        raise ValueError(f"CLaMP-2 requires input_format MTF or REMI, got '{input_format}'")
 
-        Each token is mapped to a 128-dim binary vector (one-hot over MIDI range),
-        then groups of NOTES_PER_PATCH are flattened into 8192-dim patches.
-        """
-        # Create per-token 128-dim representations
-        note_vectors = []
-        for tok in tokens:
-            vec = np.zeros(self.NOTE_DIM, dtype=np.float32)
-            idx = tok % self.NOTE_DIM
-            vec[idx] = 1.0
-            note_vectors.append(vec)
-
-        # Pad to multiple of NOTES_PER_PATCH
-        while len(note_vectors) % self.NOTES_PER_PATCH != 0:
-            note_vectors.append(np.zeros(self.NOTE_DIM, dtype=np.float32))
-
-        note_arr = np.array(note_vectors)  # (N, 128)
-        n_patches = min(len(note_arr) // self.NOTES_PER_PATCH, self.MAX_PATCHES)
-        patches = note_arr[:n_patches * self.NOTES_PER_PATCH].reshape(n_patches, self.PATCH_DIM)
-        return torch.tensor(patches, dtype=torch.float32).unsqueeze(0)  # (1, P, 8192)
-
-    def encode(self, tokens: List[int], midi_data=None) -> np.ndarray:
+    def encode(
+        self,
+        tokens: List[int],
+        midi_data=None,
+        input_format: str = "MTF",
+        miditok_tokenizer=None,
+    ) -> np.ndarray:
         if not self._loaded:
-            rng = np.random.default_rng(hash(tuple(tokens[:20])) % (2**31))
-            return rng.standard_normal(self.embedding_dim).astype(np.float32)
+            raise RuntimeError("CLaMP-2 weights not loaded")
 
-        patches = self._tokens_to_mtf_patches(tokens).to(self.device)
+        patches = self._build_patches(tokens, midi_data, input_format, miditok_tokenizer)
         with torch.no_grad():
-            hidden = self.music_model(patches)
-            embedding = self.music_proj(hidden)
-            embedding = torch.nn.functional.normalize(embedding, dim=-1)
-        return embedding[0].cpu().numpy().astype(np.float32)
+            return patches_to_hidden(
+                patches,
+                self.music_model.patch_embedding,
+                self.music_model.base,
+                self.music_proj,
+                self.device,
+            )
 
-    def encode_batch(self, token_sequences: List[List[int]], midi_data_list: Optional[List] = None) -> np.ndarray:
-        return np.array([self.encode(seq) for seq in token_sequences])
+    def encode_batch(
+        self,
+        token_sequences: List[List[int]],
+        midi_data_list: Optional[List] = None,
+        input_formats: Optional[List[str]] = None,
+        miditok_tokenizer=None,
+    ) -> np.ndarray:
+        formats = input_formats or ["MTF"] * len(token_sequences)
+        return np.array([
+            self.encode(
+                seq,
+                midi_data=midi_data_list[i] if midi_data_list and i < len(midi_data_list) else None,
+                input_format=formats[i] if i < len(formats) else "MTF",
+                miditok_tokenizer=miditok_tokenizer,
+            )
+            for i, seq in enumerate(token_sequences)
+        ])
 
     def get_embedding_dim(self) -> int:
         return self.embedding_dim
@@ -629,8 +677,8 @@ class EmbeddingExtractor:
         self.memory_cache = {} if self.use_cache else None
         logger.info(f"EmbeddingExtractor initialized with models: {list(self.models.keys())}")
 
-    def _get_cache_key(self, model_name: str, token_hash: str) -> str:
-        return f"{model_name}_{token_hash}"
+    def _get_cache_key(self, model_name: str, token_hash: str, input_format: str = "auto") -> str:
+        return f"{model_name}_{input_format}_{token_hash}"
 
     def _hash_tokens(self, tokens: List[int]) -> str:
         token_str = ",".join(map(str, tokens))
@@ -665,43 +713,71 @@ class EmbeddingExtractor:
         token_sequences: List[List[int]],
         model_name: str,
         midi_data_list: Optional[List] = None,
+        input_formats: Optional[List[str]] = None,
+        miditok_tokenizer=None,
+        use_cache: Optional[bool] = None,
     ) -> np.ndarray:
         if model_name not in self.models:
             raise ValueError(f"Unknown model: {model_name}")
 
         model = self.models[model_name]
         embeddings_list = []
+        cache_enabled = self.use_cache if use_cache is None else use_cache
+        formats = input_formats or ["auto"] * len(token_sequences)
 
         logger.info(f"Extracting embeddings for {len(token_sequences)} sequences with {model_name}")
 
-        for i, tokens in enumerate(tqdm(token_sequences, desc=f"Extracting with {model_name}")):
-            if self.use_cache:
-                token_hash = self._hash_tokens(tokens)
-                cache_key = self._get_cache_key(model_name, token_hash)
-                if cache_key in self.memory_cache:
-                    embeddings_list.append(self.memory_cache[cache_key])
-                    continue
-                cached_embedding = self._load_from_disk_cache(cache_key)
-                if cached_embedding is not None:
-                    self.memory_cache[cache_key] = cached_embedding
-                    embeddings_list.append(cached_embedding)
-                    continue
+        # Use tqdm if possible; otherwise fall back to plain iteration (avoid sys.stderr flush issues on Windows)
+        use_tqdm = False
+        try:
+            iterator = tqdm(token_sequences, desc=f"Extracting with {model_name}", file=sys.stdout)
+            use_tqdm = True
+        except Exception as e:
+            logger.debug(f"tqdm initialization failed: {e}. Falling back to plain iterator.")
+            iterator = token_sequences
 
-            if len(embeddings_list) < (i + 1):
-                midi_data = midi_data_list[i] if midi_data_list and i < len(midi_data_list) else None
-                embedding = model.encode(tokens, midi_data=midi_data)
-                embeddings_list.append(embedding)
-
-                if self.use_cache:
+        try:
+            for i, tokens in enumerate(iterator):
+                fmt = formats[i] if i < len(formats) else "auto"
+                if cache_enabled:
                     token_hash = self._hash_tokens(tokens)
-                    cache_key = self._get_cache_key(model_name, token_hash)
-                    self.memory_cache[cache_key] = embedding
-                    metadata = {
-                        "model": model_name,
-                        "num_tokens": len(tokens),
-                        "embedding_dim": embedding.shape[0]
-                    }
-                    self._save_to_disk_cache(cache_key, embedding, metadata)
+                    cache_key = self._get_cache_key(model_name, token_hash, fmt)
+                    if cache_key in self.memory_cache:
+                        embeddings_list.append(self.memory_cache[cache_key])
+                        continue
+                    cached_embedding = self._load_from_disk_cache(cache_key)
+                    if cached_embedding is not None:
+                        self.memory_cache[cache_key] = cached_embedding
+                        embeddings_list.append(cached_embedding)
+                        continue
+
+                if len(embeddings_list) < (i + 1):
+                    midi_data = midi_data_list[i] if midi_data_list and i < len(midi_data_list) else None
+                    embedding = model.encode(
+                        tokens,
+                        midi_data=midi_data,
+                        input_format=fmt,
+                        miditok_tokenizer=miditok_tokenizer,
+                    )
+                    embeddings_list.append(embedding)
+
+                    if cache_enabled:
+                        token_hash = self._hash_tokens(tokens)
+                        cache_key = self._get_cache_key(model_name, token_hash, fmt)
+                        self.memory_cache[cache_key] = embedding
+                        metadata = {
+                            "model": model_name,
+                            "input_format": fmt,
+                            "num_tokens": len(tokens),
+                            "embedding_dim": embedding.shape[0],
+                        }
+                        self._save_to_disk_cache(cache_key, embedding, metadata)
+        finally:
+            if use_tqdm:
+                try:
+                    iterator.close()
+                except Exception as e:
+                    logger.debug(f"Failed to close tqdm iterator: {e}")
 
         embeddings = np.array(embeddings_list)
         logger.info(f"Extracted {len(embeddings_list)} embeddings (shape: {embeddings.shape})")

@@ -1,7 +1,7 @@
 """Sensitivity Profiler — implements the professor's 7-step pivot plan.
 
 Steps:
-  1. Define 3 configurations (CLaMP2-ABC, CLaMP2-MTF, CLaMP1-ABC)
+  1. Define 3 configurations (CLaMP2-MTF, CLaMP2-REMI, CLaMP1-ABC)
   2. Use 3-4 datasets with clear stylistic relations
   3. Self-similarity sanity check (split-half FMD ≈ 0)
   4. Cross-dataset ranking with Spearman τ between configs
@@ -34,10 +34,12 @@ from utils.config import load_config
 
 @dataclass
 class SensitivityConfig:
-    """A single configuration (model + representation) to evaluate."""
+    """A single configuration (model + input representation) to evaluate."""
     name: str
     model: str
-    tokenizer: str
+    input_format: str  # MTF, ABC, REMI
+    tokenizer: Optional[str] = None
+    description: str = ""
 
 
 @dataclass
@@ -93,14 +95,23 @@ class SensitivityProfiler:
             SensitivityConfig(
                 name=c["name"],
                 model=c["model"],
-                tokenizer=c["tokenizer"],
+                input_format=c["input_format"],
+                tokenizer=c.get("tokenizer"),
+                description=c.get("description", ""),
             )
             for c in self.pivot_cfg["configurations"]
         ]
 
-        # Parse datasets
+        # Parse datasets (required + optional that exist on disk)
         self.datasets = [d["name"] for d in self.pivot_cfg["datasets"] if not d.get("optional", False)]
+        for d in self.pivot_cfg["datasets"]:
+            if d.get("optional", False):
+                ds_path = Path(self.config["data"]["raw_data_dir"]) / d["name"]
+                if ds_path.exists() and list(ds_path.glob("**/*.mid*")):
+                    self.datasets.append(d["name"])
         self.optional_datasets = [d["name"] for d in self.pivot_cfg["datasets"] if d.get("optional", False)]
+
+        self.min_pairs_for_spearman = int(self.pivot_cfg.get("min_pairs_for_spearman", 6))
 
         # Parse perturbations
         self.perturbations = [
@@ -187,12 +198,16 @@ class SensitivityProfiler:
                     if perturbation.constant_tempo:
                         midi_data = self.preprocessor.normalize_tempo(midi_data, target_bpm=120.0)
 
-                # Tokenize
-                tokenizer = self.tokenization.tokenizers[config.tokenizer]
-                tokens = tokenizer.encode_midi_object(midi_data)
-                if not tokens:
-                    failed += 1
-                    continue
+                # Tokenize when REMI path is used; MTF/ABC use midi_data directly
+                tokens: List[int] = []
+                if config.input_format == "REMI":
+                    if not config.tokenizer:
+                        raise ValueError(f"Config {config.name} requires tokenizer for REMI format")
+                    tokenizer = self.tokenization.tokenizers[config.tokenizer]
+                    tokens = tokenizer.encode_midi_object(midi_data)
+                    if not tokens:
+                        failed += 1
+                        continue
 
                 token_sequences.append(tokens)
                 midi_data_list.append(midi_data)
@@ -207,11 +222,18 @@ class SensitivityProfiler:
         if not token_sequences:
             return np.array([])
 
-        # Use EmbeddingExtractor's batch extraction
+        miditok_tokenizer = None
+        if config.input_format == "REMI" and config.tokenizer:
+            miditok_tokenizer = self.tokenization.tokenizers[config.tokenizer].miditok_tokenizer
+
+        input_formats = [config.input_format] * len(token_sequences)
         embeddings = self.embeddings.extract_embeddings(
             token_sequences=token_sequences,
             model_name=config.model,
             midi_data_list=midi_data_list,
+            input_formats=input_formats,
+            miditok_tokenizer=miditok_tokenizer,
+            use_cache=False,
         )
         return embeddings
 
@@ -324,7 +346,12 @@ class SensitivityProfiler:
             merged = df[df["configuration"].isin([cfg_a, cfg_b])].pivot_table(
                 index="pair", columns="configuration", values="fmd"
             )
-            if merged.shape[0] < 3:
+            n_pairs = int(merged.shape[0])
+            if n_pairs < self.min_pairs_for_spearman:
+                logger.warning(
+                    f"Skipping Spearman {cfg_a} vs {cfg_b}: only {n_pairs} pairs "
+                    f"(need >= {self.min_pairs_for_spearman})"
+                )
                 continue
             if cfg_a in merged.columns and cfg_b in merged.columns:
                 tau, p_value = spearmanr(merged[cfg_a], merged[cfg_b])
@@ -332,10 +359,11 @@ class SensitivityProfiler:
                     "config_a": cfg_a,
                     "config_b": cfg_b,
                     "spearman_tau": float(tau),
-                    "p_value": float(p_value),
-                    "n_pairs": int(merged.shape[0]),
+                    "p_value": float(p_value) if n_pairs >= 10 else float("nan"),
+                    "n_pairs": n_pairs,
+                    "interpretable": n_pairs >= 10,
                 })
-                logger.info(f"  Spearman τ({cfg_a}, {cfg_b}) = {tau:.4f} (p={p_value:.4f})")
+                logger.info(f"  Spearman τ({cfg_a}, {cfg_b}) = {tau:.4f} (n={n_pairs})")
 
         spearman_df = pd.DataFrame(spearman_rows)
         spearman_path = self.output_dir / "spearman_ranking_agreement.csv"
@@ -351,7 +379,7 @@ class SensitivityProfiler:
         """Step 5: Compute FMD(original, perturbed) for each perturbation × config.
 
         This reveals the 'sensitivity profile' of each configuration.
-        Key expected insight: ABC representation ignores velocity changes.
+        Key expected insight: MTF preserves velocity; ABC/REMI may not.
 
         Args:
             dataset_name: Dataset to use for perturbation analysis (default: maestro)
@@ -589,9 +617,9 @@ class SensitivityProfiler:
 
     def run_all(self) -> SensitivityResult:
         """Run the complete 7-step sensitivity pivot pipeline."""
-        logger.info("╔══════════════════════════════════════════════╗")
-        logger.info("║  SENSITIVITY PIVOT — Full Pipeline           ║")
-        logger.info("╚══════════════════════════════════════════════╝")
+        logger.info("=" * 60)
+        logger.info("SENSITIVITY PIVOT - Full Pipeline")
+        logger.info("=" * 60)
 
         result = SensitivityResult()
 

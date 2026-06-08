@@ -26,9 +26,9 @@ def parse_args():
     p = argparse.ArgumentParser(description="Run per-song FMD sensitivity analysis")
     p.add_argument("--midi-file", required=True, help="Path to MIDI file")
     p.add_argument("--tokenizers", nargs="+", default=None, help="List of tokenizers to compare")
-    p.add_argument("--models", nargs="+", default=None, help="List of embedding models to compare")
+    p.add_argument("--models", nargs="+", default=None, help="List of embedding models (used for tokenizer comparison)")
     p.add_argument("--segments", type=int, default=8, help="Number of segments to split the song into")
-    p.add_argument("--axis", choices=["both", "tokenizer", "model"], default="both")
+    p.add_argument("--model", default=None, help="Fixed model used for tokenizer comparison (default: first model from config)")
     p.add_argument("--remove-velocity", action="store_true")
     p.add_argument("--hard-quantization", action="store_true")
     p.add_argument("--output-dir", default=None, help="Optional output directory")
@@ -51,7 +51,7 @@ def main():
     tokenizers = args.tokenizers
     models = args.models
 
-    logger.info(f"Running per-song analysis: {midi_path}\n tokenizers={tokenizers}\n models={models}\n axis={args.axis}")
+    logger.info(f"Running per-song analysis: {midi_path}\n tokenizers={tokenizers}\n models={models}")
 
     result = runner.run_single_song_analysis(
         midi_path=midi_path,
@@ -60,7 +60,7 @@ def main():
         n_segments=args.segments,
         remove_velocity=args.remove_velocity,
         hard_quantization=args.hard_quantization,
-        axis=args.axis,
+        axis="tokenizer",
         output_dir=Path(args.output_dir) if args.output_dir else None,
     )
 

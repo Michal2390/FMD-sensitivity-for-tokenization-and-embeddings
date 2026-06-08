@@ -63,6 +63,12 @@ MIDICAPS_GENRE_MAP: Dict[str, str] = {
     "bluegrass": "country",
     "americana": "country",
     "folk": "country",
+    # Classical
+    "classical": "classical",
+    "classical/orchestral": "classical",
+    "orchestral": "classical",
+    "classical music": "classical",
+    "neo-classical": "classical",
 }
 
 

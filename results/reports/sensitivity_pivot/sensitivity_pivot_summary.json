@@ -1,13 +1,14 @@
 {
   "configurations": [
-    "CLaMP2-ABC",
     "CLaMP2-MTF",
+    "CLaMP2-REMI",
     "CLaMP1-ABC"
   ],
   "datasets": [
     "maestro",
     "pop909",
-    "folk"
+    "folk",
+    "midicaps_classical"
   ],
   "perturbations": [
     "original",
@@ -19,57 +20,75 @@
   "self_similarity": [
     {
       "dataset": "maestro",
-      "configuration": "CLaMP2-ABC",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.03928516060113907
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.016577977687120438
     },
     {
       "dataset": "maestro",
-      "configuration": "CLaMP2-MTF",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.02661903202533722
+      "configuration": "CLaMP2-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.009753159247338772
     },
     {
       "dataset": "maestro",
       "configuration": "CLaMP1-ABC",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.022093428298830986
-    },
-    {
-      "dataset": "pop909",
-      "configuration": "CLaMP2-ABC",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.0699525773525238
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.02916301228106022
     },
     {
       "dataset": "pop909",
       "configuration": "CLaMP2-MTF",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.05569601431488991
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.023925364017486572
+    },
+    {
+      "dataset": "pop909",
+      "configuration": "CLaMP2-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.010098275728523731
     },
     {
       "dataset": "pop909",
       "configuration": "CLaMP1-ABC",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.03813926875591278
-    },
-    {
-      "dataset": "folk",
-      "configuration": "CLaMP2-ABC",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.03937950357794762
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.03329426050186157
     },
     {
       "dataset": "folk",
       "configuration": "CLaMP2-MTF",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.019230861216783524
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.09419086575508118
+    },
+    {
+      "dataset": "folk",
+      "configuration": "CLaMP2-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.010856306180357933
     },
     {
       "dataset": "folk",
       "configuration": "CLaMP1-ABC",
-      "n_samples_per_half": 100,
-      "split_half_fmd": 0.059115856885910034
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.025866428390145302
+    },
+    {
+      "dataset": "midicaps_classical",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.12917494773864746
+    },
+    {
+      "dataset": "midicaps_classical",
+      "configuration": "CLaMP2-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.03920019418001175
+    },
+    {
+      "dataset": "midicaps_classical",
+      "configuration": "CLaMP1-ABC",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.03370992839336395
     }
   ],
   "cross_dataset_fmd": [
@@ -77,226 +96,292 @@
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "pair": "maestro_vs_pop909",
-      "configuration": "CLaMP2-ABC",
-      "fmd": 0.2652158737182617
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.07313240319490433
     },
     {
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "pair": "maestro_vs_pop909",
-      "configuration": "CLaMP2-MTF",
-      "fmd": 0.16954785585403442
+      "configuration": "CLaMP2-REMI",
+      "fmd": 0.05125515162944794
     },
     {
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "pair": "maestro_vs_pop909",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.14473216235637665
-    },
-    {
-      "dataset_a": "maestro",
-      "dataset_b": "folk",
-      "pair": "maestro_vs_folk",
-      "configuration": "CLaMP2-ABC",
-      "fmd": 0.5720872282981873
+      "fmd": 0.016612494364380836
     },
     {
       "dataset_a": "maestro",
       "dataset_b": "folk",
       "pair": "maestro_vs_folk",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.4765516221523285
+      "fmd": 0.7288601398468018
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "folk",
+      "pair": "maestro_vs_folk",
+      "configuration": "CLaMP2-REMI",
+      "fmd": 0.06576792895793915
     },
     {
       "dataset_a": "maestro",
       "dataset_b": "folk",
       "pair": "maestro_vs_folk",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.2937477231025696
+      "fmd": 0.014842776581645012
     },
     {
-      "dataset_a": "pop909",
-      "dataset_b": "folk",
-      "pair": "pop909_vs_folk",
-      "configuration": "CLaMP2-ABC",
-      "fmd": 0.8139728307723999
+      "dataset_a": "maestro",
+      "dataset_b": "midicaps_classical",
+      "pair": "maestro_vs_midicaps_classical",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.2721900939941406
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "midicaps_classical",
+      "pair": "maestro_vs_midicaps_classical",
+      "configuration": "CLaMP2-REMI",
+      "fmd": 0.07684294879436493
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "midicaps_classical",
+      "pair": "maestro_vs_midicaps_classical",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.014582278206944466
     },
     {
       "dataset_a": "pop909",
       "dataset_b": "folk",
       "pair": "pop909_vs_folk",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.30988609790802
+      "fmd": 0.6243343353271484
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "folk",
+      "pair": "pop909_vs_folk",
+      "configuration": "CLaMP2-REMI",
+      "fmd": 0.10189881175756454
     },
     {
       "dataset_a": "pop909",
       "dataset_b": "folk",
       "pair": "pop909_vs_folk",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.2132146656513214
+      "fmd": 0.016132628545165062
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "midicaps_classical",
+      "pair": "pop909_vs_midicaps_classical",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.2193625569343567
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "midicaps_classical",
+      "pair": "pop909_vs_midicaps_classical",
+      "configuration": "CLaMP2-REMI",
+      "fmd": 0.08893995732069016
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "midicaps_classical",
+      "pair": "pop909_vs_midicaps_classical",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.015496794134378433
+    },
+    {
+      "dataset_a": "folk",
+      "dataset_b": "midicaps_classical",
+      "pair": "folk_vs_midicaps_classical",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.47204646468162537
+    },
+    {
+      "dataset_a": "folk",
+      "dataset_b": "midicaps_classical",
+      "pair": "folk_vs_midicaps_classical",
+      "configuration": "CLaMP2-REMI",
+      "fmd": 0.08419983834028244
+    },
+    {
+      "dataset_a": "folk",
+      "dataset_b": "midicaps_classical",
+      "pair": "folk_vs_midicaps_classical",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.013781231828033924
     }
   ],
   "spearman_agreement": [
     {
-      "config_a": "CLaMP2-ABC",
-      "config_b": "CLaMP2-MTF",
-      "spearman_tau": 0.5,
-      "p_value": 0.6666666666666666,
-      "n_pairs": 3
-    },
-    {
-      "config_a": "CLaMP2-ABC",
-      "config_b": "CLaMP1-ABC",
-      "spearman_tau": 0.5,
-      "p_value": 0.6666666666666666,
-      "n_pairs": 3
+      "config_a": "CLaMP2-MTF",
+      "config_b": "CLaMP2-REMI",
+      "spearman_tau": 0.2571428571428572,
+      "p_value": NaN,
+      "n_pairs": 6,
+      "interpretable": false
     },
     {
       "config_a": "CLaMP2-MTF",
       "config_b": "CLaMP1-ABC",
-      "spearman_tau": 1.0,
-      "p_value": 0.0,
-      "n_pairs": 3
+      "spearman_tau": -0.3714285714285715,
+      "p_value": NaN,
+      "n_pairs": 6,
+      "interpretable": false
+    },
+    {
+      "config_a": "CLaMP2-REMI",
+      "config_b": "CLaMP1-ABC",
+      "spearman_tau": -0.08571428571428573,
+      "p_value": NaN,
+      "n_pairs": 6,
+      "interpretable": false
     }
   ],
   "perturbation_sensitivity": [
     {
-      "configuration": "CLaMP2-ABC",
+      "configuration": "CLaMP2-MTF",
       "perturbation": "no_velocity",
       "description": "Velocity \u2192 constant 64 (remove dynamics)",
-      "fmd_vs_original": 0.5102646350860596,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.0627632737159729,
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
-      "configuration": "CLaMP2-ABC",
+      "configuration": "CLaMP2-MTF",
       "perturbation": "quantized_time",
       "description": "Quantize to 16th notes (remove microtiming)",
-      "fmd_vs_original": 0.007901282981038094,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.11770336329936981,
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
-      "configuration": "CLaMP2-ABC",
+      "configuration": "CLaMP2-MTF",
+      "perturbation": "constant_tempo",
+      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
+      "fmd_vs_original": 0.0,
+      "n_original": 80,
+      "n_perturbed": 80
+    },
+    {
+      "configuration": "CLaMP2-MTF",
+      "perturbation": "all_combined",
+      "description": "All perturbations combined (total de-expression)",
+      "fmd_vs_original": 0.20732799172401428,
+      "n_original": 80,
+      "n_perturbed": 80
+    },
+    {
+      "configuration": "CLaMP2-REMI",
+      "perturbation": "no_velocity",
+      "description": "Velocity \u2192 constant 64 (remove dynamics)",
+      "fmd_vs_original": 0.05301079526543617,
+      "n_original": 80,
+      "n_perturbed": 80
+    },
+    {
+      "configuration": "CLaMP2-REMI",
+      "perturbation": "quantized_time",
+      "description": "Quantize to 16th notes (remove microtiming)",
+      "fmd_vs_original": 0.0004000336048193276,
+      "n_original": 80,
+      "n_perturbed": 80
+    },
+    {
+      "configuration": "CLaMP2-REMI",
       "perturbation": "constant_tempo",
       "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
       "fmd_vs_original": 0.0,
-      "n_original": 200,
-      "n_perturbed": 200
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
-      "configuration": "CLaMP2-ABC",
+      "configuration": "CLaMP2-REMI",
       "perturbation": "all_combined",
       "description": "All perturbations combined (total de-expression)",
-      "fmd_vs_original": 0.5142790079116821,
-      "n_original": 200,
-      "n_perturbed": 200
-    },
-    {
-      "configuration": "CLaMP2-MTF",
-      "perturbation": "no_velocity",
-      "description": "Velocity \u2192 constant 64 (remove dynamics)",
-      "fmd_vs_original": 0.40829452872276306,
-      "n_original": 200,
-      "n_perturbed": 200
-    },
-    {
-      "configuration": "CLaMP2-MTF",
-      "perturbation": "quantized_time",
-      "description": "Quantize to 16th notes (remove microtiming)",
-      "fmd_vs_original": 0.008018508553504944,
-      "n_original": 200,
-      "n_perturbed": 200
-    },
-    {
-      "configuration": "CLaMP2-MTF",
-      "perturbation": "constant_tempo",
-      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
-      "fmd_vs_original": 9.992007221626409e-16,
-      "n_original": 200,
-      "n_perturbed": 200
-    },
-    {
-      "configuration": "CLaMP2-MTF",
-      "perturbation": "all_combined",
-      "description": "All perturbations combined (total de-expression)",
-      "fmd_vs_original": 0.4080854654312134,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.05517923831939697,
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "no_velocity",
       "description": "Velocity \u2192 constant 64 (remove dynamics)",
-      "fmd_vs_original": 0.02228890359401703,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.02008909545838833,
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "quantized_time",
       "description": "Quantize to 16th notes (remove microtiming)",
-      "fmd_vs_original": 0.007034338545054197,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.013927015475928783,
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "constant_tempo",
       "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
-      "fmd_vs_original": 5.551115123125783e-16,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.014908810146152973,
+      "n_original": 80,
+      "n_perturbed": 80
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "all_combined",
       "description": "All perturbations combined (total de-expression)",
-      "fmd_vs_original": 0.026080306619405746,
-      "n_original": 200,
-      "n_perturbed": 200
+      "fmd_vs_original": 0.01649544946849346,
+      "n_original": 80,
+      "n_perturbed": 80
     }
   ],
   "bootstrap_stability": [
     {
-      "configuration": "CLaMP2-ABC",
-      "dataset_a": "maestro",
-      "dataset_b": "pop909",
-      "n_resamples": 10,
-      "sample_size_a": 200,
-      "sample_size_b": 200,
-      "fmd_mean": 0.2861800640821457,
-      "fmd_std": 0.02533016810796705,
-      "fmd_ci_lower": 0.2533284790813923,
-      "fmd_ci_upper": 0.32923736572265627,
-      "cv": 0.08851129511486945
-    },
-    {
       "configuration": "CLaMP2-MTF",
       "dataset_a": "maestro",
       "dataset_b": "pop909",
-      "n_resamples": 10,
-      "sample_size_a": 200,
-      "sample_size_b": 200,
-      "fmd_mean": 0.18400946259498596,
-      "fmd_std": 0.01519516590219042,
-      "fmd_ci_lower": 0.15911637172102927,
-      "fmd_ci_upper": 0.21092803366482257,
-      "cv": 0.0825781766214694
+      "n_resamples": 50,
+      "sample_size_a": 80,
+      "sample_size_b": 80,
+      "fmd_mean": 0.07999675706028939,
+      "fmd_std": 0.004490523177662064,
+      "fmd_ci_lower": 0.07339656334370374,
+      "fmd_ci_upper": 0.0879583740606904,
+      "cv": 0.05613381520300617
+    },
+    {
+      "configuration": "CLaMP2-REMI",
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "n_resamples": 50,
+      "sample_size_a": 80,
+      "sample_size_b": 80,
+      "fmd_mean": 0.05473574042320251,
+      "fmd_std": 0.00340512078262711,
+      "fmd_ci_lower": 0.04973701909184456,
+      "fmd_ci_upper": 0.06189779583364725,
+      "cv": 0.06221018947217306
     },
     {
       "configuration": "CLaMP1-ABC",
       "dataset_a": "maestro",
       "dataset_b": "pop909",
-      "n_resamples": 10,
-      "sample_size_a": 200,
-      "sample_size_b": 200,
-      "fmd_mean": 0.15726102143526077,
-      "fmd_std": 0.013477802468831908,
-      "fmd_ci_lower": 0.14031634777784346,
-      "fmd_ci_upper": 0.17972086146473884,
-      "cv": 0.08570338883612223
+      "n_resamples": 50,
+      "sample_size_a": 80,
+      "sample_size_b": 80,
+      "fmd_mean": 0.02657361052930355,
+      "fmd_std": 0.002932395435322006,
+      "fmd_ci_lower": 0.0213529534637928,
+      "fmd_ci_upper": 0.03092005690559745,
+      "cv": 0.11034990642646628
     }
   ]
 }

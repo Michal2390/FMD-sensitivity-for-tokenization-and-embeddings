@@ -1,13 +1,13 @@
 configuration,perturbation,description,fmd_vs_original,n_original,n_perturbed
-CLaMP2-ABC,no_velocity,Velocity → constant 64 (remove dynamics),0.5102646350860596,200,200
-CLaMP2-ABC,quantized_time,Quantize to 16th notes (remove microtiming),0.007901282981038094,200,200
-CLaMP2-ABC,constant_tempo,Tempo → constant 120 BPM (remove rubato/tempo changes),0.0,200,200
-CLaMP2-ABC,all_combined,All perturbations combined (total de-expression),0.5142790079116821,200,200
-CLaMP2-MTF,no_velocity,Velocity → constant 64 (remove dynamics),0.40829452872276306,200,200
-CLaMP2-MTF,quantized_time,Quantize to 16th notes (remove microtiming),0.008018508553504944,200,200
-CLaMP2-MTF,constant_tempo,Tempo → constant 120 BPM (remove rubato/tempo changes),9.992007221626409e-16,200,200
-CLaMP2-MTF,all_combined,All perturbations combined (total de-expression),0.4080854654312134,200,200
-CLaMP1-ABC,no_velocity,Velocity → constant 64 (remove dynamics),0.02228890359401703,200,200
-CLaMP1-ABC,quantized_time,Quantize to 16th notes (remove microtiming),0.007034338545054197,200,200
-CLaMP1-ABC,constant_tempo,Tempo → constant 120 BPM (remove rubato/tempo changes),5.551115123125783e-16,200,200
-CLaMP1-ABC,all_combined,All perturbations combined (total de-expression),0.026080306619405746,200,200
+CLaMP2-MTF,no_velocity,Velocity → constant 64 (remove dynamics),0.0627632737159729,80,80
+CLaMP2-MTF,quantized_time,Quantize to 16th notes (remove microtiming),0.11770336329936981,80,80
+CLaMP2-MTF,constant_tempo,Tempo → constant 120 BPM (remove rubato/tempo changes),0.0,80,80
+CLaMP2-MTF,all_combined,All perturbations combined (total de-expression),0.20732799172401428,80,80
+CLaMP2-REMI,no_velocity,Velocity → constant 64 (remove dynamics),0.05301079526543617,80,80
+CLaMP2-REMI,quantized_time,Quantize to 16th notes (remove microtiming),0.0004000336048193276,80,80
+CLaMP2-REMI,constant_tempo,Tempo → constant 120 BPM (remove rubato/tempo changes),0.0,80,80
+CLaMP2-REMI,all_combined,All perturbations combined (total de-expression),0.05517923831939697,80,80
+CLaMP1-ABC,no_velocity,Velocity → constant 64 (remove dynamics),0.02008909545838833,80,80
+CLaMP1-ABC,quantized_time,Quantize to 16th notes (remove microtiming),0.013927015475928783,80,80
+CLaMP1-ABC,constant_tempo,Tempo → constant 120 BPM (remove rubato/tempo changes),0.014908810146152973,80,80
+CLaMP1-ABC,all_combined,All perturbations combined (total de-expression),0.01649544946849346,80,80

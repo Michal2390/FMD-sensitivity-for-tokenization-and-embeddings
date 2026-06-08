@@ -191,7 +191,8 @@ def _build_song_rows(
     selected_model: str,
     selected_tokenizer: str,
     n_segments: int,
-) -> Tuple[Dict[str, object], Dict[str, object]]:
+) -> Dict[str, object]:
+    """Build a single row comparing tokenizers for a fixed model (tokenizer CSV only)."""
     song_label = runner._segment_label(midi_path)
     base_variant = PipelineVariant(tokenizer=tokenizers[0], model=models[0], remove_velocity=False, hard_quantization=False)
     midi_data = runner._preprocess_midi_file(midi_path, base_variant)
@@ -202,14 +203,11 @@ def _build_song_rows(
     segment_indexes = [int(segment["index"]) for segment in segments]
 
     tokenizer_row = _empty_tokenizer_row(song_label, midi_path, selected_model, tokenizers)
-    model_row = _empty_model_row(song_label, midi_path, selected_tokenizer, models)
     tokenizer_row["segments_built"] = len(segments)
-    model_row["segments_built"] = len(segments)
 
     if len(segments) < 2:
         tokenizer_row["status"] = "insufficient_segments"
-        model_row["status"] = "insufficient_segments"
-        return tokenizer_row, model_row
+        return tokenizer_row
 
     token_maps: Dict[str, Dict[int, List[int]]] = {
         tokenizer_name: runner._tokenize_segments(segments, tokenizer_name) for tokenizer_name in tokenizers
@@ -236,22 +234,7 @@ def _build_song_rows(
     else:
         tokenizer_row["status"] = "insufficient_segments"
 
-    # Model axis: fixed tokenizer, compare models on the segments that tokenizer can encode.
-    tokenizer_segments = [idx for idx in segment_indexes if idx in token_maps[selected_tokenizer]]
-    model_row["segments_used"] = len(tokenizer_segments)
-    if len(tokenizer_segments) >= 2:
-        sequences = [token_maps[selected_tokenizer][idx] for idx in tokenizer_segments]
-        distributions = {
-            model_name: runner.embeddings.extract_embeddings(sequences, model_name) for model_name in models
-        }
-        pair_rows, _ = runner._pairwise_fmd_rows(distributions, axis="model", group_name=selected_tokenizer)
-        summary, means = _pairwise_summary(pair_rows, models, "left", "right")
-        model_row.update(summary)
-        model_row["status"] = "ok" if means else "no_pairwise"
-    else:
-        model_row["status"] = "insufficient_segments"
-
-    return tokenizer_row, model_row
+    return tokenizer_row
 
 
 def main():
@@ -286,7 +269,6 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
 
     tokenizer_csv = outdir / f"summary_tokenizer_for_model_{_sanitize(selected_model)}.csv"
-    model_csv = outdir / f"summary_model_for_tokenizer_{_sanitize(selected_tokenizer)}.csv"
 
     tokenizer_fieldnames = [
         "song_label",
@@ -302,25 +284,9 @@ def main():
         tokenizer_fieldnames.extend([f"{key}_mean_fmd", f"{key}_std_fmd", f"{key}_n_pairs"])
     tokenizer_fieldnames.extend(["mean_of_means", "std_of_means", "range_of_means"])
 
-    model_fieldnames = [
-        "song_label",
-        "midi_path",
-        "status",
-        "error",
-        "selected_tokenizer",
-        "segments_built",
-        "segments_used",
-    ]
-    for model in models:
-        key = _sanitize(model)
-        model_fieldnames.extend([f"{key}_mean_fmd", f"{key}_std_fmd", f"{key}_n_pairs"])
-    model_fieldnames.extend(["mean_of_means", "std_of_means", "range_of_means"])
-
     # Start fresh on each run; rows are appended song-by-song during processing.
     if tokenizer_csv.exists():
         tokenizer_csv.unlink()
-    if model_csv.exists():
-        model_csv.unlink()
 
     for folder in folders:
         midi_files = sorted(list(folder.glob("*.mid")) + list(folder.glob("*.midi")))
@@ -336,7 +302,7 @@ def main():
                 logger.info(f"Processing {midi} ({folder.name})")
                 # Silence noisy native outputs while building rows
                 with suppress_stdout_stderr():
-                    tokenizer_row, model_row = _build_song_rows(
+                    tokenizer_row = _build_song_rows(
                         runner=runner,
                         midi_path=midi,
                         tokenizers=tokenizers,
@@ -345,9 +311,8 @@ def main():
                         selected_tokenizer=selected_tokenizer,
                         n_segments=args.segments,
                     )
-                logger.info(f"Finished {midi.name} -> tokenizer={tokenizer_row.get('status')}, model={model_row.get('status')}")
+                logger.info(f"Finished {midi.name} -> status={tokenizer_row.get('status')}")
                 _append_row(tokenizer_csv, tokenizer_fieldnames, tokenizer_row)
-                _append_row(model_csv, model_fieldnames, model_row)
             except Exception as exc:
                 tb = traceback.format_exc()
                 # Log full traceback to configured logger (file + console)
@@ -360,14 +325,8 @@ def main():
                     tokenizer_fieldnames,
                     _empty_tokenizer_row(song_label, midi, selected_model, tokenizers) | {"status": "failed", "error": short_tb},
                 )
-                _append_row(
-                    model_csv,
-                    model_fieldnames,
-                    _empty_model_row(song_label, midi, selected_tokenizer, models) | {"status": "failed", "error": short_tb},
-                )
 
     print(f"Wrote: {tokenizer_csv}")
-    print(f"Wrote: {model_csv}")
 
 
 if __name__ == "__main__":
