@@ -25,7 +25,7 @@ We profiled how 3 FMD configurations react to controlled perturbations of MIDI d
 | 🟡 Quantize timing (16th grid) | **0.118** | 0.000 | 0.014 |
 | 🟢 Constant tempo (120 BPM) | 0.000 | 0.000 | 0.015 |
 
-> 🎯 **CLaMP-2 + MTF on real MAESTRO detects velocity and timing; ABC is blind to both. Input format determines what FMD evaluates.**
+> 🎯 **CLaMP-2 + MTF on MAESTRO detects velocity and timing; ABC is blind to both. Input format determines what FMD evaluates.**
 
 <p align="center">
   <img src="results/plots/sensitivity_pivot/perturbation_heatmap.png" alt="Perturbation Sensitivity Heatmap" width="700">
@@ -50,7 +50,7 @@ Our initial contribution was **Normalized FMD (nFMD)** — an attempt to make FM
 
 We implemented nFMD experimentally but **rejected it** because it produces misleading results.
 
-### ✅ The Pivot: Sensitivity Profiling
+### ✅ Sensitivity Profiling
 
 Instead of cross-model normalization, we asked:
 
@@ -60,21 +60,21 @@ This produces **directly actionable knowledge:**
 
 - 🎹 Evaluating expressive dynamics? → Use **CLaMP-2 + MTF**
 - 🎼 Evaluating score-like / folk structure? → Use **CLaMP-1 + ABC** (not for velocity)
-- ⏱️ Evaluating timing/microtiming? → **CLaMP-2 + MTF** (FMD = 0.12 on real MAESTRO)
+- ⏱️ Evaluating timing/microtiming? → **CLaMP-2 + MTF** (FMD = 0.12 on MAESTRO)
 
 ---
 
 ## 🧪 Experimental Design
 
-### 🔧 3 Configurations (honest naming)
+### 🔧 3 Configurations
 
-| Config | Model | Input format | What it actually does | Isolates |
-|:------:|:-----:|:-------------|:------------------------|:---------|
+| Config | Model | Input format | Pipeline | Isolates |
+|:------:|:-----:|:-------------|:---------|:---------|
 | 🅰️ **CLaMP2-MTF** | CLaMP-2 | MTF | MIDI → MTF text (`mido`) → M3 patches | Native CLaMP-2 path |
 | 🅱️ **CLaMP2-REMI** | CLaMP-2 | REMI | MidiTok REMI tokens → text → M3 patches | Tokenization effect (same model) |
 | 🅲 **CLaMP1-ABC** | CLaMP-1 | ABC | MIDI → ABC (`music21`) → bar patches | Model effect |
 
-> ⚠️ Earlier drafts incorrectly labeled REMI as "ABC". CLaMP does not consume REMI natively — see `src/embeddings/clamp_formats.py` for the corrected encoding paths.
+Encoding details: `src/embeddings/clamp_formats.py`
 
 ### 🎶 4 Datasets (6 pairwise comparisons)
 
@@ -141,7 +141,7 @@ Split-half FMD (should be ≈ 0 if stable):
 | CLaMP2-MTF vs CLaMP1-ABC | **−0.37** | ⚠️ Rankings diverge |
 | CLaMP2-REMI vs CLaMP1-ABC | −0.09 | ⚪ No agreement |
 
-> 🔑 **Key finding:** On real data, MTF sees MAESTRO–Folk FMD = **0.73**; ABC flattens all pairs to ~0.015.
+> 🔑 **Key finding:** MTF sees MAESTRO–Folk FMD = **0.73**; ABC flattens all pairs to ~0.015.
 
 <p align="center">
   <img src="results/plots/sensitivity_pivot/cross_dataset_bar.png" alt="Cross-Dataset FMD Ranking" width="700">
@@ -164,8 +164,8 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 
 | Finding | Details |
 |:--------|:--------|
-| 🔴 **Velocity** | MTF FMD = 0.063; REMI = 0.053; ABC = 0.020 on real MAESTRO |
-| 🟡 **Timing** | MTF FMD = **0.118** on real MAESTRO; REMI/ABC at noise level |
+| 🔴 **Velocity** | MTF FMD = 0.063; REMI = 0.053; ABC = 0.020 on MAESTRO |
+| 🟡 **Timing** | MTF FMD = **0.118** on MAESTRO; REMI/ABC at noise level |
 | 🟢 **Tempo** | FMD < 0.02 for all configs |
 | ⚫ **Combined (MTF)** | `all_combined` dominated by velocity + timing removal |
 
@@ -200,7 +200,7 @@ FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
 | 1️⃣ | **Sensitivity profiling methodology** — perturbation-based framework | 3 configs × 5 perturbations |
 | 2️⃣ | **Input format determines sensitivity** — MTF detects velocity + timing | 0.063 / 0.118 vs ~0.02 |
 | 3️⃣ | **Ranking depends on representation** — MTF vs ABC τ = −0.37 | 6 dataset pairs |
-| 4️⃣ | **Corrected CLaMP encoders** — MTF via `mido`, ABC via `music21` | See `clamp_formats.py` |
+| 4️⃣ | **CLaMP encoding paths** — MTF (`mido`), ABC (`music21`), REMI (MidiTok) | See `clamp_formats.py` |
 | 5️⃣ | **Rejection of nFMD** — negative result preventing dead-end research | — |
 
 ### 🎯 Practical Recommendations
@@ -237,7 +237,7 @@ python main.py --mode sensitivity --sensitivity-step plots
 ### 📦 Dataset preparation
 
 ```bash
-python main.py --mode fetch-data --datasets maestro pop909   # real MAESTRO + POP909
+python main.py --mode fetch-data --datasets maestro pop909   # MAESTRO + POP909
 python scripts/download_folk_dataset.py                      # Nottingham folk
 # MidiCaps classical: HF download + extract midicaps.tar.gz, then:
 python -c "import sys; sys.path.insert(0,'src'); from utils.config import load_config; from data.midicaps_loader import MidiCapsGenreLoader; c=load_config('configs/config.yaml'); c['cross_validation']['midicaps']['genres']=['classical']; MidiCapsGenreLoader(c).populate_raw_datasets()"
@@ -261,7 +261,7 @@ results/plots/sensitivity_pivot/
 └── self_similarity.png
 ```
 
-**Runtime:** ~116 min on CPU (80 files/dataset, real datasets). Config: `configs/sensitivity_pivot.yaml`.
+**Runtime:** ~116 min on CPU (80 files/dataset). Config: `configs/sensitivity_pivot.yaml`.
 
 ---
 
@@ -276,12 +276,12 @@ src/
   │   └── extractor.py                  # CLaMP-1/2, MusicBERT, MERT, NLP
   ├── metrics/fmd.py                    # Fréchet Music Distance
   └── experiments/
-      ├── sensitivity_profiler.py       # Main pivot pipeline (7-step plan)
-      └── paper_pipeline.py             # Legacy multi-model analysis
+      ├── sensitivity_profiler.py       # Sensitivity profiling pipeline (7 steps)
+      └── paper_pipeline.py             # Multi-model benchmark
 
 configs/
   ├── config.yaml                       # Main project config
-  └── sensitivity_pivot.yaml            # Pivot experiment config
+  └── sensitivity_pivot.yaml            # Sensitivity experiment config
 
 results/
   ├── reports/sensitivity_pivot/        # CSV + JSON results
@@ -290,22 +290,15 @@ results/
 
 ---
 
-## 📚 Previous Work
+## 📚 Additional Modes
 
-<details>
-<summary><b>📂 nFMD & Multi-Model ANOVA (Weeks 1–11)</b></summary>
+Extended analyses (Lakh MIDI validation, multi-model benchmark, cross-dataset validation):
 
-Our earlier 6-model ANOVA analysis (Lakh MIDI) showed:
-
-- 🏆 Model choice explains **96%** of FMD variance (η² = 0.962)
-- 📉 Tokenizer effect is negligible when pooled (η² = 0.001)
-- ✅ Cross-dataset Spearman ρ = 0.975 (Lakh vs MidiCaps)
-
-These results motivated the pivot: since model choice so thoroughly dominates, comparing raw FMD across models is meaningless.
-
-Legacy modes: `python main.py --mode paper` | `--mode lakh` | `--mode cross-validate`
-
-</details>
+```bash
+python main.py --mode paper
+python main.py --mode lakh
+python main.py --mode cross-validate
+```
 
 ---
 
@@ -334,5 +327,5 @@ Legacy modes: `python main.py --mode paper` | `--mode lakh` | `--mode cross-vali
 ---
 
 <p align="center">
-  <b>✅ Status: Results Complete (real datasets)</b> | 📅 Last Updated: 2026-06-08
+  <b>✅ Status: Results Complete</b> | 📅 Last Updated: 2026-06-08
 </p>
