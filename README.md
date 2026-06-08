@@ -319,7 +319,7 @@ python main.py --mode cross-validate
 |:--|:--|
 | 🏫 **Institution** | Warsaw University of Technology, EITI |
 | 📚 **Course** | WIMU (Music Information Retrieval) |
-| 👨‍💻 **Authors** | Michał Fereniec, Bartłomiej Sędłak |
+| 👨‍💻 **Authors** | Michał Fereniec, Bartosz Sędzikowski
 | 👨‍🏫 **Supervisor** | mgr inż. Tomasz Radzikowski |
 | 📅 **Duration** | February–June 2026 |
 | 🎤 **Presentation** | June 2026 |
