@@ -51,27 +51,27 @@ pytest tests\ -q -k "not integration"
 
 ## 3. Przygotowanie danych (4 datasety)
 
-Pivot wymaga **prawdziwych** plików MIDI — nie używaj syntetycznych placeholderów.
+Pivot wymaga **prawdziwych** plików MIDI - nie używaj syntetycznych placeholderów.
 
-### Krok A — MAESTRO + POP909 (automatyczne pobieranie)
+### Krok A - MAESTRO + POP909 (automatyczne pobieranie)
 
 ```powershell
 python main.py --mode fetch-data --datasets maestro pop909
 ```
 
 Oczekiwany wynik:
-- `data/raw/maestro/` — ~1276 plików `.midi`
-- `data/raw/pop909/` — ~2898 plików `.mid`
+- `data/raw/maestro/` - ~1276 plików `.midi`
+- `data/raw/pop909/` - ~2898 plików `.mid`
 
-### Krok B — Folk (Nottingham)
+### Krok B - Folk (Nottingham)
 
 ```powershell
 python scripts\download_folk_dataset.py
 ```
 
-Oczekiwany wynik: `data/raw/folk/` — ~1000+ plików `.mid`
+Oczekiwany wynik: `data/raw/folk/` - ~1000+ plików `.mid`
 
-### Krok C — MidiCaps classical (ręcznie)
+### Krok C - MidiCaps classical (ręcznie)
 
 1. Pobierz archiwum z [HuggingFace MidiCaps](https://huggingface.co/datasets/amaai-lab/MidiCaps) (`midicaps.tar.gz`)
 2. Wypakuj do `data/raw/midicaps/`
@@ -81,7 +81,7 @@ Oczekiwany wynik: `data/raw/folk/` — ~1000+ plików `.mid`
 python -c "import sys; sys.path.insert(0,'src'); from utils.config import load_config; from data.midicaps_loader import MidiCapsGenreLoader; c=load_config('configs/config.yaml'); c['cross_validation']['midicaps']['genres']=['classical']; MidiCapsGenreLoader(c).populate_raw_datasets()"
 ```
 
-Oczekiwany wynik: `data/raw/midicaps_classical/` — ~300 plików `.mid`
+Oczekiwany wynik: `data/raw/midicaps_classical/` - ~300 plików `.mid`
 
 ### Weryfikacja
 
@@ -185,10 +185,10 @@ results/plots/sensitivity_pivot/
 
 Usunięte z repo (nieaktualne):
 
-- `scripts/run_experiment.py` — stuby exp1–exp5
-- `scripts/generate_pivot_plots.py` — stare etykiety (CLaMP2-ABC)
-- `scripts/generate_starter_midis.py` — syntetyczne datasety
-- `scripts/run_nfmd_analysis.py` — odrzucony kierunek nFMD (raw FMD nie jest porównywalne między modelami)
+- `scripts/run_experiment.py` - stuby exp1-exp5
+- `scripts/generate_pivot_plots.py` - stare etykiety (CLaMP2-ABC)
+- `scripts/generate_starter_midis.py` - syntetyczne datasety
+- `scripts/run_nfmd_analysis.py` - odrzucony kierunek nFMD (raw FMD nie jest porównywalne między modelami)
 
 ---
 

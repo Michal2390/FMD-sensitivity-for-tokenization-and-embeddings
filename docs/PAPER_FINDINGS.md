@@ -18,7 +18,7 @@ quickly and defensibly. All numbers come from
 
 ## The three claims and their evidence
 
-### Claim 1 — Representation gates detectability (perturbation study, MAESTRO)
+### Claim 1 - Representation gates detectability (perturbation study, MAESTRO)
 SNR = perturbation FMD ÷ split-half noise floor. `SNR > 1` = above sampling
 noise; significance = two-sample permutation test (200 perms).
 
@@ -36,7 +36,7 @@ REMI < 0.01, TSD < 0.01, MTF = 0.02; ABC = 0.06, not detected.)
   representations that encode it.** ABC has no velocity channel → stays at
   noise (0.67). This is mechanistic, not statistical luck.
 - ABC shows a tiny *systematic* shift for tempo/combined (permutation
-  p < 0.05) but always **below** its own sampling noise (SNR < 1) — systematic
+  p < 0.05) but always **below** its own sampling noise (SNR < 1) - systematic
   yet negligible.
 - **Microtiming and tempo are below the floor for every config** at n=80.
 - **Combined ≈ velocity** → de-expression here is dominated by dynamics.
@@ -44,7 +44,7 @@ REMI < 0.01, TSD < 0.01, MTF = 0.02; ABC = 0.06, not detected.)
   the bolded/"detected" cells are those with SNR ≥ 1 **and** p < 0.05.
 - → **Figure:** `fig2_snr_heatmap.png`, `fig4_perturbation_significance.png`.
 
-### Claim 2 — Rankings agree only between detail-preserving representations
+### Claim 2 - Rankings agree only between detail-preserving representations
 Spearman ρ between configs over **15 dataset pairs** (interpretable, n ≥ 10):
 
 | Pair | ρ | p | reading |
@@ -56,25 +56,25 @@ Spearman ρ between configs over **15 dataset pairs** (interpretable, n ≥ 10):
 | MusicBERT-REMI ↔ CLaMP1-ABC | 0.146 | 0.603 | none |
 | CLaMP2-MTF ↔ CLaMP1-ABC | 0.039 | 0.889 | no agreement |
 
-- REMI and MTF — a token model and a contrastive model in **incomparable
-  spaces** — still order corpora the same way. ABC orders them differently.
+- REMI and MTF - a token model and a contrastive model in **incomparable
+  spaces** - still order corpora the same way. ABC orders them differently.
 - This is the **rigorous backbone** (real p-values, n=15) that answers the
   "statistics on too few values" critique. Spearman is rank-based → immune to
   the scale problem.
 - → **Figure:** `fig5_spearman_heatmap.png`; magnitudes in
   `fig6_cross_dataset_sep.png` (separation ratios, comparable across configs).
 
-### Claim 3 — Raw FMD is NOT comparable across embedding models
+### Claim 3 - Raw FMD is NOT comparable across embedding models
 Split-half noise floors (self-similarity):
 
 | Config | typical noise floor | why |
 |:--|:--:|:--|
-| MusicBERT-REMI / TSD | ~1.2 – 2.3 | embeddings **unnormalised** (‖e‖ ~ 10–20) |
-| CLaMP2-MTF / CLaMP1-ABC | ~0.02 – 0.04 | embeddings **L2-normalised** (unit sphere) |
+| MusicBERT-REMI / TSD | ~1.2 - 2.3 | embeddings **unnormalised** (‖e‖ ~ 10-20) |
+| CLaMP2-MTF / CLaMP1-ABC | ~0.02 - 0.04 | embeddings **L2-normalised** (unit sphere) |
 
 - The ~60× gap is **geometry, not music** (Eq. for FMD scales with ‖embedding‖²).
 - Therefore: never compare raw FMD across models. Earlier "63× more
-  consistent / 730× more expressive" claims are **scale artifacts** — do not
+  consistent / 730× more expressive" claims are **scale artifacts** - do not
   use them. Use SNR / Spearman / CV (all scale-invariant).
 - Bootstrap CV (scale-invariant): REMI 15.1%, TSD 20.2%, MTF 14.0%, ABC 11.0%
   → comparably stable; TSD noisiest.
@@ -88,20 +88,20 @@ Split-half noise floors (self-similarity):
 |:--|:--|
 | "CLaMP-2 + REMI" mislabelled (actually ABC) | REMI/TSD → **MusicBERT**; CLaMP gets only native MTF/ABC. No fake CLaMP-REMI. |
 | Velocity result explained by ABC having no velocity | Now explicit & correct: velocity-bearing reps detect it (SNR>1), ABC does not (0.54). |
-| "Statistics on three values — indefensible" | **15 pairs**, Spearman interpretable with p-values; perturbations get permutation p + bootstrap CI. |
+| "Statistics on three values - indefensible" | **15 pairs**, Spearman interpretable with p-values; perturbations get permutation p + bootstrap CI. |
 | Hard-coded values in code | All tables/figures **auto-generated from CSVs**; nothing transcribed by hand. |
 
 ---
 
 ## Suggested manuscript outline (IMRaD)
 
-1. **Introduction** — FMD is pipeline-dependent; contributions (4 bullets from `draft.tex`).
-2. **Related work** — FID/FAD/FMD; MusicBERT; CLaMP-1/2; MidiTok/REMI/TSD.
-3. **Background** — Eq. (1) and *why it is not scale-free* (the normalisation argument).
-4. **Method** — 4 configs, 6 datasets, 5 perturbations; SNR; permutation test; Spearman; bootstrap.
-5. **Results** — noise floor → perturbation (Claim 1) → ranking (Claim 2) → stability.
-6. **Discussion** — representation sets the ceiling; the negative result; practitioner guidance.
-7. **Limitations** — MusicBERT stringify caveat; n≪d; ABC lossy on dense polyphony; single perturbation corpus; Lakh provenance.
+1. **Introduction** - FMD is pipeline-dependent; contributions (4 bullets from `draft.tex`).
+2. **Related work** - FID/FAD/FMD; MusicBERT; CLaMP-1/2; MidiTok/REMI/TSD.
+3. **Background** - Eq. (1) and *why it is not scale-free* (the normalisation argument).
+4. **Method** - 4 configs, 6 datasets, 5 perturbations; SNR; permutation test; Spearman; bootstrap.
+5. **Results** - noise floor → perturbation (Claim 1) → ranking (Claim 2) → stability.
+6. **Discussion** - representation sets the ceiling; the negative result; practitioner guidance.
+7. **Limitations** - MusicBERT stringify caveat; n≪d; ABC lossy on dense polyphony; single perturbation corpus; Lakh provenance.
 8. **Conclusion.**
 
 The full prose draft with citations and footnotes is in `../draft.tex`
@@ -111,11 +111,11 @@ The full prose draft with citations and footnotes is in `../draft.tex`
 
 ## Open decisions for the authors
 
-1. **Which branch to submit** — this branch (`fix/sensitivity-pivot-methodology`,
+1. **Which branch to submit** - this branch (`fix/sensitivity-pivot-methodology`,
    MusicBERT + CLaMP, honest REMI routing) vs the colleague's all-CLaMP branch.
-   Recommendation: this one — it avoids feeding CLaMP a representation it
+   Recommendation: this one - it avoids feeding CLaMP a representation it
    cannot natively consume, and the cross-config comparison is rank-based.
-2. **Language** — `draft.tex` is in English (ISMIR/field standard). A Polish
+2. **Language** - `draft.tex` is in English (ISMIR/field standard). A Polish
    version can be produced on request.
-3. **Optional strengthening** — dose–response perturbation sweep; replicate
+3. **Optional strengthening** - dose-response perturbation sweep; replicate
    the perturbation study on a second corpus (e.g. POP909).

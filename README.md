@@ -11,7 +11,7 @@
   <a href="#"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"></a>
 </p>
 
-> 📖 An FMD score is **not a property of the music alone** — it is produced by a *pipeline* (input representation → embedding model → Fréchet formula). We profile how that pipeline reshapes what FMD perceives, and give practical guidance for the music-generation community.
+> 📖 An FMD score is **not a property of the music alone** - it is produced by a *pipeline* (input representation → embedding model → Fréchet formula). We profile how that pipeline reshapes what FMD perceives, and give practical guidance for the music-generation community.
 
 ---
 
@@ -19,9 +19,9 @@
 
 We profiled **4 FMD configurations** across **6 datasets** (15 pairs) and **5 controlled perturbations** of MIDI. Three things stand out:
 
-1. **🎚️ Input representation decides what FMD can see.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) — and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). ABC notation, which has no velocity channel, stays at noise.
-2. **🤝 Representations that preserve performance detail rank genres the same way.** Cross-dataset rankings of **REMI and CLaMP-2/MTF agree strongly (Spearman ρ = 0.825, p < 0.001)**, while **ABC agrees with no one (ρ ≈ 0.04–0.15, p > 0.6)**.
-3. **⚠️ Raw FMD is NOT comparable across embedding models.** CLaMP embeddings are L2-normalised (unit sphere → small FMD); MusicBERT's are not (→ large FMD). The ~60× gap is geometry, not music — so we compare via **scale-invariant** statistics (SNR, Spearman, CV), never raw magnitude.
+1. **🎚️ Input representation decides what FMD can see.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) - and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). ABC notation, which has no velocity channel, stays at noise.
+2. **🤝 Representations that preserve performance detail rank genres the same way.** Cross-dataset rankings of **REMI and CLaMP-2/MTF agree strongly (Spearman ρ = 0.825, p < 0.001)**, while **ABC agrees with no one (ρ ≈ 0.04-0.15, p > 0.6)**.
+3. **⚠️ Raw FMD is NOT comparable across embedding models.** CLaMP embeddings are L2-normalised (unit sphere → small FMD); MusicBERT's are not (→ large FMD). The ~60× gap is geometry, not music - so we compare via **scale-invariant** statistics (SNR, Spearman, CV), never raw magnitude.
 
 <p align="center">
   <img src="results/plots/sensitivity_pivot/paper/fig2_snr_heatmap.png" alt="Perturbation SNR heatmap" width="560">
@@ -57,7 +57,7 @@ Encoding details: [`src/embeddings/clamp_formats.py`](src/embeddings/clamp_forma
 
 ### 🎶 6 Datasets → 15 pairs
 
-`maestro` (expressive classical piano), `pop909` (pop), `classical`, `jazz`, `rock`, `rap` (Lakh-derived genre subsets). 80 files each, fixed seed. **C(6,2) = 15 pairs** — enough for an interpretable Spearman rank agreement (the code flags it interpretable at n ≥ 10).
+`maestro` (expressive classical piano), `pop909` (pop), `classical`, `jazz`, `rock`, `rap` (Lakh-derived genre subsets). 80 files each, fixed seed. **C(6,2) = 15 pairs** - enough for an interpretable Spearman rank agreement (the code flags it interpretable at n ≥ 10).
 
 ### 🎛️ 5 Perturbations (controlled expression removal)
 
@@ -67,9 +67,9 @@ Encoding details: [`src/embeddings/clamp_formats.py`](src/embeddings/clamp_forma
 
 ## 📊 Results
 
-### 1️⃣ Noise floor (self-similarity) — read scales *within* a config, not across
+### 1️⃣ Noise floor (self-similarity) - read scales *within* a config, not across
 
-Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× higher than CLaMP **purely because its embeddings are unnormalised** — this is the reason every cross-config statement below is scale-invariant.
+Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× higher than CLaMP **purely because its embeddings are unnormalised** - this is the reason every cross-config statement below is scale-invariant.
 
 | Config | maestro | pop909 | classical | jazz | rock | rap |
 |:--|:--:|:--:|:--:|:--:|:--:|:--:|
@@ -82,7 +82,7 @@ Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× hig
   <img src="results/plots/sensitivity_pivot/paper/fig1_noise_floor.png" alt="Per-configuration noise floor" width="560">
 </p>
 
-### 2️⃣ Perturbation sensitivity ⭐ — SNR = FMD / noise floor
+### 2️⃣ Perturbation sensitivity ⭐ - SNR = FMD / noise floor
 
 `SNR > 1` means the perturbation moves the distribution more than within-dataset sampling noise. Significance is a **two-sample permutation test** (200 permutations); CIs are bootstrap (100 resamples).
 
@@ -93,9 +93,9 @@ Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× hig
 | ⏱️ Tempo flattened | 0.06 | 0.14 | 0.13 | 0.83 |
 | 💀 All combined | **3.30** ✓ | **1.71** ✓ | **1.55** ✓ | 0.90 |
 
-> 🎯 **Velocity is the only attribute detected above the noise floor — and only where it is represented.** ✓ = SNR > 1 **and** permutation-significant (p < 0.05). REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel and stays at noise (0.67, p = 0.06).** Microtiming and tempo fall at/below the floor for every configuration. The *combined* effect simply tracks velocity. (ABC does show a tiny *systematic* shift for tempo/combined — permutation p < 0.05 — but always **below** its own sampling noise, i.e. systematic yet negligible.)
+> 🎯 **Velocity is the only attribute detected above the noise floor - and only where it is represented.** ✓ = SNR > 1 **and** permutation-significant (p < 0.05). REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel and stays at noise (0.67, p = 0.06).** Microtiming and tempo fall at/below the floor for every configuration. The *combined* effect simply tracks velocity. (ABC does show a tiny *systematic* shift for tempo/combined - permutation p < 0.05 - but always **below** its own sampling noise, i.e. systematic yet negligible.)
 
-### 3️⃣ Cross-dataset ranking + Spearman agreement ⭐ — the rigorous backbone
+### 3️⃣ Cross-dataset ranking + Spearman agreement ⭐ - the rigorous backbone
 
 FMD ranks the 15 dataset pairs differently depending on the pipeline. Rank agreement between configurations (scale-invariant, **n = 15**):
 
@@ -125,7 +125,7 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 | CLaMP2-MTF | 0.048 ± 0.007 | [0.039, 0.060] | 14.0% |
 | CLaMP1-ABC | 0.024 ± 0.003 | [0.019, 0.030] | 11.0% |
 
-> 📊 All four are comparably stable (CV 11–20%); MusicBERT-TSD is the noisiest. **Do not compare the mean columns across the CLaMP/MusicBERT boundary** — different spaces.
+> 📊 All four are comparably stable (CV 11-20%); MusicBERT-TSD is the noisiest. **Do not compare the mean columns across the CLaMP/MusicBERT boundary** - different spaces.
 
 ---
 
@@ -133,7 +133,7 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 
 | # | Finding | Evidence |
 |:-:|:--|:--|
-| 1️⃣ | **Input representation sets a ceiling on what FMD can detect** | velocity SNR 1.2–3.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.67 in ABC |
+| 1️⃣ | **Input representation sets a ceiling on what FMD can detect** | velocity SNR 1.2-3.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.67 in ABC |
 | 2️⃣ | **Rankings agree only between detail-preserving representations** | REMI↔MTF ρ=0.825 (p<0.001); ABC↔all ρ≈0 |
 | 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.35; ranking ρ=0.44 |
 | 4️⃣ | **Raw FMD is not cross-model comparable** | noise floors differ ~60× from normalisation, not music |
@@ -143,7 +143,7 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 | Goal | ✅ Use | ❌ Avoid | Why |
 |:--|:--|:--|:--|
 | 🎹 Dynamics / expression | MusicBERT-REMI or CLaMP-2/MTF | CLaMP-1/ABC | ABC discards velocity entirely |
-| 🎼 Score / folk structure | CLaMP-1/ABC | — | velocity-invariant by design |
+| 🎼 Score / folk structure | CLaMP-1/ABC | - | velocity-invariant by design |
 | 📊 Stylistic-distance ranking | CLaMP-2/MTF | CLaMP-1/ABC | ABC ranks genres nearly flatly |
 | 🔁 Cross-model comparison | SNR / Spearman / CV | raw FMD magnitude | scale is geometry, not music |
 
@@ -152,7 +152,7 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 ## 🚀 Reproducing the results
 
 ```bash
-# Full 7-step pipeline (≈30–60 min on a single GPU)
+# Full 7-step pipeline (≈30-60 min on a single GPU)
 python main.py --mode sensitivity
 
 # Individual steps
@@ -202,7 +202,7 @@ src/
   ├── tokenization/tokenizer.py         # MidiTok REMI / TSD / Octuple / MIDI-Like
   └── data/                             # dataset manager + genre/MidiCaps loaders
 scripts/{generate_draft_figures.py, generate_draft_tables.py}   # paper figures & tables from CSVs
-tests/                                  # unit tests (pytest) — all green
+tests/                                  # unit tests (pytest) - all green
 draft.tex                               # the paper
 results/reports|plots/sensitivity_pivot/   # CSV/JSON results + figures
 ```
@@ -232,7 +232,7 @@ results/reports|plots/sensitivity_pivot/   # CSV/JSON results + figures
 | 📚 **Course** | WIMU (Music Information Retrieval) |
 | 👨‍💻 **Authors** | Michał Fereniec, Bartosz Sędzikowski |
 | 👨‍🏫 **Supervisor** | mgr inż. Tomasz Radzikowski |
-| 📅 **Duration** | February–June 2026 |
+| 📅 **Duration** | February-June 2026 |
 
 <p align="center">
   <b>✅ Status: Results Complete</b> | 📅 Last Updated: 2026-06-09

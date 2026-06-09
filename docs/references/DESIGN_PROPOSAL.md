@@ -4,40 +4,40 @@
 
 Projekt zakłada budowę spójnego pipeline'u do przetwarzania danych, ekstrakcji wektorów cech (embeddingów) oraz sprawdzania wyników.
 
-### Tydzień 1 (23.03.2026 – 29.03.2026): Inicjalizacja projektu i przygotowanie danych
+### Tydzień 1 (23.03.2026 - 29.03.2026): Inicjalizacja projektu i przygotowanie danych
 
 - [x] Przegląd literatury i konfiguracja repozytorium (Git)
 - [ ] Pobranie i wstępna weryfikacja zbiorów danych referencyjnych (MAESTRO, MidiCaps, POP909)
 - [ ] Konfiguracja środowiska i instalacja bazowych zależności
 
-### Tydzień 2 (30.03.2026 – 05.04.2026): Implementacja modułu preprocessingu i tokenizacji
+### Tydzień 2 (30.03.2026 - 05.04.2026): Implementacja modułu preprocessingu i tokenizacji
 
 - [ ] Napisanie skryptów do standaryzacji danych MIDI
 - [ ] Zintegrowanie biblioteki MidiTok
 - [ ] Implementacja 4 rodzajów tokenizacji: REMI, TSD, Octuple oraz MIDI-Like
 
-### Tydzień 3 (06.04.2026 – 12.04.2026): Integracja modeli CLaMP i ekstrakcja embeddingów
+### Tydzień 3 (06.04.2026 - 12.04.2026): Integracja modeli CLaMP i ekstrakcja embeddingów
 
 - [ ] Podłączenie modeli bazowych: CLaMP 1 oraz CLaMP 2
 
-### Tydzień 4 (13.04.2026 – 19.04.2026): Kalkulacja metryki FMD
+### Tydzień 4 (13.04.2026 - 19.04.2026): Kalkulacja metryki FMD
 
 - [ ] Implementacja modułu obliczającego FMD (Frechet Music Distance)
 - [ ] Obliczenie średnich cech i stopnia zróżnicowania embeddingów z Tygodnia 3
 - [ ] Uzyskanie bazowych wyników FMD dla par zbiorów danych (MAESTRO vs MidiCaps, itd.)
 
-### Tydzień 5 (20.04.2026 – 26.04.2026): Eksperymenty z parametrami preprocessingu
+### Tydzień 5 (20.04.2026 - 26.04.2026): Eksperymenty z parametrami preprocessingu
 
 - [ ] Wygenerowanie znormalizowanych wariantów danych (zastosowanie twardej kwantyzacji rytmicznej, spłaszczenie/usunięcie wartości velocity)
 - [ ] Ponowna ekstrakcja embeddingów i kalkulacja FMD dla zniekształconych danych w celu zbadania ich wpływu na stabilność metryki
 
-### Tydzień 6 (27.04.2026 – 03.05.2026): Analiza danych i ewaluacja rankingów
+### Tydzień 6 (27.04.2026 - 03.05.2026): Analiza danych i ewaluacja rankingów
 
 - [ ] Zestawienie otrzymanych wyników matematycznych
 - [ ] Porównanie rankingów FMD między różnymi konfiguracjami (tokenizacja × model) a teoretycznie spodziewanym podobieństwem gatunkowym
 - [ ] Generowanie wykresów oraz tabel analitycznych
 
-### Tydzień 7 (04.05.2026 – 10.05.2026): Finalizacja i dokumentacja
+### Tydzień 7 (04.05.2026 - 10.05.2026): Finalizacja i dokumentacja
 
 - [ ] Wyczyszczenie kodu, dodanie komentarzy i instrukcji odtworzenia wyników
 - [ ] Napisanie raportu końcowego podsumowującego, która kombinacja najlepiej oddaje postrzegane różnice muzyczne
