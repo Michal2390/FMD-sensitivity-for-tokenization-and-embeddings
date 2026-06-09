@@ -207,7 +207,7 @@ draft.tex                               # the paper
 results/reports|plots/sensitivity_pivot/   # CSV/JSON results + figures
 ```
 
-> The repository is focused on the sensitivity study. An earlier multi-model / normalised-FMD (nFMD) exploration was retired because raw FMD is not comparable across embedding spaces; superseded notes are kept in `docs/` with explicit "outdated" banners.
+> The repository is focused on the sensitivity study. An earlier multi-model / normalised-FMD (nFMD) exploration was retired because raw FMD is not comparable across embedding spaces; its code, results, and notes have been removed to keep the project unambiguous.
 
 ---
 

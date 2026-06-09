@@ -1,16 +1,16 @@
 % =====================================================================
-%  draft.tex  --  strong working draft
+%  draft.tex
 %  "What Does the Frechet Music Distance Measure? A Sensitivity Study
 %   of Tokenization and Embedding Choices for Symbolic Music"
 %
-%  Compile from the REPOSITORY ROOT (so \input/\includegraphics relative
-%  paths resolve):
-%      pdflatex draft.tex   (run twice for references)
+%  Self-contained: compile with `pdflatex draft.tex` (run twice for refs).
+%  The only external assets are the figures in
+%  results/plots/sensitivity_pivot/paper/ (see \graphicspath below) --
+%  compile from the repository root, or copy that folder next to this file.
 %
-%  All tables are \input{} from auto-generated files
-%  (results/reports/sensitivity_pivot/tables/), produced by
-%  scripts/generate_draft_tables.py -- i.e. NO number is typed by hand.
-%  Figures are produced by scripts/generate_draft_figures.py.
+%  All tables/figures were generated from the result CSVs by
+%  scripts/generate_draft_tables.py and scripts/generate_draft_figures.py
+%  (no number was typed by hand); the tables are inlined below.
 % =====================================================================
 \documentclass[11pt]{article}
 
@@ -30,8 +30,6 @@
 \newcommand{\fmd}{\mathrm{FMD}}
 \graphicspath{{results/plots/sensitivity_pivot/paper/}}
 \captionsetup{font=small,labelfont=bf}
-% tables live here; \inputtable{name} pulls in the generated booktabs body
-\newcommand{\inputtable}[1]{\input{results/reports/sensitivity_pivot/tables/#1}}
 
 \title{\textbf{What Does the Fr\'echet Music Distance Measure?\\
 A Sensitivity Study of Tokenization and Embedding Choices\\
@@ -41,7 +39,7 @@ for Symbolic Music}}
 \small Warsaw University of Technology, Faculty of Electronics and Information Technology\\
 \small Course: WIMU (Music Information Retrieval) \quad Supervisor: mgr in\.z.\ Tomasz Radzikowski}
 
-\date{June 2026 --- working draft}
+\date{June 2026}
 
 \begin{document}
 \maketitle
@@ -339,7 +337,16 @@ CLaMP/MusicBERT gap is a geometric artifact of embedding normalisation, not
 a musical property. Generated from \texttt{self\_similarity.csv}.}
 \label{tab:selfsim}
 \small
-\inputtable{tab_self_similarity.tex}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Configuration & classical & jazz & maestro & pop909 & rap & rock \\
+\midrule
+\texttt{MusicBERT-REMI} & 1.877 & 1.800 & 2.124 & 1.572 & 1.707 & 1.580 \\
+\texttt{MusicBERT-TSD} & 1.514 & 1.351 & 2.308 & 2.323 & 1.275 & 1.213 \\
+\texttt{CLaMP2-MTF} & 0.027 & 0.021 & 0.036 & 0.029 & 0.020 & 0.023 \\
+\texttt{CLaMP1-ABC} & 0.025 & 0.031 & 0.020 & 0.026 & 0.025 & 0.025 \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{figure}[t]
@@ -388,7 +395,31 @@ SNR marks a \emph{detected} attribute ($\snr\ge1$ and $p<0.05$). Generated
 from \texttt{perturbation\_sensitivity.csv}.}
 \label{tab:pert}
 \small
-\inputtable{tab_perturbation.tex}
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Configuration & Perturbation & FMD & SNR & 95\% CI & perm.\ $p$ \\
+\midrule
+\texttt{MusicBERT-REMI} & Velocity removed & 7.3166 & \textbf{3.16} & [7.294,\,10.732] & $<$0.01 \\
+\texttt{MusicBERT-REMI} & Timing quantized & 0.1043 & {0.05} & [0.730,\,2.217] & 1.00 \\
+\texttt{MusicBERT-REMI} & Tempo flattened & 0.1483 & {0.06} & [0.755,\,1.825] & 1.00 \\
+\texttt{MusicBERT-REMI} & All combined & 7.6272 & \textbf{3.30} & [7.528,\,9.427] & $<$0.01 \\
+\addlinespace
+\texttt{MusicBERT-TSD} & Velocity removed & 3.1343 & \textbf{1.35} & [3.387,\,5.348] & $<$0.01 \\
+\texttt{MusicBERT-TSD} & Timing quantized & 0.2585 & {0.11} & [0.718,\,2.315] & 1.00 \\
+\texttt{MusicBERT-TSD} & Tempo flattened & 0.3293 & {0.14} & [0.642,\,2.872] & 1.00 \\
+\texttt{MusicBERT-TSD} & All combined & 3.9613 & \textbf{1.71} & [3.844,\,6.011] & $<$0.01 \\
+\addlinespace
+\texttt{CLaMP2-MTF} & Velocity removed & 0.0464 & \textbf{1.18} & [0.050,\,0.074] & 0.02 \\
+\texttt{CLaMP2-MTF} & Timing quantized & 0.0259 & {0.66} & [0.034,\,0.055] & 0.08 \\
+\texttt{CLaMP2-MTF} & Tempo flattened & 0.0050 & {0.13} & [0.013,\,0.030] & 1.00 \\
+\texttt{CLaMP2-MTF} & All combined & 0.0608 & \textbf{1.55} & [0.065,\,0.087] & $<$0.01 \\
+\addlinespace
+\texttt{CLaMP1-ABC} & Velocity removed & 0.0166 & {0.67} & [0.020,\,0.036] & 0.06 \\
+\texttt{CLaMP1-ABC} & Timing quantized & 0.0154 & {0.62} & [0.018,\,0.034] & 0.09 \\
+\texttt{CLaMP1-ABC} & Tempo flattened & 0.0206 & {0.83} & [0.021,\,0.040] & 0.03 \\
+\texttt{CLaMP1-ABC} & All combined & 0.0223 & {0.90} & [0.023,\,0.049] & $<$0.01 \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{figure}[t]
@@ -434,7 +465,18 @@ pairs (interpretable at $n\ge10$). \textbf{Bold} $\rho$ marks $p<0.05$.
 Generated from \texttt{spearman\_ranking\_agreement.csv}.}
 \label{tab:spearman}
 \small
-\inputtable{tab_spearman.tex}
+\begin{tabular}{@{}llccc@{}}
+\toprule
+Configuration A & Configuration B & $\rho$ & $p$ & $n$ \\
+\midrule
+\texttt{MusicBERT-REMI} & \texttt{MusicBERT-TSD} & 0.436 & 0.104 & 15 \\
+\texttt{MusicBERT-REMI} & \texttt{CLaMP2-MTF} & \textbf{0.825} & $<$0.001 & 15 \\
+\texttt{MusicBERT-REMI} & \texttt{CLaMP1-ABC} & 0.146 & 0.603 & 15 \\
+\texttt{MusicBERT-TSD} & \texttt{CLaMP2-MTF} & \textbf{0.525} & 0.044 & 15 \\
+\texttt{MusicBERT-TSD} & \texttt{CLaMP1-ABC} & 0.321 & 0.243 & 15 \\
+\texttt{CLaMP2-MTF} & \texttt{CLaMP1-ABC} & 0.039 & 0.889 & 15 \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \begin{figure}[t]
@@ -452,7 +494,27 @@ configuration's noise floor; $>1$ = above sampling noise), so values are
 comparable across configurations. Generated from \texttt{cross\_dataset\_fmd.csv}.}
 \label{tab:cross}
 \small
-\inputtable{tab_cross_dataset.tex}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Dataset pair & MusicBERT-REMI & MusicBERT-TSD & CLaMP2-MTF & CLaMP1-ABC \\
+\midrule
+maestro\_vs\_rock & 2.83 & 2.88 & 3.12 & 0.53 \\
+maestro\_vs\_rap & 2.49 & 6.85 & 3.72 & 0.63 \\
+maestro\_vs\_jazz & 2.36 & 4.00 & 2.66 & 0.73 \\
+classical\_vs\_rap & 2.21 & 6.64 & 3.18 & 0.55 \\
+classical\_vs\_rock & 2.18 & 1.88 & 2.52 & 0.53 \\
+pop909\_vs\_jazz & 2.06 & 3.98 & 1.92 & 0.80 \\
+pop909\_vs\_rock & 1.96 & 1.89 & 2.04 & 0.56 \\
+pop909\_vs\_rap & 1.92 & 6.63 & 2.88 & 0.62 \\
+jazz\_vs\_rap & 1.84 & 4.41 & 1.67 & 0.64 \\
+classical\_vs\_jazz & 1.81 & 3.67 & 2.11 & 0.68 \\
+jazz\_vs\_rock & 1.78 & 3.41 & 2.04 & 0.62 \\
+maestro\_vs\_pop909 & 1.65 & 1.94 & 1.35 & 0.57 \\
+rock\_vs\_rap & 1.60 & 4.62 & 1.69 & 0.49 \\
+pop909\_vs\_classical & 1.57 & 1.47 & 1.86 & 0.54 \\
+maestro\_vs\_classical & 1.36 & 1.41 & 1.29 & 0.60 \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 \subsection{Bootstrap stability}
@@ -469,7 +531,16 @@ $N=80$). CV is scale-invariant and comparable across configurations; the
 mean and CI are not. Generated from \texttt{bootstrap\_stability.csv}.}
 \label{tab:boot}
 \small
-\inputtable{tab_bootstrap.tex}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Configuration & mean & std & 95\% CI & CV \\
+\midrule
+\texttt{MusicBERT-REMI} & 3.5110 & 0.5314 & [2.662,\,4.637] & 15.1\% \\
+\texttt{MusicBERT-TSD} & 3.9238 & 0.7910 & [2.742,\,5.473] & 20.2\% \\
+\texttt{CLaMP2-MTF} & 0.0478 & 0.0067 & [0.039,\,0.060] & 14.0\% \\
+\texttt{CLaMP1-ABC} & 0.0238 & 0.0026 & [0.019,\,0.030] & 11.0\% \\
+\bottomrule
+\end{tabular}
 \end{table}
 
 % =====================================================================
@@ -557,12 +628,13 @@ small, reusable, fully scripted protocol for doing so.
 % =====================================================================
 All numbers derive from
 \texttt{results/reports/sensitivity\_pivot/} (CSV/JSON), produced by
-\texttt{python main.py --mode sensitivity}. Every table in this paper is
-\texttt{\textbackslash input} from
-\texttt{scripts/generate\_draft\_tables.py} and every figure from
-\texttt{scripts/generate\_draft\_figures.py}, so no result is transcribed by
-hand. Configurations, datasets, perturbations, and seeds are fixed in
-\texttt{configs/sensitivity\_pivot.yaml}.
+\texttt{python main.py --mode sensitivity}. Every table and figure in this
+paper was generated programmatically from those CSVs by
+\texttt{scripts/generate\_draft\_tables.py} and
+\texttt{scripts/generate\_draft\_figures.py} (no result was transcribed by
+hand). Configurations, datasets, perturbations, and seeds are fixed in
+\texttt{configs/sensitivity\_pivot.yaml}; the code is available at
+\texttt{github.com/Michal2390/FMD-sensitivity-for-tokenization-and-embeddings}.
 
 % =====================================================================
 \begin{thebibliography}{99}

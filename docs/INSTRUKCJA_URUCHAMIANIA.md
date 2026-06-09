@@ -156,16 +156,15 @@ results/plots/sensitivity_pivot/
 
 ---
 
-## 6. Inne tryby (legacy / pomocnicze)
+## 6. Inne tryby (pomocnicze)
 
 | Tryb | Komenda | Opis |
 |:-----|:--------|:-----|
-| Demo | `python main.py --mode demo` | Szybki test FMD |
+| Demo | `python main.py --mode demo` | Szybki test FMD (bez modeli) |
 | Testy | `python main.py --mode tests` | Pełny pytest |
 | Pełny CI | `python main.py --mode full` | Testy + sensitivity pivot |
-| Paper (stary) | `python main.py --mode paper` | Multi-model benchmark |
-| Lakh (stary) | `python main.py --mode lakh` | Walidacja Lakh MIDI |
-| Per-song | `python main.py --mode song --midi-file ścieżka.mid` | Analiza jednego utworu |
+| Fetch data | `python main.py --mode fetch-data` | Pobranie datasetów ze źródeł |
+| Lint | `python main.py --mode lint` | black + flake8 |
 
 ---
 
@@ -189,8 +188,7 @@ Usunięte z repo (nieaktualne):
 - `scripts/run_experiment.py` — stuby exp1–exp5
 - `scripts/generate_pivot_plots.py` — stare etykiety (CLaMP2-ABC)
 - `scripts/generate_starter_midis.py` — syntetyczne datasety
-- `scripts/run_nfmd_analysis.py` — odrzucony kierunek nFMD
-- Wykresy `fig1_*.png` … `fig6_*.png` — błędne etykiety
+- `scripts/run_nfmd_analysis.py` — odrzucony kierunek nFMD (raw FMD nie jest porównywalne między modelami)
 
 ---
 
