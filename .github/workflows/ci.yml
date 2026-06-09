@@ -24,7 +24,9 @@ jobs:
           pip install -r requirements-ci.txt
           pip install -e .
       - name: App import sanity check
-        run: python -c "from src.metrics.fmd import FrechetMusicDistance; from src.embeddings.extractor import EmbeddingExtractor; from src.utils.config import load_config; print('Import sanity check passed')"
+        env:
+          PYTHONPATH: src
+        run: python -c "from metrics.fmd import FrechetMusicDistance; from embeddings.extractor import EmbeddingExtractor; from utils.config import load_config; print('Import sanity check passed')"
       - name: CLI sanity check
         run: python main.py --help
 

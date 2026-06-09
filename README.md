@@ -135,7 +135,7 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 |:-:|:--|:--|
 | 1️⃣ | **Input representation sets a ceiling on what FMD can detect** | velocity SNR 1.2–3.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.67 in ABC |
 | 2️⃣ | **Rankings agree only between detail-preserving representations** | REMI↔MTF ρ=0.825 (p<0.001); ABC↔all ρ≈0 |
-| 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.42; ranking ρ=0.44 |
+| 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.35; ranking ρ=0.44 |
 | 4️⃣ | **Raw FMD is not cross-model comparable** | noise floors differ ~60× from normalisation, not music |
 
 ### 🎯 Practical recommendations

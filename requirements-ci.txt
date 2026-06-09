@@ -16,6 +16,7 @@ miditok>=3.0.0
 pretty_midi>=0.2.10
 symusic>=0.4.0
 music21>=9.1.0
+unidecode>=1.3.0
 
 # NLP / Sentence Transformers
 sentence-transformers>=2.2.0
