@@ -1,7 +1,0 @@
-group1,group2,meandiff,p-adj,lower,upper,reject,p_adj_holm,p_adj_bonf,still_sig_holm,still_sig_bonf
-MIDI-Like,Octuple,,,,,False,,,False,False
-MIDI-Like,REMI,,,,,False,,,False,False
-MIDI-Like,TSD,,,,,False,,,False,False
-Octuple,REMI,,,,,False,,,False,False
-Octuple,TSD,,,,,False,,,False,False
-REMI,TSD,,,,,False,,,False,False

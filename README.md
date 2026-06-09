@@ -185,6 +185,32 @@ The scientific write-up is in [`draft.tex`](draft.tex); a plain-language finding
 
 ---
 
+## 🗂️ Project structure
+
+```
+main.py                                 # CLI entry point (modes: sensitivity, full, fetch-data, tests, demo, lint)
+configs/
+  ├── config.yaml                       # infrastructure config (models, tokenizers, FMD)
+  └── sensitivity_pivot.yaml            # the experiment: configs, datasets, perturbations, seeds
+src/
+  ├── experiments/
+  │   ├── sensitivity_profiler.py       # the 7-step pipeline (noise floor, SNR, permutation, Spearman, bootstrap)
+  │   └── study_config.py               # validates model↔input pairings (rejects e.g. CLaMP+REMI)
+  ├── embeddings/{extractor.py, clamp_formats.py}   # MusicBERT / CLaMP-1/2 encoders, MTF/ABC builders
+  ├── metrics/fmd.py                    # Fréchet Music Distance (standard formula; no cross-model normalisation)
+  ├── preprocessing/processor.py        # MIDI loading + the three perturbations
+  ├── tokenization/tokenizer.py         # MidiTok REMI / TSD / Octuple / MIDI-Like
+  └── data/                             # dataset manager + genre/MidiCaps loaders
+scripts/{generate_draft_figures.py, generate_draft_tables.py}   # paper figures & tables from CSVs
+tests/                                  # unit tests (pytest) — all green
+draft.tex                               # the paper
+results/reports|plots/sensitivity_pivot/   # CSV/JSON results + figures
+```
+
+> The repository is focused on the sensitivity study. An earlier multi-model / normalised-FMD (nFMD) exploration was retired because raw FMD is not comparable across embedding spaces; superseded notes are kept in `docs/` with explicit "outdated" banners.
+
+---
+
 ## 📖 References
 
 1. Retkowski, J., Stępniak, J., Modrzejewski, M. (2025). *Fréchet Music Distance: A Metric for Generative Symbolic Music Evaluation.*

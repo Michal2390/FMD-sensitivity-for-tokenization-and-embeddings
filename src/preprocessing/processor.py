@@ -76,8 +76,7 @@ class MIDIPreprocessor:
             logger.debug("No time quantization applied")
             return midi_data
 
-        # Get time signature and tempo information
-        time_sigs = midi_data.time_signature_changes
+        # Get tempo information
         tempos = midi_data.get_tempo_changes()
 
         # Use first tempo if available, otherwise default to 120 BPM

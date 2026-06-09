@@ -2,8 +2,6 @@
 
 import pytest
 import numpy as np
-import tempfile
-import json
 from pathlib import Path
 import sys
 
@@ -179,16 +177,21 @@ class TestFMDComparator:
         assert comparator.fmd_calc is not None
 
     def test_compare_models(self, comparator):
-        """Test comparing FMD across models."""
+        """Test comparing FMD across models.
+
+        FMD compares two Gaussians in the *same* space, so cross-model
+        comparison is only defined for equal embedding dimensionality.
+        """
+        rng = np.random.default_rng(0)
         embeddings_by_model = {
-            "MusicBERT": np.random.randn(100, 768),
-            "MusicBERT-large": np.random.randn(100, 1024),
+            "model_a": rng.standard_normal((100, 768)),
+            "model_b": rng.standard_normal((100, 768)),
         }
-        
+
         results = comparator.compare_models(embeddings_by_model)
-        
-        assert "MusicBERT_vs_MusicBERT-large" in results
-        assert isinstance(results["MusicBERT_vs_MusicBERT-large"], float)
+
+        assert "model_a_vs_model_b" in results
+        assert isinstance(results["model_a_vs_model_b"], float)
 
 
 class TestEmbeddingFMDIntegration:

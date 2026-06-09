@@ -14,8 +14,6 @@ from embeddings.extractor import (
     EmbeddingFactory,
     MusicBERTModel,
     MusicBERTLargeModel,
-    NLPBaselineModel,
-    MERTModel,
     EmbeddingExtractor,
     EmbeddingAnalyzer,
 )

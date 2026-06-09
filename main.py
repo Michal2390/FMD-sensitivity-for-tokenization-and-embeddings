@@ -1,4 +1,13 @@
-"""Main entry point with one-click modes for research workflow."""
+"""Main entry point for the FMD sensitivity study.
+
+Modes:
+  sensitivity  run the full sensitivity profiling pipeline (default)
+  full         unit tests, then the sensitivity pipeline
+  fetch-data   download MIDI datasets from configured external sources
+  tests        run the unit-test suite
+  demo         lightweight sanity check (no model downloads required)
+  lint         run black + flake8 quality checks
+"""
 
 from __future__ import annotations
 
@@ -7,20 +16,19 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
 from tqdm import tqdm
 
-# Add src and scripts to path
+# Make `src/` importable (the project is run from the repository root).
 sys.path.insert(0, str(Path(__file__).parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
 from utils.config import get_logger, load_config, setup_logging
 
 
 class FMDSensitivityAnalysis:
-    """Main class for FMD sensitivity analysis."""
+    """Runner for the FMD sensitivity study."""
 
     def __init__(self):
-        """Initialize the analysis."""
         self.config = load_config("configs/config.yaml")
         setup_logging(
             self.config["logging"].get("level", "INFO"),
@@ -28,44 +36,22 @@ class FMDSensitivityAnalysis:
         )
         self.logger = get_logger(__name__)
 
+    # ── tests / quality ────────────────────────────────────────────────
     def run_all_tests(self) -> bool:
-        """Run all unit tests."""
+        """Run the unit-test suite."""
         import pytest
 
-        self.logger.info("Running all unit tests")
-        result = pytest.main(["tests/", "-v", "--tb=short"])
-        return result == 0
-
-    def run_demo(self):
-        """Run lightweight sanity demo."""
-        import numpy as np
-        from data.manager import DatasetManager
-        from metrics.fmd import FrechetMusicDistance
-
-        self.logger.info("Running demo")
-        self.logger.info(f"Experiments in config: {len(self.config['experiments'])}")
-        self.logger.info(f"Tokenizers in config: {len(self.config['tokenization']['tokenizers'])}")
-        self.logger.info(f"Embedding models in config: {len(self.config['embeddings']['models'])}")
-
-        manager = DatasetManager(self.config)
-        self.logger.info(f"Dataset manager ready at: {manager.raw_data_dir}")
-
-        fmd_calc = FrechetMusicDistance(self.config)
-        emb1 = np.random.randn(100, 64)
-        emb2 = np.random.randn(100, 64)
-        value = fmd_calc.compute_fmd(emb1, emb2)
-        self.logger.info(f"Demo FMD value: {value:.4f}")
+        self.logger.info("Running unit tests")
+        return pytest.main(["tests/", "-v", "--tb=short"]) == 0
 
     def run_lint_check(self):
-        """Run code quality checks."""
+        """Run code-quality checks (non-fatal)."""
         self.logger.info("Running code quality checks")
-
         black = subprocess.run(
             ["black", "src/", "tests/", "scripts/", "main.py", "--check", "--quiet"],
             capture_output=True,
         )
         self.logger.info("Black: OK" if black.returncode == 0 else "Black: formatting needed")
-
         flake = subprocess.run(
             ["flake8", "src/", "tests/", "scripts/", "main.py", "--count"],
             capture_output=True,
@@ -73,41 +59,21 @@ class FMDSensitivityAnalysis:
         )
         self.logger.info("Flake8: OK" if flake.returncode == 0 else f"Flake8 issues:\n{flake.stdout}")
 
-    def run_paper_benchmark(self, full: bool = False):
-        """Run paper-oriented comparison benchmark and report generation."""
-        from experiments.paper_pipeline import PaperExperimentRunner
+    def run_demo(self):
+        """Lightweight sanity check: config loads and FMD computes."""
+        import numpy as np
+        from metrics.fmd import FrechetMusicDistance
 
-        runner = PaperExperimentRunner(self.config)
-        if full:
-            self.logger.info("Running full paper benchmark")
-            result = runner.run_full()
-        else:
-            self.logger.info("Running quick paper benchmark")
-            result = runner.run_quick()
+        self.logger.info(
+            f"Config OK — {len(self.config['embeddings']['models'])} models, "
+            f"{len(self.config['tokenization']['tokenizers'])} tokenizers configured"
+        )
+        fmd = FrechetMusicDistance(self.config)
+        rng = np.random.default_rng(0)
+        value = fmd.compute_fmd(rng.standard_normal((100, 64)), rng.standard_normal((100, 64)))
+        self.logger.info(f"Demo FMD between two random Gaussians: {value:.4f}")
 
-        self.logger.info(f"Paper benchmark done. Rows: {result.get('pairwise_rows')}")
-        for label, path in result.get("outputs", {}).items():
-            self.logger.info(f"Output {label}: {path}")
-
-        plots_cfg = self.config.get("paper", {}).get("publication_plots", {})
-        if plots_cfg.get("enabled", True):
-            self.run_publication_plots()
-        return result
-
-    def run_publication_plots(self):
-        """Generate publication-ready plots from latest paper outputs."""
-        from experiments.publication_plots import generate_publication_plots
-
-        self.logger.info("Generating publication plots")
-        outputs = generate_publication_plots(self.config)
-        if not outputs:
-            self.logger.warning("No publication plots generated")
-            return outputs
-
-        for label, path in outputs.items():
-            self.logger.info(f"Plot {label}: {path}")
-        return outputs
-
+    # ── data ───────────────────────────────────────────────────────────
     def run_fetch_data(self, dataset_names: list[str] | None = None) -> bool:
         """Download MIDI datasets from configured external sources."""
         from data.manager import DatasetManager
@@ -120,352 +86,88 @@ class FMDSensitivityAnalysis:
         ok_all = True
         total = max(1, len(targets))
         for idx, dataset_name in enumerate(
-            tqdm(targets, desc="Fetch datasets", unit="dataset", dynamic_ncols=True),
-            start=1,
+            tqdm(targets, desc="Fetch datasets", unit="dataset", dynamic_ncols=True), start=1
         ):
-            pct = 100.0 * idx / total
-            self.logger.info(f"[Progress] fetch-data {idx}/{total} ({pct:.1f}%) -> {dataset_name}")
+            self.logger.info(f"[Progress] fetch-data {idx}/{total} -> {dataset_name}")
             info = manager.get_dataset_info(dataset_name)
             url = str(info.get("url", "")).strip().lower()
-            if not url.startswith("http"):
-                self.logger.warning(f"Skipping {dataset_name}: no external downloadable URL configured ({url})")
-                ok = manager.ensure_dataset_exists(dataset_name, download=False)
-            else:
-                ok = manager.ensure_dataset_exists(dataset_name, download=True)
-            ok_all = ok_all and ok
+            download = url.startswith("http")
+            if not download:
+                self.logger.warning(f"{dataset_name}: no downloadable URL configured")
+            ok_all = manager.ensure_dataset_exists(dataset_name, download=download) and ok_all
         return ok_all
 
-    def run_lakh_validation(self):
-        """Run Lakh MIDI 32-variant sensitivity validation (rock vs classical)."""
-        from experiments.paper_pipeline import PaperExperimentRunner
-
-        self.logger.info("Running Lakh MIDI validation pipeline")
-        runner = PaperExperimentRunner(self.config)
-        result = runner.run_lakh_validation()
-
-        self.logger.info(f"Lakh validation done. Valid rows: {result.get('valid_rows')}")
-        for label, path in result.get("outputs", {}).items():
-            self.logger.info(f"Output {label}: {path}")
-
-        # Generate Lakh-specific plots
-        self.run_lakh_plots()
-        return result
-
-    def run_lakh_plots(self):
-        """Generate publication plots for Lakh validation outputs."""
-        from experiments.lakh_plots import generate_lakh_plots
-
-        self.logger.info("Generating Lakh validation plots")
-        outputs = generate_lakh_plots(self.config)
-        if not outputs:
-            self.logger.warning("No Lakh plots generated")
-            return outputs
-        for label, path in outputs.items():
-            self.logger.info(f"Lakh plot {label}: {path}")
-        return outputs
-
+    # ── main experiment ────────────────────────────────────────────────
     def run_sensitivity_pivot(self, step: str | None = None):
-        """Run the sensitivity pivot pipeline (professor's 7-step plan).
-
-        Args:
-            step: Optional specific step to run ('self-similarity', 'ranking',
-                  'perturbation', 'bootstrap', 'plots'). If None, runs all steps.
-        """
-        print("[Progress] importing SensitivityProfiler", flush=True)
+        """Run the sensitivity profiling pipeline (optionally a single step)."""
         from experiments.sensitivity_profiler import SensitivityProfiler
 
-        print("[Progress] constructing SensitivityProfiler", flush=True)
-        self.logger.info("Running sensitivity pivot pipeline")
+        self.logger.info("Running sensitivity pipeline")
         profiler = SensitivityProfiler(self.config, "configs/sensitivity_pivot.yaml")
-        print("[Progress] SensitivityProfiler constructed", flush=True)
 
+        steps = {
+            "self-similarity": profiler.run_self_similarity,
+            "ranking": profiler.run_cross_dataset_ranking,
+            "perturbation": profiler.run_perturbation_sensitivity,
+            "bootstrap": profiler.run_bootstrap_stability,
+            "plots": profiler.generate_plots,
+        }
         if step is None:
-            result = profiler.run_all()
-            self.logger.info("Sensitivity pivot complete (all steps)")
-            return result
-        elif step == "self-similarity":
-            return profiler.run_self_similarity()
-        elif step == "ranking":
-            return profiler.run_cross_dataset_ranking()
-        elif step == "perturbation":
-            return profiler.run_perturbation_sensitivity()
-        elif step == "bootstrap":
-            return profiler.run_bootstrap_stability()
-        elif step == "plots":
-            profiler.generate_plots()
-            return None
-        else:
-            raise ValueError(f"Unknown step: {step}. Use: self-similarity, ranking, perturbation, bootstrap, plots")
-
-    def run_song_benchmark(
-        self,
-        midi_file: str,
-        axis: str = "both",
-        segments: int = 8,
-        tokenizers: list[str] | None = None,
-        models: list[str] | None = None,
-        remove_velocity: bool = False,
-        hard_quantization: bool = False,
-        output_dir: str | None = None,
-    ):
-        """Run a per-song FMD sensitivity benchmark."""
-        from experiments.paper_pipeline import PaperExperimentRunner
-
-        runner = PaperExperimentRunner(self.config)
-        result = runner.run_single_song_analysis(
-            midi_path=Path(midi_file),
-            tokenizers=tokenizers,
-            models=models,
-            n_segments=segments,
-            remove_velocity=remove_velocity,
-            hard_quantization=hard_quantization,
-            axis=axis,
-            output_dir=Path(output_dir) if output_dir else None,
-        )
-        self.logger.info(f"Per-song benchmark done for: {midi_file}")
-        for label, path in result.get("outputs", {}).items():
-            self.logger.info(f"Output {label}: {path}")
-        return result
+            return profiler.run_all()
+        if step not in steps:
+            raise ValueError(f"Unknown step: {step}. Use one of {sorted(steps)}")
+        return steps[step]()
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    """Create CLI parser."""
-    parser = argparse.ArgumentParser(description="FMD sensitivity analysis runner")
+    parser = argparse.ArgumentParser(description="FMD sensitivity study runner")
     parser.add_argument(
         "--mode",
-        choices=[
-            "quick",
-            "full",
-            "paper",
-            "paper-full",
-            "paper-plots",
-            "lakh",
-            "lakh-plots",
-            "cross-validate",
-            "song",
-            "sensitivity",
-            "fetch-data",
-            "tests",
-            "demo",
-            "lint",
-        ],
-        default="quick",
-        help=(
-            "quick: one-click default (demo + quick paper benchmark), "
-            "full: tests + sensitivity pivot pipeline, "
-            "paper: quick paper benchmark, paper-full: full benchmark, "
-            "paper-plots: only generate plots from existing paper outputs, "
-            "lakh: Lakh MIDI validation (32 variants, rock vs classical), "
-            "lakh-plots: generate Lakh validation plots from existing outputs, "
-            "song: per-song FMD sensitivity analysis, "
-            "sensitivity: run sensitivity pivot (7-step plan), "
-            "fetch-data: download datasets from configured external sources"
-        ),
+        choices=["sensitivity", "full", "fetch-data", "tests", "demo", "lint"],
+        default="sensitivity",
+        help="sensitivity (default), full (tests+sensitivity), fetch-data, tests, demo, lint",
     )
     parser.add_argument(
-        "--datasets",
-        nargs="*",
-        default=None,
-        help="Optional list of dataset names for --mode fetch-data",
+        "--datasets", nargs="*", default=None,
+        help="Optional dataset-name subset for --mode fetch-data",
     )
     parser.add_argument(
-        "--sensitivity-step",
-        type=str,
-        default=None,
+        "--sensitivity-step", type=str, default=None,
         choices=["self-similarity", "ranking", "perturbation", "bootstrap", "plots"],
-        help="Run a specific step of the sensitivity pivot (default: all steps)",
-    )
-    parser.add_argument(
-        "--midi-file",
-        type=str,
-        default=None,
-        help="Path to a single MIDI file for --mode song",
-    )
-    parser.add_argument(
-        "--song-axis",
-        choices=["both", "tokenizer", "model"],
-        default="both",
-        help="Which per-song comparison to run",
-    )
-    parser.add_argument(
-        "--song-segments",
-        type=int,
-        default=8,
-        help="Number of time windows used to build the per-song embedding distributions",
-    )
-    parser.add_argument(
-        "--song-tokenizers",
-        nargs="*",
-        default=None,
-        help="Optional tokenizer subset for --mode song",
-    )
-    parser.add_argument(
-        "--song-models",
-        nargs="*",
-        default=None,
-        help="Optional model subset for --mode song",
-    )
-    parser.add_argument(
-        "--song-output-dir",
-        type=str,
-        default=None,
-        help="Optional output directory for --mode song",
-    )
-    parser.add_argument(
-        "--song-remove-velocity",
-        action="store_true",
-        help="Remove velocity before per-song analysis",
-    )
-    parser.add_argument(
-        "--song-hard-quantization",
-        action="store_true",
-        help="Apply hard quantization before per-song analysis",
-    )
-    parser.add_argument(
-        "--cv-source",
-        choices=["cd1", "midicaps", "all"],
-        default="all",
-        dest="cv_source",
-        help="Source for cross-validation mode: cd1, midicaps, or all (default: all)",
+        help="Run a single step of the sensitivity pipeline (default: all)",
     )
     return parser
 
 
 def main():
-    """One-click entry point for IDE Run button and CLI."""
-    parser = build_arg_parser()
-    args = parser.parse_args()
-
+    args = build_arg_parser().parse_args()
     analysis = FMDSensitivityAnalysis()
-    start_time = time.perf_counter()
+    start = time.perf_counter()
 
     def _done(success: bool = True):
-        elapsed = time.perf_counter() - start_time
         status = "SUCCESS" if success else "FAILED"
-        print(f"\n=== Program finished: {status} | elapsed: {elapsed:.1f}s ===")
+        print(f"\n=== Program finished: {status} | elapsed: {time.perf_counter() - start:.1f}s ===")
 
     try:
-        if args.mode == "quick":
-            steps = [
-                ("demo", lambda: analysis.run_demo()),
-                ("paper-quick", lambda: analysis.run_paper_benchmark(full=False)),
-            ]
-            for i, (label, fn) in enumerate(
-                tqdm(steps, desc="Quick pipeline", unit="step", dynamic_ncols=True),
-                start=1,
-            ):
-                pct = 100.0 * i / len(steps)
-                analysis.logger.info(f"[Progress] {i}/{len(steps)} ({pct:.1f}%) -> {label}")
-                fn()
-            _done(True)
-            return
-
-        if args.mode == "paper":
-            analysis.logger.info("[Progress] 100.0% -> paper")
-            analysis.run_paper_benchmark(full=False)
-            _done(True)
-            return
-
-        if args.mode == "paper-full":
-            analysis.logger.info("[Progress] 100.0% -> paper-full")
-            analysis.run_paper_benchmark(full=True)
-            _done(True)
-            return
-
-        if args.mode == "paper-plots":
-            analysis.logger.info("[Progress] 100.0% -> paper-plots")
-            analysis.run_publication_plots()
-            _done(True)
-            return
-
-        if args.mode == "fetch-data":
-            ok = analysis.run_fetch_data(args.datasets)
-            if not ok:
-                _done(False)
-                raise SystemExit(1)
-            _done(True)
-            return
-
         if args.mode == "sensitivity":
-            analysis.logger.info("[Progress] 100.0% -> sensitivity pivot")
             analysis.run_sensitivity_pivot(step=args.sensitivity_step)
-            _done(True)
-            return
-
-        if args.mode == "song":
-            if not args.midi_file:
-                raise ValueError("--midi-file is required for --mode song")
-            analysis.run_song_benchmark(
-                midi_file=args.midi_file,
-                axis=args.song_axis,
-                segments=args.song_segments,
-                tokenizers=args.song_tokenizers,
-                models=args.song_models,
-                remove_velocity=args.song_remove_velocity,
-                hard_quantization=args.song_hard_quantization,
-                output_dir=args.song_output_dir,
-            )
-            _done(True)
-            return
-
-        if args.mode == "lakh":
-            analysis.logger.info("[Progress] 100.0% -> lakh")
-            analysis.run_lakh_validation()
-            _done(True)
-            return
-
-        if args.mode == "lakh-plots":
-            analysis.logger.info("[Progress] 100.0% -> lakh-plots")
-            analysis.run_lakh_plots()
-            _done(True)
-            return
-
-        if args.mode == "cross-validate":
-            analysis.logger.info("[Progress] 100.0% -> cross-validate")
-            import subprocess as _sp
-            source_arg = getattr(args, "cv_source", "all") or "all"
-            cmd = [sys.executable, "run_cross_dataset_validation.py", "--source", source_arg]
-            result = _sp.run(cmd)
-            _done(result.returncode == 0)
-            if result.returncode != 0:
-                raise SystemExit(result.returncode)
-            return
-
-        if args.mode == "tests":
-            ok = analysis.run_all_tests()
-            if not ok:
+        elif args.mode == "fetch-data":
+            if not analysis.run_fetch_data(args.datasets):
                 _done(False)
                 raise SystemExit(1)
-            _done(True)
-            return
-
-        if args.mode == "demo":
-            analysis.logger.info("[Progress] 100.0% -> demo")
+        elif args.mode == "tests":
+            if not analysis.run_all_tests():
+                _done(False)
+                raise SystemExit(1)
+        elif args.mode == "demo":
             analysis.run_demo()
-            _done(True)
-            return
-
-        if args.mode == "lint":
-            analysis.logger.info("[Progress] 100.0% -> lint")
+        elif args.mode == "lint":
             analysis.run_lint_check()
-            _done(True)
-            return
-
-        # Full mode
-        steps = [
-            ("tests", lambda: analysis.run_all_tests()),
-            ("sensitivity", lambda: analysis.run_sensitivity_pivot()),
-        ]
-        for i, (label, fn) in enumerate(
-            tqdm(steps, desc="Full pipeline", unit="step", dynamic_ncols=True),
-            start=1,
-        ):
-            pct = 100.0 * i / len(steps)
-            analysis.logger.info(f"[Progress] {i}/{len(steps)} ({pct:.1f}%) -> {label}")
-            result = fn()
-            if label == "tests" and result is False:
+        elif args.mode == "full":
+            if not analysis.run_all_tests():
                 _done(False)
                 raise SystemExit(1)
+            analysis.run_sensitivity_pivot()
         _done(True)
     except Exception:
         _done(False)

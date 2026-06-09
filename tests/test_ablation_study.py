@@ -11,7 +11,6 @@ import json
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from preprocessing.processor import MIDIPreprocessor
-from tokenization.tokenizer import TokenizationPipeline
 from embeddings.extractor import EmbeddingExtractor
 from metrics.fmd import FrechetMusicDistance
 from utils.config import load_config

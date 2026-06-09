@@ -1,7 +1,0 @@
-group1,group2,meandiff,p-adj,lower,upper,reject
-MIDI-Like,Octuple,0.0436,0.4245,-0.0334,0.1207,False
-MIDI-Like,REMI,-0.0339,0.6312,-0.1109,0.0432,False
-MIDI-Like,TSD,0.0038,0.9991,-0.0733,0.0808,False
-Octuple,REMI,-0.0775,0.0481,-0.1546,-0.0005,True
-Octuple,TSD,-0.0399,0.5021,-0.1169,0.0372,False
-REMI,TSD,0.0377,0.5493,-0.0394,0.1147,False

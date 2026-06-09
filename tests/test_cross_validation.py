@@ -2,14 +2,10 @@
 
 from __future__ import annotations
 
-import tempfile
+import csv
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-import numpy as np
-import pandas as pd
 import pytest
-import yaml
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -157,63 +153,3 @@ def test_midicaps_csv_parsing(base_config, tmp_path):
     assert len(files["rock"]) == 5
     assert "jazz" in files
     assert len(files["jazz"]) == 3
-
-
-# ──────────────────────────────────────────────────────────────────────
-# Cross-validation analysis helpers
-# ──────────────────────────────────────────────────────────────────────
-
-def test_compute_eta_squared():
-    """Test η² computation."""
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-    from run_cross_dataset_validation import compute_eta_squared
-
-    rng = np.random.default_rng(42)
-    df = pd.DataFrame({
-        "fmd": np.concatenate([rng.normal(0.1, 0.02, 50), rng.normal(0.3, 0.02, 50)]),
-        "tokenizer": ["REMI"] * 50 + ["Octuple"] * 50,
-    })
-    eta = compute_eta_squared(df, ["tokenizer"])
-    assert "tokenizer" in eta
-    assert eta["tokenizer"] > 0.5  # Should be very high given clear separation
-
-
-def test_compare_rankings():
-    """Test Spearman ranking comparison."""
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-    from run_cross_dataset_validation import compare_rankings
-
-    rank_a = pd.DataFrame({
-        "variant": ["v1", "v2", "v3", "v4"],
-        "mean_fmd": [0.3, 0.2, 0.1, 0.4],
-    })
-    rank_b = pd.DataFrame({
-        "variant": ["v1", "v2", "v3", "v4"],
-        "mean_fmd": [0.35, 0.18, 0.12, 0.38],
-    })
-    result = compare_rankings(rank_a, rank_b)
-    assert result["spearman_rho"] is not None
-    assert result["spearman_rho"] > 0.8  # Should be very correlated
-
-
-def test_compute_cell_means():
-    """Test tokenizer×model cell aggregation."""
-    import sys
-    sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-    from run_cross_dataset_validation import compute_cell_means
-
-    df = pd.DataFrame({
-        "tokenizer": ["REMI", "REMI", "Octuple", "Octuple"],
-        "model": ["MusicBERT", "MusicBERT-large", "MusicBERT", "MusicBERT-large"],
-        "fmd": [0.2, 0.1, 0.3, 0.4],
-    })
-    cells = compute_cell_means(df)
-    assert len(cells) == 4
-    assert "mean_fmd" in cells.columns
-
-
-# need csv import for test_midicaps_csv_parsing
-import csv
-

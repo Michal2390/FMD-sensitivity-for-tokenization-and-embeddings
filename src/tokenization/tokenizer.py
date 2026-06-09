@@ -19,7 +19,6 @@ def create_tokenizer_config(params: Dict) -> TokenizerConfig:
         TokenizerConfig object
     """
     # Extract parameters with defaults
-    beat_res = params.get("beat_res", 480)
     nb_velocities = params.get("nb_velocities", 32)
 
     # Map beat_res to time signatures

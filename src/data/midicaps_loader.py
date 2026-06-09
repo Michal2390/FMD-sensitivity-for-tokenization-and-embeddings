@@ -13,9 +13,6 @@ from __future__ import annotations
 import csv
 import json
 import shutil
-import tempfile
-import urllib.request
-import zipfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional

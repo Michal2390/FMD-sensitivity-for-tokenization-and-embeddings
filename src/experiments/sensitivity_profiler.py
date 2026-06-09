@@ -16,9 +16,10 @@ import json
 from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 from loguru import logger
 
 from utils.config import load_config
@@ -335,7 +336,6 @@ class SensitivityProfiler:
 
         Expected: FMD ≈ 0 for each split. If high → configuration is unstable.
         """
-        import pandas as pd
         from tqdm import tqdm
 
         logger.info("=" * 60)
@@ -387,7 +387,6 @@ class SensitivityProfiler:
 
         Returns ranking table + Spearman τ agreement matrix.
         """
-        import pandas as pd
         from scipy.stats import spearmanr
         from tqdm import tqdm
 
@@ -482,7 +481,6 @@ class SensitivityProfiler:
         Args:
             dataset_name: Dataset to use for perturbation analysis (default: maestro)
         """
-        import pandas as pd
         from tqdm import tqdm
 
         logger.info("=" * 60)
@@ -579,7 +577,6 @@ class SensitivityProfiler:
         Resample N times, compute FMD each time, report mean ± std.
         Shows which configuration is more stable with limited data.
         """
-        import pandas as pd
         from tqdm import tqdm
 
         logger.info("=" * 60)
@@ -694,7 +691,6 @@ class SensitivityProfiler:
             import matplotlib
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
-            import pandas as pd
             import seaborn as sns
         except ImportError:
             logger.warning("matplotlib/seaborn not available, skipping plots")

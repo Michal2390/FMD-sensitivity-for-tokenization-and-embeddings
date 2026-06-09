@@ -1,9 +1,11 @@
 """Tests for MIDI tokenization module."""
 
-import pytest
-from pathlib import Path
-import pretty_midi
+import os
 import tempfile
+from pathlib import Path
+
+import pretty_midi
+import pytest
 import yaml
 
 from src.tokenization.tokenizer import (
@@ -42,14 +44,16 @@ def sample_midi_file():
 
     midi.instruments.append(instrument)
 
-    # Save to temporary file
-    with tempfile.NamedTemporaryFile(suffix='.mid', delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-        midi.write(str(tmp_path))
-        yield tmp_path
-        # Cleanup
-        if tmp_path.exists():
-            tmp_path.unlink()
+    # Save to a temporary file (Windows-safe: close handle before use/cleanup)
+    fd, name = tempfile.mkstemp(suffix=".mid")
+    os.close(fd)
+    tmp_path = Path(name)
+    midi.write(str(tmp_path))
+    yield tmp_path
+    try:
+        tmp_path.unlink()
+    except OSError:
+        pass
 
 
 class TestTokenizers:

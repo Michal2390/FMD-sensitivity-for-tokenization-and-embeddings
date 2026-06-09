@@ -1,9 +1,11 @@
 """Tests for MIDI preprocessing module."""
 
-import pytest
-from pathlib import Path
-import pretty_midi
+import os
 import tempfile
+from pathlib import Path
+
+import pretty_midi
+import pytest
 import yaml
 
 from src.preprocessing.processor import MIDIPreprocessor, PreprocessingPipeline
@@ -39,14 +41,16 @@ def sample_midi():
 
 @pytest.fixture
 def sample_midi_file(sample_midi):
-    """Create a temporary MIDI file."""
-    with tempfile.NamedTemporaryFile(suffix='.mid', delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-        sample_midi.write(str(tmp_path))
-        yield tmp_path
-        # Cleanup
-        if tmp_path.exists():
-            tmp_path.unlink()
+    """Create a temporary MIDI file (Windows-safe: no lingering handle)."""
+    fd, name = tempfile.mkstemp(suffix=".mid")
+    os.close(fd)
+    tmp_path = Path(name)
+    sample_midi.write(str(tmp_path))
+    yield tmp_path
+    try:
+        tmp_path.unlink()
+    except OSError:
+        pass
 
 
 class TestMIDIPreprocessor:
