@@ -26,16 +26,24 @@ configurations:
     input_format: "ABC"
     description: "CLaMP-1 with ABC notation via music21 (no velocity in ABC)"
 
-# 4 datasets → 6 pairs for valid Spearman ranking
+# 6 datasets → C(6,2) = 15 pairs.
+# Spearman rank-agreement between configurations is only flagged
+# `interpretable` (and a p-value reported) at n_pairs >= 10, so 15 pairs
+# puts the cross-configuration ranking on statistically defensible ground
+# (directly addresses the "statistics on too few values" critique).
 datasets:
   - name: "maestro"
-    description: "Classical piano, virtuosic (MAESTRO v3)"
+    description: "Classical piano, virtuosic performance (MAESTRO v3)"
   - name: "pop909"
-    description: "Pop songs (POP909)"
-  - name: "folk"
-    description: "Folk tunes (Nottingham)"
-  - name: "midicaps_classical"
-    description: "Classical subset from MidiCaps (168k Lakh-derived corpus)"
+    description: "Pop songs, clean arrangements (POP909)"
+  - name: "classical"
+    description: "Classical (Lakh-derived genre subset)"
+  - name: "jazz"
+    description: "Jazz (Lakh-derived genre subset)"
+  - name: "rock"
+    description: "Rock (Lakh-derived genre subset)"
+  - name: "rap"
+    description: "Rap/Hip-hop (Lakh-derived genre subset)"
 
 perturbations:
   - name: "original"
@@ -73,6 +81,15 @@ bootstrap:
   sample_size: 100
   seed: 42
   dataset_pair: ["maestro", "pop909"]
+
+# Bootstrap significance for the perturbation step: each perturbation FMD is
+# resampled and tested against the within-dataset noise-floor distribution
+# (split-half FMD of the unperturbed embeddings). Yields a CI, a per-config
+# SNR, and a bootstrap p-value instead of a single undefended number.
+perturbation_bootstrap:
+  n_resamples: 100        # bootstrap resamples for the FMD confidence interval
+  n_permutations: 200     # permutations for the two-sample significance test
+  seed: 42
 
 min_pairs_for_spearman: 6
 strict_paper_mode: true

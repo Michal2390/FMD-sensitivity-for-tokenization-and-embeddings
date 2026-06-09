@@ -1,7 +1,7 @@
 # 🎵 FMD Sensitivity to Tokenization and Embedding Configuration
 
 <p align="center">
-  <b>🔬 Sensitivity Profiling of Fréchet Music Distance for Symbolic Music Evaluation</b>
+  <b>🔬 What does the Fréchet Music Distance actually measure? A sensitivity study across tokenizers and embedding models.</b>
 </p>
 
 <p align="center">
@@ -11,305 +11,190 @@
   <a href="#"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"></a>
 </p>
 
-> 📖 An empirical study revealing how pipeline configuration choices (embedding model, input representation, preprocessing) alter what FMD actually measures — with practical recommendations for the music generation community.
+> 📖 An FMD score is **not a property of the music alone** — it is produced by a *pipeline* (input representation → embedding model → Fréchet formula). We profile how that pipeline reshapes what FMD perceives, and give practical guidance for the music-generation community.
 
 ---
 
 ## ⚡ TL;DR
 
-We profiled how 3 FMD configurations react to controlled perturbations of MIDI data. **The key discovery:**
+We profiled **4 FMD configurations** across **6 datasets** (15 pairs) and **5 controlled perturbations** of MIDI. Three things stand out:
 
-| Perturbation | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC |
-|:-------------|:----------:|:-----------:|:----------:|
-| 🔴 Remove velocity (dynamics) | **0.063** | 0.053 | 0.020 |
-| 🟡 Quantize timing (16th grid) | **0.118** | 0.000 | 0.014 |
-| 🟢 Constant tempo (120 BPM) | 0.000 | 0.000 | 0.015 |
-
-> 🎯 **CLaMP-2 + MTF on MAESTRO detects velocity and timing; ABC is blind to both. Input format determines what FMD evaluates.**
+1. **🎚️ Input representation decides what FMD can see.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) — and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). ABC notation, which has no velocity channel, stays at noise.
+2. **🤝 Representations that preserve performance detail rank genres the same way.** Cross-dataset rankings of **REMI and CLaMP-2/MTF agree strongly (Spearman ρ = 0.825, p < 0.001)**, while **ABC agrees with no one (ρ ≈ 0.04–0.15, p > 0.6)**.
+3. **⚠️ Raw FMD is NOT comparable across embedding models.** CLaMP embeddings are L2-normalised (unit sphere → small FMD); MusicBERT's are not (→ large FMD). The ~60× gap is geometry, not music — so we compare via **scale-invariant** statistics (SNR, Spearman, CV), never raw magnitude.
 
 <p align="center">
-  <img src="results/plots/sensitivity_pivot/perturbation_heatmap.png" alt="Perturbation Sensitivity Heatmap" width="700">
+  <img src="results/plots/sensitivity_pivot/paper/fig2_snr_heatmap.png" alt="Perturbation SNR heatmap" width="560">
 </p>
 
 ---
 
-## 🔄 Motivation and Research Pivot
+## 🧭 What changed (and why)
 
-### ❌ Original Approach: Normalized FMD (nFMD) — Why It Failed
+An earlier version of this study mislabelled configurations (a "CLaMP-2 + REMI" entry that actually fed ABC) and computed rank statistics over too few points. This version fixes both:
 
-Our initial contribution was **Normalized FMD (nFMD)** — an attempt to make FMD values comparable across different embedding models by normalizing for embedding scale. We observed that raw FMD values differ by **12.8×** across models for the same genre pair simply due to embedding norm differences.
-
-**🚫 Why nFMD is fundamentally flawed:**
-
-| # | Argument | Explanation |
-|:-:|:---------|:------------|
-| 1️⃣ | **The problem doesn't exist meaningfully** | Each model lives in a different feature space. Forcing common scale ≠ measuring the same thing |
-| 2️⃣ | **FMD/FID/FAD were never designed for cross-model comparison** | Fréchet distance works *within* a fixed space |
-| 3️⃣ | **Normalization obscures rather than reveals** | Apparent "hidden effects" are likely division artefacts |
-| 4️⃣ | **Precedent agrees** | FID and FAD have never been normalized in the literature |
-
-We implemented nFMD experimentally but **rejected it** because it produces misleading results.
-
-### ✅ Sensitivity Profiling
-
-Instead of cross-model normalization, we asked:
-
-> 💡 **"Given a fixed FMD configuration, what musical properties does the metric actually measure?"**
-
-This produces **directly actionable knowledge:**
-
-- 🎹 Evaluating expressive dynamics? → Use **CLaMP-2 + MTF**
-- 🎼 Evaluating score-like / folk structure? → Use **CLaMP-1 + ABC** (not for velocity)
-- ⏱️ Evaluating timing/microtiming? → **CLaMP-2 + MTF** (FMD = 0.12 on MAESTRO)
+| Problem (old) | Fix (now) |
+|:--|:--|
+| ❌ CLaMP fed REMI tokens it cannot natively consume | ✅ REMI/TSD tokens go to **MusicBERT** (a token model); CLaMP only gets its **native** MTF/ABC |
+| ❌ Rank stats over 3 points (indefensible) | ✅ **6 datasets → 15 pairs**, Spearman now interpretable with real *p*-values |
+| ❌ Single perturbation numbers, no test | ✅ Each perturbation gets **SNR + bootstrap CI + permutation *p*-value** |
+| ❌ "CLaMP 63× more consistent" (a scale artifact) | ✅ Cross-config claims use **scale-invariant** SNR / Spearman / CV only |
 
 ---
 
 ## 🧪 Experimental Design
 
-### 🔧 3 Configurations
+### 🔧 4 Configurations (honest input semantics)
 
-| Config | Model | Input format | Pipeline | Isolates |
-|:------:|:-----:|:-------------|:---------|:---------|
-| 🅰️ **CLaMP2-MTF** | CLaMP-2 | MTF | MIDI → MTF text (`mido`) → M3 patches | Native CLaMP-2 path |
-| 🅱️ **CLaMP2-REMI** | CLaMP-2 | REMI | MidiTok REMI tokens → text → M3 patches | Tokenization effect (same model) |
-| 🅲 **CLaMP1-ABC** | CLaMP-1 | ABC | MIDI → ABC (`music21`) → bar patches | Model effect |
+| Config | Model | Input | Isolates | Norm. |
+|:------:|:-----:|:------|:---------|:-----:|
+| 🅰️ **MusicBERT-REMI** | MusicBERT | MidiTok REMI tokens | tokenization baseline | no |
+| 🅱️ **MusicBERT-TSD** | MusicBERT | MidiTok TSD tokens | tokenizer effect (same model) | no |
+| 🅲 **CLaMP2-MTF** | CLaMP-2 | MIDI-Text Format (native) | model effect, expressive path | yes |
+| 🅳 **CLaMP1-ABC** | CLaMP-1 | ABC notation (`music21`) | score-like path (no velocity) | yes |
 
-Encoding details: `src/embeddings/clamp_formats.py`
+Encoding details: [`src/embeddings/clamp_formats.py`](src/embeddings/clamp_formats.py). All models output 768-d embeddings.
 
-### 🎶 4 Datasets (6 pairwise comparisons)
+### 🎶 6 Datasets → 15 pairs
 
-| Dataset | Style | Used in run | Source |
-|:--------|:------|:-----------:|:-------|
-| 🎹 **MAESTRO** | Classical piano | 80 files | [Google Magenta v3](https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip) |
-| 🎤 **POP909** | Pop songs | 80 files | [Music-X-Lab](https://github.com/music-x-lab/POP909-Dataset) |
-| 🪕 **Folk** | Traditional folk tunes | 80 files | [Nottingham Dataset](https://github.com/jukedeck/nottingham-dataset) |
-| 🎻 **MidiCaps classical** | Orchestral/classical | 80 files | [MidiCaps](https://huggingface.co/datasets/amaai-lab/MidiCaps) (tag: classical) |
-
-4 datasets → C(4,2) = **6 pairs** — minimum for meaningful Spearman ranking comparison.
+`maestro` (expressive classical piano), `pop909` (pop), `classical`, `jazz`, `rock`, `rap` (Lakh-derived genre subsets). 80 files each, fixed seed. **C(6,2) = 15 pairs** — enough for an interpretable Spearman rank agreement (the code flags it interpretable at n ≥ 10).
 
 ### 🎛️ 5 Perturbations (controlled expression removal)
 
-| Perturbation | What it removes | Implementation |
-|:-------------|:----------------|:---------------|
-| ✨ `original` | Nothing (baseline) | — |
-| 🔇 `no_velocity` | Dynamics/expression | All notes → velocity 64 |
-| 📐 `quantized_time` | Microtiming/swing | Snap to 16th-note grid |
-| ⏱️ `constant_tempo` | Rubato/tempo variation | Remap beats → 120 BPM |
-| 💀 `all_combined` | All expression | All three combined |
+`original` · `no_velocity` (dynamics → 64) · `quantized_time` (16th-grid) · `constant_tempo` (120 BPM) · `all_combined`.
 
 ---
 
 ## 📊 Results
 
-Full Polish report: [`docs/SENSITIVITY_PIVOT_RESULTS.md`](docs/SENSITIVITY_PIVOT_RESULTS.md)
+### 1️⃣ Noise floor (self-similarity) — read scales *within* a config, not across
 
-### ✅ Step 3: Self-Similarity Sanity Check
+Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× higher than CLaMP **purely because its embeddings are unnormalised** — this is the reason every cross-config statement below is scale-invariant.
 
-Split-half FMD (should be ≈ 0 if stable):
-
-| Dataset | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC |
-|:--------|:----------:|:-----------:|:----------:|
-| 🎹 MAESTRO | 0.017 | 0.010 | 0.029 |
-| 🎤 POP909 | 0.024 | 0.010 | 0.033 |
-| 🪕 Folk | 0.094 | 0.011 | 0.026 |
-| 🎻 MidiCaps classical | 0.129 | 0.039 | 0.034 |
-
-> ✅ All values < 0.15. **Noise floor:** ~0.01–0.04 (REMI/ABC), ~0.02–0.13 (MTF).
+| Config | maestro | pop909 | classical | jazz | rock | rap |
+|:--|:--:|:--:|:--:|:--:|:--:|:--:|
+| MusicBERT-REMI | 2.12 | 1.57 | 1.88 | 1.80 | 1.58 | 1.71 |
+| MusicBERT-TSD | 2.31 | 2.32 | 1.51 | 1.35 | 1.21 | 1.27 |
+| CLaMP2-MTF | 0.036 | 0.029 | 0.027 | 0.021 | 0.023 | 0.020 |
+| CLaMP1-ABC | 0.020 | 0.026 | 0.025 | 0.031 | 0.025 | 0.025 |
 
 <p align="center">
-  <img src="results/plots/sensitivity_pivot/self_similarity.png" alt="Self-Similarity Sanity Check" width="600">
+  <img src="results/plots/sensitivity_pivot/paper/fig1_noise_floor.png" alt="Per-configuration noise floor" width="560">
 </p>
 
----
+### 2️⃣ Perturbation sensitivity ⭐ — SNR = FMD / noise floor
 
-### 📈 Step 4: Cross-Dataset Ranking (6 pairs)
+`SNR > 1` means the perturbation moves the distribution more than within-dataset sampling noise. Significance is a **two-sample permutation test** (200 permutations); CIs are bootstrap (100 resamples).
 
-| Pair | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC |
-|:-----|:----------:|:-----------:|:----------:|
-| MAESTRO ↔ POP909 | 0.073 | 0.051 | 0.017 |
-| MAESTRO ↔ Folk | **0.729** | 0.066 | 0.015 |
-| MAESTRO ↔ MidiCaps classical | 0.272 | 0.077 | 0.015 |
-| POP909 ↔ Folk | **0.624** | 0.102 | 0.016 |
-| POP909 ↔ MidiCaps classical | 0.219 | 0.089 | 0.015 |
-| Folk ↔ MidiCaps classical | 0.472 | 0.084 | 0.014 |
+| Perturbation | MusicBERT-REMI | MusicBERT-TSD | CLaMP2-MTF | CLaMP1-ABC |
+|:--|:--:|:--:|:--:|:--:|
+| 🔇 **Velocity removed** | **3.16** ✓ | **1.35** ✓ | **1.18** ✓ | 0.67 |
+| 📐 Timing quantized | 0.05 | 0.11 | 0.66 | 0.62 |
+| ⏱️ Tempo flattened | 0.06 | 0.14 | 0.13 | 0.83 |
+| 💀 All combined | **3.30** ✓ | **1.71** ✓ | **1.55** ✓ | 0.90 |
 
-**Spearman τ (n = 6 pairs):**
+> 🎯 **Velocity is the only attribute detected above the noise floor — and only where it is represented.** ✓ = SNR > 1 **and** permutation-significant (p < 0.05). REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel and stays at noise (0.67, p = 0.06).** Microtiming and tempo fall at/below the floor for every configuration. The *combined* effect simply tracks velocity. (ABC does show a tiny *systematic* shift for tempo/combined — permutation p < 0.05 — but always **below** its own sampling noise, i.e. systematic yet negligible.)
 
-| Pair | τ | Interpretation |
-|:-----|:-:|:---------------|
-| CLaMP2-MTF vs CLaMP2-REMI | 0.26 | ⚪ Moderate agreement |
-| CLaMP2-MTF vs CLaMP1-ABC | **−0.37** | ⚠️ Rankings diverge |
-| CLaMP2-REMI vs CLaMP1-ABC | −0.09 | ⚪ No agreement |
+### 3️⃣ Cross-dataset ranking + Spearman agreement ⭐ — the rigorous backbone
 
-> 🔑 **Key finding:** MTF sees MAESTRO–Folk FMD = **0.73**; ABC flattens all pairs to ~0.015.
+FMD ranks the 15 dataset pairs differently depending on the pipeline. Rank agreement between configurations (scale-invariant, **n = 15**):
+
+| Pair of configurations | Spearman ρ | p | Reading |
+|:--|:--:|:--:|:--|
+| MusicBERT-REMI ↔ **CLaMP2-MTF** | **0.825** | **< 0.001** | 🟢 strong agreement |
+| MusicBERT-TSD ↔ CLaMP2-MTF | 0.525 | 0.044 | 🟡 moderate |
+| MusicBERT-REMI ↔ MusicBERT-TSD | 0.436 | 0.104 | ⚪ tokenizer changes ranking |
+| MusicBERT-TSD ↔ CLaMP1-ABC | 0.321 | 0.243 | ⚪ none |
+| MusicBERT-REMI ↔ CLaMP1-ABC | 0.146 | 0.603 | ⚪ none |
+| CLaMP2-MTF ↔ **CLaMP1-ABC** | 0.039 | 0.889 | 🔴 no agreement |
+
+> 🔑 **Representations that preserve performance detail (REMI, MTF) rank genres the same way; ABC ranks them differently and nearly flatly.** What FMD calls "stylistic distance" depends on the pipeline.
 
 <p align="center">
-  <img src="results/plots/sensitivity_pivot/cross_dataset_bar.png" alt="Cross-Dataset FMD Ranking" width="700">
+  <img src="results/plots/sensitivity_pivot/paper/fig5_spearman_heatmap.png" alt="Spearman rank agreement" width="460">
 </p>
 
----
+### 4️⃣ Bootstrap stability (MAESTRO vs POP909, 50 resamples, N = 80)
 
-### 🔬 Step 5: Perturbation Sensitivity ⭐ MAIN RESULT
-
-FMD(original, perturbed) on MAESTRO. Higher = more sensitive:
-
-| Perturbation | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC | Verdict |
-|:-------------|:----------:|:-----------:|:----------:|:--------|
-| 🔇 **no_velocity** | **0.063** | 0.053 | 0.020 | 🔴 MTF + REMI see dynamics |
-| 📐 quantized_time | **0.118** | 0.000 | 0.014 | 🔴 Only MTF sees timing |
-| ⏱️ constant_tempo | 0.000 | 0.000 | 0.015 | ⚪ Near noise floor |
-| 💀 all_combined | **0.207** | 0.055 | 0.016 | MTF: velocity + timing |
-
-#### 🔍 Analysis
-
-| Finding | Details |
-|:--------|:--------|
-| 🔴 **Velocity** | MTF FMD = 0.063; REMI = 0.053; ABC = 0.020 on MAESTRO |
-| 🟡 **Timing** | MTF FMD = **0.118** on MAESTRO; REMI/ABC at noise level |
-| 🟢 **Tempo** | FMD < 0.02 for all configs |
-| ⚫ **Combined (MTF)** | `all_combined` dominated by velocity + timing removal |
-
-> 💡 **Key insight:** FMD sensitivity to expression depends on input format. ABC and REMI silently drop information that MTF preserves.
-
----
-
-### 📉 Step 6: Bootstrap Stability
-
-50× bootstrap (MAESTRO vs POP909, N = 80):
+Coefficient of variation (CV) is scale-invariant and *is* comparable across configs:
 
 | Config | FMD mean ± std | 95% CI | CV |
-|:-------|:--------------:|:------:|:--:|
-| CLaMP2-MTF | 0.080 ± 0.004 | [0.073, 0.088] | 5.6% |
-| CLaMP2-REMI | 0.055 ± 0.003 | [0.050, 0.062] | 6.2% |
-| CLaMP1-ABC | 0.027 ± 0.003 | [0.021, 0.031] | 11.0% |
+|:--|:--:|:--:|:--:|
+| MusicBERT-REMI | 3.51 ± 0.53 | [2.66, 4.64] | 15.1% |
+| MusicBERT-TSD | 3.92 ± 0.79 | [2.74, 5.47] | 20.2% |
+| CLaMP2-MTF | 0.048 ± 0.007 | [0.039, 0.060] | 14.0% |
+| CLaMP1-ABC | 0.024 ± 0.003 | [0.019, 0.030] | 11.0% |
 
-> 📊 MTF has highest absolute FMD (better separation) and lowest relative variance.
-
-<p align="center">
-  <img src="results/plots/sensitivity_pivot/bootstrap_stability.png" alt="Bootstrap Stability" width="600">
-</p>
+> 📊 All four are comparably stable (CV 11–20%); MusicBERT-TSD is the noisiest. **Do not compare the mean columns across the CLaMP/MusicBERT boundary** — different spaces.
 
 ---
 
 ## 🏆 Conclusions
 
-### 📝 Main Contributions
+| # | Finding | Evidence |
+|:-:|:--|:--|
+| 1️⃣ | **Input representation sets a ceiling on what FMD can detect** | velocity SNR 1.2–3.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.67 in ABC |
+| 2️⃣ | **Rankings agree only between detail-preserving representations** | REMI↔MTF ρ=0.825 (p<0.001); ABC↔all ρ≈0 |
+| 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.42; ranking ρ=0.44 |
+| 4️⃣ | **Raw FMD is not cross-model comparable** | noise floors differ ~60× from normalisation, not music |
 
-| # | Contribution | Key number |
-|:-:|:-------------|:-----------|
-| 1️⃣ | **Sensitivity profiling methodology** — perturbation-based framework | 3 configs × 5 perturbations |
-| 2️⃣ | **Input format determines sensitivity** — MTF detects velocity + timing | 0.063 / 0.118 vs ~0.02 |
-| 3️⃣ | **Ranking depends on representation** — MTF vs ABC τ = −0.37 | 6 dataset pairs |
-| 4️⃣ | **CLaMP encoding paths** — MTF (`mido`), ABC (`music21`), REMI (MidiTok) | See `clamp_formats.py` |
-| 5️⃣ | **Rejection of nFMD** — negative result preventing dead-end research | — |
-
-### 🎯 Practical Recommendations
+### 🎯 Practical recommendations
 
 | Goal | ✅ Use | ❌ Avoid | Why |
-|:-----|:-------|:---------|:----|
-| 🎹 Dynamics / expression | CLaMP-2 + MTF | CLaMP-1 + ABC | FMD = 0.063 vs 0.020 |
-| 🎼 Score / folk structure | CLaMP-1 + ABC | — | Velocity-invariant by design |
-| 📊 Stylistic distance ranking | CLaMP-2 + MTF | CLaMP-1 + ABC | ABC flattens performance gaps |
-| ⏱️ Timing / microtiming | CLaMP-2 + MTF | CLaMP-1 + ABC, REMI | FMD = 0.118 vs ~0.00 |
+|:--|:--|:--|:--|
+| 🎹 Dynamics / expression | MusicBERT-REMI or CLaMP-2/MTF | CLaMP-1/ABC | ABC discards velocity entirely |
+| 🎼 Score / folk structure | CLaMP-1/ABC | — | velocity-invariant by design |
+| 📊 Stylistic-distance ranking | CLaMP-2/MTF | CLaMP-1/ABC | ABC ranks genres nearly flatly |
+| 🔁 Cross-model comparison | SNR / Spearman / CV | raw FMD magnitude | scale is geometry, not music |
 
 ---
 
-## 🚀 Running the Experiments
-
-> 🇵🇱 Szczegółowa instrukcja krok po kroku (Windows): [`docs/INSTRUKCJA_URUCHAMIANIA.md`](docs/INSTRUKCJA_URUCHAMIANIA.md)
-
-### Full pipeline
+## 🚀 Reproducing the results
 
 ```bash
+# Full 7-step pipeline (≈30–60 min on a single GPU)
 python main.py --mode sensitivity
-```
 
-### Individual steps
-
-```bash
+# Individual steps
 python main.py --mode sensitivity --sensitivity-step self-similarity
 python main.py --mode sensitivity --sensitivity-step ranking
 python main.py --mode sensitivity --sensitivity-step perturbation
 python main.py --mode sensitivity --sensitivity-step bootstrap
-python main.py --mode sensitivity --sensitivity-step plots
+
+# Figures + LaTeX tables for the paper (regenerated from the result CSVs)
+python scripts/generate_draft_figures.py
+python scripts/generate_draft_tables.py
 ```
 
-### 📦 Dataset preparation
-
-```bash
-python main.py --mode fetch-data --datasets maestro pop909   # MAESTRO + POP909
-python scripts/download_folk_dataset.py                      # Nottingham folk
-# MidiCaps classical: HF download + extract midicaps.tar.gz, then:
-python -c "import sys; sys.path.insert(0,'src'); from utils.config import load_config; from data.midicaps_loader import MidiCapsGenreLoader; c=load_config('configs/config.yaml'); c['cross_validation']['midicaps']['genres']=['classical']; MidiCapsGenreLoader(c).populate_raw_datasets()"
-```
+Config: [`configs/sensitivity_pivot.yaml`](configs/sensitivity_pivot.yaml). Install deps with `pip install -r requirements.txt` (includes `unidecode`, required by the CLaMP M3 patcher).
 
 ### 📁 Output
 
 ```
-results/reports/sensitivity_pivot/
-├── self_similarity.csv
-├── cross_dataset_fmd.csv
-├── spearman_ranking_agreement.csv
-├── perturbation_sensitivity.csv
-├── bootstrap_stability.csv
-└── sensitivity_pivot_summary.json
-
-results/plots/sensitivity_pivot/
-├── perturbation_heatmap.png
-├── cross_dataset_bar.png
-├── bootstrap_stability.png
-└── self_similarity.png
+results/reports/sensitivity_pivot/      # CSV + JSON results
+  ├── self_similarity.csv               # noise floor, 6 datasets × 4 configs
+  ├── cross_dataset_fmd.csv             # 15 pairs × 4 configs
+  ├── spearman_ranking_agreement.csv    # rank agreement (n=15, interpretable)
+  ├── perturbation_sensitivity.csv      # FMD, SNR, CI, permutation p
+  ├── bootstrap_stability.csv           # mean ± std, CI, CV
+  └── tables/*.tex                      # auto-generated LaTeX tables
+results/plots/sensitivity_pivot/paper/  # publication figures (fig1…fig6)
 ```
 
-**Runtime:** ~116 min on CPU (80 files/dataset). Config: `configs/sensitivity_pivot.yaml`.
-
----
-
-## 🗂️ Project Structure
-
-```
-src/
-  ├── preprocessing/processor.py        # MIDI preprocessing + perturbations
-  ├── tokenization/tokenizer.py         # REMI, TSD, Octuple, MIDI-Like (MidiTok)
-  ├── embeddings/
-  │   ├── clamp_formats.py              # MTF (mido), ABC (music21), M3 patching
-  │   └── extractor.py                  # CLaMP-1/2, MusicBERT, MERT, NLP
-  ├── metrics/fmd.py                    # Fréchet Music Distance
-  └── experiments/
-      ├── sensitivity_profiler.py       # Sensitivity profiling pipeline (7 steps)
-      └── paper_pipeline.py             # Multi-model benchmark
-
-configs/
-  ├── config.yaml                       # Main project config
-  └── sensitivity_pivot.yaml            # Sensitivity experiment config
-
-results/
-  ├── reports/sensitivity_pivot/        # CSV + JSON results
-  └── plots/sensitivity_pivot/          # Publication figures
-```
-
----
-
-## 📚 Additional Modes
-
-Extended analyses (Lakh MIDI validation, multi-model benchmark, cross-dataset validation):
-
-```bash
-python main.py --mode paper
-python main.py --mode lakh
-python main.py --mode cross-validate
-```
+The scientific write-up is in [`draft.tex`](draft.tex); a plain-language findings summary is in [`docs/PAPER_FINDINGS.md`](docs/PAPER_FINDINGS.md).
 
 ---
 
 ## 📖 References
 
 1. Retkowski, J., Stępniak, J., Modrzejewski, M. (2025). *Fréchet Music Distance: A Metric for Generative Symbolic Music Evaluation.*
-2. Wu, Y., et al. (2023). *CLaMP: Contrastive Language-Music Pre-training.*
-3. Wu, Y., et al. (2024). *CLaMP 2: Multimodal Music Information Retrieval.*
-4. Fradet, N., et al. (2024). *MidiTok: A Python Package for MIDI File Tokenization.*
-5. Heusel, M., et al. (2017). *GANs Trained by a Two Time-Scale Update Rule.* (FID)
-6. Kilgour, K., et al. (2019). *Fréchet Audio Distance.* (FAD)
+2. Zeng, M., et al. (2021). *MusicBERT: Symbolic Music Understanding with Large-Scale Pre-Training.* (Findings of ACL)
+3. Wu, Y., et al. (2023). *CLaMP: Contrastive Language-Music Pre-training.*
+4. Wu, Y., et al. (2024). *CLaMP 2: Multimodal Music Information Retrieval.*
+5. Fradet, N., et al. (2021). *MidiTok: A Python Package for MIDI File Tokenization.*
+6. Huang, Y.-S., Yang, Y.-H. (2020). *Pop Music Transformer* (REMI).
+7. Heusel, M., et al. (2017). *GANs Trained by a Two Time-Scale Update Rule* (FID).
+8. Kilgour, K., et al. (2019). *Fréchet Audio Distance* (FAD).
 
 ---
 
@@ -319,13 +204,10 @@ python main.py --mode cross-validate
 |:--|:--|
 | 🏫 **Institution** | Warsaw University of Technology, EITI |
 | 📚 **Course** | WIMU (Music Information Retrieval) |
-| 👨‍💻 **Authors** | Michał Fereniec, Bartosz Sędzikowski
+| 👨‍💻 **Authors** | Michał Fereniec, Bartosz Sędzikowski |
 | 👨‍🏫 **Supervisor** | mgr inż. Tomasz Radzikowski |
 | 📅 **Duration** | February–June 2026 |
-| 🎤 **Presentation** | June 2026 |
-
----
 
 <p align="center">
-  <b>✅ Status: Results Complete</b> | 📅 Last Updated: 2026-06-08
+  <b>✅ Status: Results Complete</b> | 📅 Last Updated: 2026-06-09
 </p>

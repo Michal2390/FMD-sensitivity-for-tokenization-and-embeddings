@@ -1,14 +1,17 @@
 {
   "configurations": [
+    "MusicBERT-REMI",
+    "MusicBERT-TSD",
     "CLaMP2-MTF",
-    "CLaMP2-REMI",
     "CLaMP1-ABC"
   ],
   "datasets": [
     "maestro",
     "pop909",
-    "folk",
-    "midicaps_classical"
+    "classical",
+    "jazz",
+    "rock",
+    "rap"
   ],
   "perturbations": [
     "original",
@@ -20,75 +23,147 @@
   "self_similarity": [
     {
       "dataset": "maestro",
-      "configuration": "CLaMP2-MTF",
+      "configuration": "MusicBERT-REMI",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.016577977687120438
+      "split_half_fmd": 2.12370451375134
     },
     {
       "dataset": "maestro",
-      "configuration": "CLaMP2-REMI",
+      "configuration": "MusicBERT-TSD",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.009753159247338772
+      "split_half_fmd": 2.3083197572691656
+    },
+    {
+      "dataset": "maestro",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.03561647960799896
     },
     {
       "dataset": "maestro",
       "configuration": "CLaMP1-ABC",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.02916301228106022
+      "split_half_fmd": 0.019749189263489786
+    },
+    {
+      "dataset": "pop909",
+      "configuration": "MusicBERT-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.5723455074486292
+    },
+    {
+      "dataset": "pop909",
+      "configuration": "MusicBERT-TSD",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 2.3229537542820022
     },
     {
       "dataset": "pop909",
       "configuration": "CLaMP2-MTF",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.023925364017486572
-    },
-    {
-      "dataset": "pop909",
-      "configuration": "CLaMP2-REMI",
-      "n_samples_per_half": 40,
-      "split_half_fmd": 0.010098275728523731
+      "split_half_fmd": 0.028573787963285524
     },
     {
       "dataset": "pop909",
       "configuration": "CLaMP1-ABC",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.03329426050186157
+      "split_half_fmd": 0.025713173714074444
     },
     {
-      "dataset": "folk",
+      "dataset": "classical",
+      "configuration": "MusicBERT-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.8769676794968122
+    },
+    {
+      "dataset": "classical",
+      "configuration": "MusicBERT-TSD",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.5135511230978853
+    },
+    {
+      "dataset": "classical",
       "configuration": "CLaMP2-MTF",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.09419086575508118
+      "split_half_fmd": 0.0274161048735882
     },
     {
-      "dataset": "folk",
-      "configuration": "CLaMP2-REMI",
-      "n_samples_per_half": 40,
-      "split_half_fmd": 0.010856306180357933
-    },
-    {
-      "dataset": "folk",
+      "dataset": "classical",
       "configuration": "CLaMP1-ABC",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.025866428390145302
+      "split_half_fmd": 0.02547673792719074
     },
     {
-      "dataset": "midicaps_classical",
+      "dataset": "jazz",
+      "configuration": "MusicBERT-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.7995126906013166
+    },
+    {
+      "dataset": "jazz",
+      "configuration": "MusicBERT-TSD",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.3506540148533457
+    },
+    {
+      "dataset": "jazz",
       "configuration": "CLaMP2-MTF",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.12917494773864746
+      "split_half_fmd": 0.02120498446042246
     },
     {
-      "dataset": "midicaps_classical",
-      "configuration": "CLaMP2-REMI",
-      "n_samples_per_half": 40,
-      "split_half_fmd": 0.03920019418001175
-    },
-    {
-      "dataset": "midicaps_classical",
+      "dataset": "jazz",
       "configuration": "CLaMP1-ABC",
       "n_samples_per_half": 40,
-      "split_half_fmd": 0.03370992839336395
+      "split_half_fmd": 0.0310625719067682
+    },
+    {
+      "dataset": "rock",
+      "configuration": "MusicBERT-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.5797069305794547
+    },
+    {
+      "dataset": "rock",
+      "configuration": "MusicBERT-TSD",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.2127908492469546
+    },
+    {
+      "dataset": "rock",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.02255755968010853
+    },
+    {
+      "dataset": "rock",
+      "configuration": "CLaMP1-ABC",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.025260417240942523
+    },
+    {
+      "dataset": "rap",
+      "configuration": "MusicBERT-REMI",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.7068525955997291
+    },
+    {
+      "dataset": "rap",
+      "configuration": "MusicBERT-TSD",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 1.274700600000616
+    },
+    {
+      "dataset": "rap",
+      "configuration": "CLaMP2-MTF",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.020421961097403546
+    },
+    {
+      "dataset": "rap",
+      "configuration": "CLaMP1-ABC",
+      "n_samples_per_half": 40,
+      "split_half_fmd": 0.025081437691425068
     }
   ],
   "cross_dataset_fmd": [
@@ -96,279 +171,786 @@
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "pair": "maestro_vs_pop909",
-      "configuration": "CLaMP2-MTF",
-      "fmd": 0.07313240319490433
+      "configuration": "MusicBERT-REMI",
+      "fmd": 2.933012760183793
     },
     {
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "pair": "maestro_vs_pop909",
-      "configuration": "CLaMP2-REMI",
-      "fmd": 0.05125515162944794
+      "configuration": "MusicBERT-TSD",
+      "fmd": 3.234787883935166
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "pair": "maestro_vs_pop909",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.03505337377436796
     },
     {
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "pair": "maestro_vs_pop909",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.016612494364380836
+      "fmd": 0.014410119905412133
     },
     {
       "dataset_a": "maestro",
-      "dataset_b": "folk",
-      "pair": "maestro_vs_folk",
+      "dataset_b": "classical",
+      "pair": "maestro_vs_classical",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 2.419105272900981
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "classical",
+      "pair": "maestro_vs_classical",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 2.353255108084416
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "classical",
+      "pair": "maestro_vs_classical",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.7288601398468018
+      "fmd": 0.033382965129037434
     },
     {
       "dataset_a": "maestro",
-      "dataset_b": "folk",
-      "pair": "maestro_vs_folk",
-      "configuration": "CLaMP2-REMI",
-      "fmd": 0.06576792895793915
-    },
-    {
-      "dataset_a": "maestro",
-      "dataset_b": "folk",
-      "pair": "maestro_vs_folk",
+      "dataset_b": "classical",
+      "pair": "maestro_vs_classical",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.014842776581645012
+      "fmd": 0.0152717830628199
     },
     {
       "dataset_a": "maestro",
-      "dataset_b": "midicaps_classical",
-      "pair": "maestro_vs_midicaps_classical",
+      "dataset_b": "jazz",
+      "pair": "maestro_vs_jazz",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 4.18651763516238
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "jazz",
+      "pair": "maestro_vs_jazz",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 6.655466844786551
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "jazz",
+      "pair": "maestro_vs_jazz",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.2721900939941406
+      "fmd": 0.0690392101140413
     },
     {
       "dataset_a": "maestro",
-      "dataset_b": "midicaps_classical",
-      "pair": "maestro_vs_midicaps_classical",
-      "configuration": "CLaMP2-REMI",
-      "fmd": 0.07684294879436493
+      "dataset_b": "jazz",
+      "pair": "maestro_vs_jazz",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.018503157081656285
     },
     {
       "dataset_a": "maestro",
-      "dataset_b": "midicaps_classical",
-      "pair": "maestro_vs_midicaps_classical",
-      "configuration": "CLaMP1-ABC",
-      "fmd": 0.014582278206944466
+      "dataset_b": "rock",
+      "pair": "maestro_vs_rock",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 5.034225375404286
     },
     {
-      "dataset_a": "pop909",
-      "dataset_b": "folk",
-      "pair": "pop909_vs_folk",
+      "dataset_a": "maestro",
+      "dataset_b": "rock",
+      "pair": "maestro_vs_rock",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 4.78475036232885
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "rock",
+      "pair": "maestro_vs_rock",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.6243343353271484
+      "fmd": 0.08095963273520212
     },
     {
-      "dataset_a": "pop909",
-      "dataset_b": "folk",
-      "pair": "pop909_vs_folk",
-      "configuration": "CLaMP2-REMI",
-      "fmd": 0.10189881175756454
-    },
-    {
-      "dataset_a": "pop909",
-      "dataset_b": "folk",
-      "pair": "pop909_vs_folk",
+      "dataset_a": "maestro",
+      "dataset_b": "rock",
+      "pair": "maestro_vs_rock",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.016132628545165062
+      "fmd": 0.01357476492270776
     },
     {
-      "dataset_a": "pop909",
-      "dataset_b": "midicaps_classical",
-      "pair": "pop909_vs_midicaps_classical",
+      "dataset_a": "maestro",
+      "dataset_b": "rap",
+      "pair": "maestro_vs_rap",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 4.428314470494532
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "rap",
+      "pair": "maestro_vs_rap",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 11.39339538182406
+    },
+    {
+      "dataset_a": "maestro",
+      "dataset_b": "rap",
+      "pair": "maestro_vs_rap",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.2193625569343567
+      "fmd": 0.09667094922507746
     },
     {
-      "dataset_a": "pop909",
-      "dataset_b": "midicaps_classical",
-      "pair": "pop909_vs_midicaps_classical",
-      "configuration": "CLaMP2-REMI",
-      "fmd": 0.08893995732069016
-    },
-    {
-      "dataset_a": "pop909",
-      "dataset_b": "midicaps_classical",
-      "pair": "pop909_vs_midicaps_classical",
+      "dataset_a": "maestro",
+      "dataset_b": "rap",
+      "pair": "maestro_vs_rap",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.015496794134378433
+      "fmd": 0.016003737005711782
     },
     {
-      "dataset_a": "folk",
-      "dataset_b": "midicaps_classical",
-      "pair": "folk_vs_midicaps_classical",
+      "dataset_a": "pop909",
+      "dataset_b": "classical",
+      "pair": "pop909_vs_classical",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 2.7910434201697365
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "classical",
+      "pair": "pop909_vs_classical",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 2.446730578419407
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "classical",
+      "pair": "pop909_vs_classical",
       "configuration": "CLaMP2-MTF",
-      "fmd": 0.47204646468162537
+      "fmd": 0.048308784942822675
     },
     {
-      "dataset_a": "folk",
-      "dataset_b": "midicaps_classical",
-      "pair": "folk_vs_midicaps_classical",
-      "configuration": "CLaMP2-REMI",
-      "fmd": 0.08419983834028244
-    },
-    {
-      "dataset_a": "folk",
-      "dataset_b": "midicaps_classical",
-      "pair": "folk_vs_midicaps_classical",
+      "dataset_a": "pop909",
+      "dataset_b": "classical",
+      "pair": "pop909_vs_classical",
       "configuration": "CLaMP1-ABC",
-      "fmd": 0.013781231828033924
+      "fmd": 0.013672973289089119
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "jazz",
+      "pair": "pop909_vs_jazz",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.661354699235627
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "jazz",
+      "pair": "pop909_vs_jazz",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 6.629543181377677
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "jazz",
+      "pair": "pop909_vs_jazz",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.04983041392481044
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "jazz",
+      "pair": "pop909_vs_jazz",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.020369770219324457
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rock",
+      "pair": "pop909_vs_rock",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.4738411426859734
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rock",
+      "pair": "pop909_vs_rock",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 3.150044484366779
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rock",
+      "pair": "pop909_vs_rock",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.05286374261689253
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rock",
+      "pair": "pop909_vs_rock",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.014343278011159255
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rap",
+      "pair": "pop909_vs_rap",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.403406037872088
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rap",
+      "pair": "pop909_vs_rap",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 11.03017700427593
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rap",
+      "pair": "pop909_vs_rap",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.07477244113250889
+    },
+    {
+      "dataset_a": "pop909",
+      "dataset_b": "rap",
+      "pair": "pop909_vs_rap",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.015762828439152332
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "jazz",
+      "pair": "classical_vs_jazz",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.2140639461496896
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "jazz",
+      "pair": "classical_vs_jazz",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 6.113436986560289
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "jazz",
+      "pair": "classical_vs_jazz",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.05466739623741934
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "jazz",
+      "pair": "classical_vs_jazz",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.017383471696357344
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rock",
+      "pair": "classical_vs_rock",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.874891574509915
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rock",
+      "pair": "classical_vs_rock",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 3.1294737805924484
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rock",
+      "pair": "classical_vs_rock",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.06549927151183768
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rock",
+      "pair": "classical_vs_rock",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.013462855297289189
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rap",
+      "pair": "classical_vs_rap",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.9333158619190565
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rap",
+      "pair": "classical_vs_rap",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 11.053667112379832
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rap",
+      "pair": "classical_vs_rap",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.08265794097361018
+    },
+    {
+      "dataset_a": "classical",
+      "dataset_b": "rap",
+      "pair": "classical_vs_rap",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.013866233808090878
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rock",
+      "pair": "jazz_vs_rock",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.167942690721504
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rock",
+      "pair": "jazz_vs_rock",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 5.666361049272242
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rock",
+      "pair": "jazz_vs_rock",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.05293656460779178
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rock",
+      "pair": "jazz_vs_rock",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.015661355937604038
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rap",
+      "pair": "jazz_vs_rap",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 3.2732294388151084
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rap",
+      "pair": "jazz_vs_rap",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 7.3426886853971
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rap",
+      "pair": "jazz_vs_rap",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.04338470432527383
+    },
+    {
+      "dataset_a": "jazz",
+      "dataset_b": "rap",
+      "pair": "jazz_vs_rap",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.016339536130356325
+    },
+    {
+      "dataset_a": "rock",
+      "dataset_b": "rap",
+      "pair": "rock_vs_rap",
+      "configuration": "MusicBERT-REMI",
+      "fmd": 2.844895043953963
+    },
+    {
+      "dataset_a": "rock",
+      "dataset_b": "rap",
+      "pair": "rock_vs_rap",
+      "configuration": "MusicBERT-TSD",
+      "fmd": 7.678632212295327
+    },
+    {
+      "dataset_a": "rock",
+      "dataset_b": "rap",
+      "pair": "rock_vs_rap",
+      "configuration": "CLaMP2-MTF",
+      "fmd": 0.0438036909033947
+    },
+    {
+      "dataset_a": "rock",
+      "dataset_b": "rap",
+      "pair": "rock_vs_rap",
+      "configuration": "CLaMP1-ABC",
+      "fmd": 0.01250362219905543
     }
   ],
   "spearman_agreement": [
     {
-      "config_a": "CLaMP2-MTF",
-      "config_b": "CLaMP2-REMI",
-      "spearman_tau": 0.2571428571428572,
-      "p_value": NaN,
-      "n_pairs": 6,
-      "interpretable": false
+      "config_a": "MusicBERT-REMI",
+      "config_b": "MusicBERT-TSD",
+      "spearman_tau": 0.4357142857142856,
+      "p_value": 0.10449335704406648,
+      "n_pairs": 15,
+      "interpretable": true
+    },
+    {
+      "config_a": "MusicBERT-REMI",
+      "config_b": "CLaMP2-MTF",
+      "spearman_tau": 0.825,
+      "p_value": 0.0001532355709056457,
+      "n_pairs": 15,
+      "interpretable": true
+    },
+    {
+      "config_a": "MusicBERT-REMI",
+      "config_b": "CLaMP1-ABC",
+      "spearman_tau": 0.1464285714285714,
+      "p_value": 0.602549920983054,
+      "n_pairs": 15,
+      "interpretable": true
+    },
+    {
+      "config_a": "MusicBERT-TSD",
+      "config_b": "CLaMP2-MTF",
+      "spearman_tau": 0.5249999999999999,
+      "p_value": 0.04448390580010633,
+      "n_pairs": 15,
+      "interpretable": true
+    },
+    {
+      "config_a": "MusicBERT-TSD",
+      "config_b": "CLaMP1-ABC",
+      "spearman_tau": 0.3214285714285714,
+      "p_value": 0.24271904680166828,
+      "n_pairs": 15,
+      "interpretable": true
     },
     {
       "config_a": "CLaMP2-MTF",
       "config_b": "CLaMP1-ABC",
-      "spearman_tau": -0.3714285714285715,
-      "p_value": NaN,
-      "n_pairs": 6,
-      "interpretable": false
-    },
-    {
-      "config_a": "CLaMP2-REMI",
-      "config_b": "CLaMP1-ABC",
-      "spearman_tau": -0.08571428571428573,
-      "p_value": NaN,
-      "n_pairs": 6,
-      "interpretable": false
+      "spearman_tau": 0.039285714285714285,
+      "p_value": 0.8894459296739485,
+      "n_pairs": 15,
+      "interpretable": true
     }
   ],
   "perturbation_sensitivity": [
     {
+      "configuration": "MusicBERT-REMI",
+      "perturbation": "no_velocity",
+      "description": "Velocity \u2192 constant 64 (remove dynamics)",
+      "fmd_vs_original": 7.3165931931216726,
+      "fmd_boot_mean": 8.182306633494552,
+      "fmd_ci_lower": 7.294469371359917,
+      "fmd_ci_upper": 10.732091694196955,
+      "noise_floor_mean": 2.3146274684166146,
+      "noise_floor_ci_upper": 4.4135348513651085,
+      "snr": 3.1610240926272217,
+      "boot_p_value": 0.0,
+      "significant": true,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-REMI",
+      "perturbation": "quantized_time",
+      "description": "Quantize to 16th notes (remove microtiming)",
+      "fmd_vs_original": 0.10427430232738644,
+      "fmd_boot_mean": 1.0432607071289495,
+      "fmd_ci_lower": 0.7085645636322334,
+      "fmd_ci_upper": 1.700970283413627,
+      "noise_floor_mean": 2.3146274684166146,
+      "noise_floor_ci_upper": 4.4135348513651085,
+      "snr": 0.04505014467780345,
+      "boot_p_value": 1.0,
+      "significant": false,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-REMI",
+      "perturbation": "constant_tempo",
+      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
+      "fmd_vs_original": 0.1482843517253798,
+      "fmd_boot_mean": 1.132199046099246,
+      "fmd_ci_lower": 0.7463881137679815,
+      "fmd_ci_upper": 2.0133413898002424,
+      "noise_floor_mean": 2.3146274684166146,
+      "noise_floor_ci_upper": 4.4135348513651085,
+      "snr": 0.06406402488034839,
+      "boot_p_value": 1.0,
+      "significant": false,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-REMI",
+      "perturbation": "all_combined",
+      "description": "All perturbations combined (total de-expression)",
+      "fmd_vs_original": 7.627190867353797,
+      "fmd_boot_mean": 8.294812160021822,
+      "fmd_ci_lower": 7.419911525025757,
+      "fmd_ci_upper": 9.46088851737342,
+      "noise_floor_mean": 2.3146274684166146,
+      "noise_floor_ci_upper": 4.4135348513651085,
+      "snr": 3.2952131483047635,
+      "boot_p_value": 0.0,
+      "significant": true,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-TSD",
+      "perturbation": "no_velocity",
+      "description": "Velocity \u2192 constant 64 (remove dynamics)",
+      "fmd_vs_original": 3.1343086724987312,
+      "fmd_boot_mean": 4.0236710348890625,
+      "fmd_ci_lower": 3.410917720717924,
+      "fmd_ci_upper": 5.569421650696873,
+      "noise_floor_mean": 2.2002950147437734,
+      "noise_floor_ci_upper": 4.789871959405998,
+      "snr": 1.4244947388856055,
+      "boot_p_value": 0.11,
+      "significant": false,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-TSD",
+      "perturbation": "quantized_time",
+      "description": "Quantize to 16th notes (remove microtiming)",
+      "fmd_vs_original": 0.2585247058893767,
+      "fmd_boot_mean": 1.1692385950982824,
+      "fmd_ci_lower": 0.7477413961210955,
+      "fmd_ci_upper": 2.1257816248875936,
+      "noise_floor_mean": 2.2002950147437734,
+      "noise_floor_ci_upper": 4.789871959405998,
+      "snr": 0.11749547408736104,
+      "boot_p_value": 1.0,
+      "significant": false,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-TSD",
+      "perturbation": "constant_tempo",
+      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
+      "fmd_vs_original": 0.32930921664991786,
+      "fmd_boot_mean": 1.3286192391712057,
+      "fmd_ci_lower": 0.6244315648609148,
+      "fmd_ci_upper": 2.4587374119393357,
+      "noise_floor_mean": 2.2002950147437734,
+      "noise_floor_ci_upper": 4.789871959405998,
+      "snr": 0.1496659377234767,
+      "boot_p_value": 1.0,
+      "significant": false,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
+      "configuration": "MusicBERT-TSD",
+      "perturbation": "all_combined",
+      "description": "All perturbations combined (total de-expression)",
+      "fmd_vs_original": 3.96130561496331,
+      "fmd_boot_mean": 4.6916391361597904,
+      "fmd_ci_lower": 3.921181889910397,
+      "fmd_ci_upper": 5.928303486048739,
+      "noise_floor_mean": 2.2002950147437734,
+      "noise_floor_ci_upper": 4.789871959405998,
+      "snr": 1.8003520384399943,
+      "boot_p_value": 0.1,
+      "significant": false,
+      "n_original": 80,
+      "n_perturbed": 80,
+      "n_bootstrap": 100
+    },
+    {
       "configuration": "CLaMP2-MTF",
       "perturbation": "no_velocity",
       "description": "Velocity \u2192 constant 64 (remove dynamics)",
-      "fmd_vs_original": 0.0627632737159729,
+      "fmd_vs_original": 0.046447030447612114,
+      "fmd_boot_mean": 0.05861781057033489,
+      "fmd_ci_lower": 0.05088959718102351,
+      "fmd_ci_upper": 0.07027850677551718,
+      "noise_floor_mean": 0.03485738352839203,
+      "noise_floor_ci_upper": 0.06796368798016762,
+      "snr": 1.3324875749718876,
+      "boot_p_value": 0.05,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP2-MTF",
       "perturbation": "quantized_time",
       "description": "Quantize to 16th notes (remove microtiming)",
-      "fmd_vs_original": 0.11770336329936981,
+      "fmd_vs_original": 0.025945296010335295,
+      "fmd_boot_mean": 0.03897837105513271,
+      "fmd_ci_lower": 0.032853643420800514,
+      "fmd_ci_upper": 0.05072433521204092,
+      "noise_floor_mean": 0.03485738352839203,
+      "noise_floor_ci_upper": 0.06796368798016762,
+      "snr": 0.7443271233826927,
+      "boot_p_value": 1.0,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP2-MTF",
       "perturbation": "constant_tempo",
       "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
-      "fmd_vs_original": 0.0,
+      "fmd_vs_original": 0.004962293832049214,
+      "fmd_boot_mean": 0.020529179341884047,
+      "fmd_ci_lower": 0.014024874646595293,
+      "fmd_ci_upper": 0.03441187754845909,
+      "noise_floor_mean": 0.03485738352839203,
+      "noise_floor_ci_upper": 0.06796368798016762,
+      "snr": 0.14235990569995957,
+      "boot_p_value": 1.0,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP2-MTF",
       "perturbation": "all_combined",
       "description": "All perturbations combined (total de-expression)",
-      "fmd_vs_original": 0.20732799172401428,
+      "fmd_vs_original": 0.06084541388225806,
+      "fmd_boot_mean": 0.07180518960084332,
+      "fmd_ci_lower": 0.0638937157788144,
+      "fmd_ci_upper": 0.08526002423570574,
+      "noise_floor_mean": 0.03485738352839203,
+      "noise_floor_ci_upper": 0.06796368798016762,
+      "snr": 1.7455531001831581,
+      "boot_p_value": 0.05,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
-    },
-    {
-      "configuration": "CLaMP2-REMI",
-      "perturbation": "no_velocity",
-      "description": "Velocity \u2192 constant 64 (remove dynamics)",
-      "fmd_vs_original": 0.05301079526543617,
-      "n_original": 80,
-      "n_perturbed": 80
-    },
-    {
-      "configuration": "CLaMP2-REMI",
-      "perturbation": "quantized_time",
-      "description": "Quantize to 16th notes (remove microtiming)",
-      "fmd_vs_original": 0.0004000336048193276,
-      "n_original": 80,
-      "n_perturbed": 80
-    },
-    {
-      "configuration": "CLaMP2-REMI",
-      "perturbation": "constant_tempo",
-      "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
-      "fmd_vs_original": 0.0,
-      "n_original": 80,
-      "n_perturbed": 80
-    },
-    {
-      "configuration": "CLaMP2-REMI",
-      "perturbation": "all_combined",
-      "description": "All perturbations combined (total de-expression)",
-      "fmd_vs_original": 0.05517923831939697,
-      "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "no_velocity",
       "description": "Velocity \u2192 constant 64 (remove dynamics)",
-      "fmd_vs_original": 0.02008909545838833,
+      "fmd_vs_original": 0.013198020115322007,
+      "fmd_boot_mean": 0.023222014719022802,
+      "fmd_ci_lower": 0.01715039596683685,
+      "fmd_ci_upper": 0.03051424469675654,
+      "noise_floor_mean": 0.024546045143119186,
+      "noise_floor_ci_upper": 0.031013916342269077,
+      "snr": 0.5376841783826716,
+      "boot_p_value": 1.0,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "quantized_time",
       "description": "Quantize to 16th notes (remove microtiming)",
-      "fmd_vs_original": 0.013927015475928783,
+      "fmd_vs_original": 0.016418447517308365,
+      "fmd_boot_mean": 0.02634698090023725,
+      "fmd_ci_lower": 0.020035277408149962,
+      "fmd_ci_upper": 0.03605497738738888,
+      "noise_floor_mean": 0.024546045143119186,
+      "noise_floor_ci_upper": 0.031013916342269077,
+      "snr": 0.6688836194009375,
+      "boot_p_value": 1.0,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "constant_tempo",
       "description": "Tempo \u2192 constant 120 BPM (remove rubato/tempo changes)",
-      "fmd_vs_original": 0.014908810146152973,
+      "fmd_vs_original": 0.01625770022766465,
+      "fmd_boot_mean": 0.025240444726837064,
+      "fmd_ci_lower": 0.01986368702046909,
+      "fmd_ci_upper": 0.030727345756136972,
+      "noise_floor_mean": 0.024546045143119186,
+      "noise_floor_ci_upper": 0.031013916342269077,
+      "snr": 0.6623348133221394,
+      "boot_p_value": 1.0,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     },
     {
       "configuration": "CLaMP1-ABC",
       "perturbation": "all_combined",
       "description": "All perturbations combined (total de-expression)",
-      "fmd_vs_original": 0.01649544946849346,
+      "fmd_vs_original": 0.014195708097708426,
+      "fmd_boot_mean": 0.02385806325363836,
+      "fmd_ci_lower": 0.019237826889372596,
+      "fmd_ci_upper": 0.0296968093510557,
+      "noise_floor_mean": 0.024546045143119186,
+      "noise_floor_ci_upper": 0.031013916342269077,
+      "snr": 0.5783297478244802,
+      "boot_p_value": 1.0,
+      "significant": false,
       "n_original": 80,
-      "n_perturbed": 80
+      "n_perturbed": 80,
+      "n_bootstrap": 100
     }
   ],
   "bootstrap_stability": [
     {
+      "configuration": "MusicBERT-REMI",
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "n_resamples": 50,
+      "sample_size_a": 80,
+      "sample_size_b": 80,
+      "fmd_mean": 3.5109629113723453,
+      "fmd_std": 0.5313785984835803,
+      "fmd_ci_lower": 2.6619985650640743,
+      "fmd_ci_upper": 4.6370057786737116,
+      "cv": 0.15134839412925555
+    },
+    {
+      "configuration": "MusicBERT-TSD",
+      "dataset_a": "maestro",
+      "dataset_b": "pop909",
+      "n_resamples": 50,
+      "sample_size_a": 80,
+      "sample_size_b": 80,
+      "fmd_mean": 3.9238448439234457,
+      "fmd_std": 0.7910023442833286,
+      "fmd_ci_lower": 2.741682480038621,
+      "fmd_ci_upper": 5.473181036380728,
+      "cv": 0.20158858867936447
+    },
+    {
       "configuration": "CLaMP2-MTF",
       "dataset_a": "maestro",
       "dataset_b": "pop909",
       "n_resamples": 50,
       "sample_size_a": 80,
       "sample_size_b": 80,
-      "fmd_mean": 0.07999675706028939,
-      "fmd_std": 0.004490523177662064,
-      "fmd_ci_lower": 0.07339656334370374,
-      "fmd_ci_upper": 0.0879583740606904,
-      "cv": 0.05613381520300617
-    },
-    {
-      "configuration": "CLaMP2-REMI",
-      "dataset_a": "maestro",
-      "dataset_b": "pop909",
-      "n_resamples": 50,
-      "sample_size_a": 80,
-      "sample_size_b": 80,
-      "fmd_mean": 0.05473574042320251,
-      "fmd_std": 0.00340512078262711,
-      "fmd_ci_lower": 0.04973701909184456,
-      "fmd_ci_upper": 0.06189779583364725,
-      "cv": 0.06221018947217306
+      "fmd_mean": 0.04779134873184874,
+      "fmd_std": 0.0067112799180030465,
+      "fmd_ci_lower": 0.03912242603756312,
+      "fmd_ci_upper": 0.06004522616817522,
+      "cv": 0.14042876160828177
     },
     {
       "configuration": "CLaMP1-ABC",
@@ -377,11 +959,11 @@
       "n_resamples": 50,
       "sample_size_a": 80,
       "sample_size_b": 80,
-      "fmd_mean": 0.02657361052930355,
-      "fmd_std": 0.002932395435322006,
-      "fmd_ci_lower": 0.0213529534637928,
-      "fmd_ci_upper": 0.03092005690559745,
-      "cv": 0.11034990642646628
+      "fmd_mean": 0.02383104435743035,
+      "fmd_std": 0.002629466902938207,
+      "fmd_ci_lower": 0.019290653649551966,
+      "fmd_ci_upper": 0.02959445613622186,
+      "cv": 0.11033787959520784
     }
   ]
 }

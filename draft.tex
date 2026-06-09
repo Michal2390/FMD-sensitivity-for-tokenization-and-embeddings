@@ -1,0 +1,635 @@
+% =====================================================================
+%  draft.tex  --  strong working draft
+%  "What Does the Frechet Music Distance Measure? A Sensitivity Study
+%   of Tokenization and Embedding Choices for Symbolic Music"
+%
+%  Compile from the REPOSITORY ROOT (so \input/\includegraphics relative
+%  paths resolve):
+%      pdflatex draft.tex   (run twice for references)
+%
+%  All tables are \input{} from auto-generated files
+%  (results/reports/sensitivity_pivot/tables/), produced by
+%  scripts/generate_draft_tables.py -- i.e. NO number is typed by hand.
+%  Figures are produced by scripts/generate_draft_figures.py.
+% =====================================================================
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\snr}{\mathrm{SNR}}
+\newcommand{\fmd}{\mathrm{FMD}}
+\graphicspath{{results/plots/sensitivity_pivot/paper/}}
+\captionsetup{font=small,labelfont=bf}
+% tables live here; \inputtable{name} pulls in the generated booktabs body
+\newcommand{\inputtable}[1]{\input{results/reports/sensitivity_pivot/tables/#1}}
+
+\title{\textbf{What Does the Fr\'echet Music Distance Measure?\\
+A Sensitivity Study of Tokenization and Embedding Choices\\
+for Symbolic Music}}
+
+\author{Micha{\l} Fereniec \quad Bartosz S\k{e}dzikowski\\[2pt]
+\small Warsaw University of Technology, Faculty of Electronics and Information Technology\\
+\small Course: WIMU (Music Information Retrieval) \quad Supervisor: mgr in\.z.\ Tomasz Radzikowski}
+
+\date{June 2026 --- working draft}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The Fr\'echet Music Distance (FMD) is increasingly used to evaluate
+generative symbolic-music systems, but an FMD score is not a property of
+the music alone: it is produced by a \emph{pipeline} --- an input
+representation, a pre-trained embedding model, and the Fr\'echet formula
+--- and different pipelines measure different things. We profile four FMD
+configurations spanning two embedding models (MusicBERT, CLaMP-1/2) and
+three input representations (MidiTok REMI/TSD token streams, CLaMP-2
+MIDI-text format, and CLaMP-1 ABC notation) over six datasets and five
+controlled, musically interpretable perturbations of MIDI. Our central
+methodological point is that \emph{raw FMD is not comparable across
+embedding spaces}: CLaMP embeddings are $L_2$-normalised (unit sphere,
+small FMD) whereas MusicBERT's are not (large FMD), so the configurations'
+noise floors differ by roughly $60\times$ for purely geometric reasons.
+We therefore compare configurations only through scale-invariant
+quantities: a per-configuration signal-to-noise ratio (SNR), a
+permutation test, and Spearman rank agreement. Three findings emerge.
+(i)~Removing note velocity is the only perturbation that moves the
+embedding distribution above the sampling-noise floor, and only in
+representations that encode velocity (SNR $1.2$--$3.2$, permutation
+$p\le0.02$, for REMI/TSD/MTF vs.\ $0.67$ for ABC, which has no velocity
+channel); microtiming and tempo stay at or below the floor everywhere. (ii)~Across $15$ dataset pairs, the
+rankings produced by REMI and CLaMP-2/MTF agree strongly (Spearman
+$\rho=0.825$, $p<0.001$), whereas ABC agrees with no configuration
+($\rho\le0.15$, $p>0.6$): ``stylistic distance'' is representation-dependent.
+(iii)~Even the tokenizer alone (REMI vs.\ TSD, same model) reshapes the
+sensitivity profile and the ranking. We conclude that the input
+representation, more than the model, decides what FMD perceives, give
+practitioner guidance, and document a cautionary negative result: naive
+cross-model FMD comparison is a scale artifact, not a finding.
+\end{abstract}
+
+\noindent\textbf{Keywords:} Fr\'echet Music Distance, symbolic music
+evaluation, MIDI tokenization, music embeddings, CLaMP, MusicBERT,
+perturbation analysis, sensitivity.
+
+% =====================================================================
+\section{Introduction}
+% =====================================================================
+Distribution-level distances of the Fr\'echet family have become the
+default way to judge generative models: the Fr\'echet Inception Distance
+(FID) for images~\cite{heusel2017fid} and the Fr\'echet Audio Distance
+(FAD) for audio~\cite{kilgour2019fad} compare a reference and a candidate
+set by fitting a Gaussian to each in a pre-trained embedding space and
+measuring the Fr\'echet (Wasserstein-2) distance between the two
+Gaussians~\cite{dowson1982frechet}. The Fr\'echet Music Distance
+(FMD)~\cite{retkowski2025fmd} transplants this recipe to \emph{symbolic}
+music, replacing the perceptual backbone with a symbolic-music encoder.
+
+This convenience hides a dependency that matters for anyone reporting an
+FMD number. An FMD score is produced not by the music alone but by a
+\emph{pipeline} with at least three moving parts: (i)~how a MIDI file is
+turned into model input (a tokenization such as REMI or TSD, a MIDI-text
+rendering, or a score-like ABC transcription); (ii)~which pre-trained
+model embeds that input; and (iii)~the Fr\'echet formula itself. Two
+pipelines that disagree about which musical attributes survive the
+encoding will assign systematically different distances to the
+\emph{same} pair of corpora. If the community compares systems by FMD, it
+must first understand what each FMD variant is actually sensitive to.
+
+We study this empirically. Rather than proposing a new metric, we treat
+existing FMD pipelines as objects of measurement and ask: \emph{given a
+fixed configuration, which musical properties does it respond to, and how
+does that depend on the tokenizer and the embedding model?} We answer it
+with a perturbation protocol --- stripping one expressive attribute
+(dynamics, microtiming, tempo) from the data and measuring how far the
+embedding distribution moves --- calibrated against each pipeline's own
+sampling noise, plus a cross-dataset ranking whose agreement across
+pipelines we test with Spearman's $\rho$.
+
+\paragraph{A pivot, and an honest accounting.}
+An earlier iteration of this project (a)~pursued a \emph{normalized} FMD
+intended to make scores comparable across models, and (b)~included a
+configuration nominally labelled ``CLaMP-2 + REMI'' that in fact fed the
+model ABC notation. We retired both. CLaMP does not natively consume
+MidiTok token streams, so token-based representations here are routed to
+MusicBERT~\cite{zeng2021musicbert} --- a model designed for symbolic-music
+tokens --- while CLaMP receives only its native MIDI-text and ABC inputs.
+And the cross-model FMD gap we had hoped to ``normalize away'' turns out to
+be a property of embedding geometry (\S\ref{sec:background}), not of the
+music; the constructive replacement is to compare each pipeline
+\emph{against itself} and to compare pipelines only through scale-invariant
+statistics.
+
+\paragraph{Contributions.}
+\begin{enumerate}\itemsep2pt
+  \item A perturbation-based \emph{sensitivity-profiling} protocol for FMD
+  pipelines, using musically interpretable, reversible ablations of MIDI,
+  with each effect calibrated by a per-configuration noise floor into a
+  dimensionless, cross-pipeline-comparable SNR and tested with a two-sample
+  permutation test (\S\ref{sec:method}).
+  \item Evidence that the input representation, more than the model, gates
+  what FMD detects: velocity is detected only where it is represented;
+  microtiming and tempo are below the noise floor for all configurations
+  (\S\ref{sec:results}).
+  \item A scale-invariant cross-configuration analysis over $15$ dataset
+  pairs showing that detail-preserving representations (REMI, MTF) rank
+  corpora alike ($\rho=0.825$, $p<0.001$) while ABC agrees with none
+  (\S\ref{sec:results}).
+  \item A documented negative result and a caution for the field: comparing
+  raw FMD across embedding models is a scale artifact
+  (\S\ref{sec:background},~\S\ref{sec:discussion}), with practitioner
+  guidance.
+\end{enumerate}
+
+% =====================================================================
+\section{Related Work}
+% =====================================================================
+\paragraph{Fr\'echet distances for generative evaluation.}
+FID~\cite{heusel2017fid} popularised fitting Gaussians in a pre-trained
+feature space and using the closed-form Fr\'echet distance between
+Gaussians~\cite{dowson1982frechet}; FAD~\cite{kilgour2019fad} adapted it to
+audio. FMD~\cite{retkowski2025fmd} brings the construction to symbolic
+music and is the metric we profile. A recurring concern for the whole
+family is estimator bias and instability when the number of samples is
+small relative to the embedding dimension, which inflates the covariance
+term --- a regime we operate in and quantify.
+
+\paragraph{Symbolic-music embeddings.}
+MusicBERT~\cite{zeng2021musicbert} pre-trains a Transformer on symbolic
+music with an OctupleMIDI encoding for music-understanding tasks.
+CLaMP~\cite{wu2023clamp} learns a contrastive language--music space over
+ABC notation, and CLaMP-2~\cite{wu2024clamp2} extends this to a multimodal
+setting with an M3 patch encoder operating on a MIDI-text format (MTF).
+Crucially for our analysis, the contrastive CLaMP models $L_2$-normalise
+their output embeddings (they are trained with cosine similarity), whereas
+MusicBERT exposes raw hidden states; this geometric difference, not any
+musical one, dominates the raw FMD scale.
+
+\paragraph{MIDI tokenization.}
+MidiTok~\cite{fradet2021miditok} provides interchangeable tokenizations of
+MIDI, including REMI~\cite{huang2020remi} and TSD. The tokenizer decides
+which attributes (velocity bins, time-shifts, tempo events) are even
+representable downstream, and is therefore a first-class variable in any
+FMD pipeline; Le et al.~\cite{le2024nlpsurvey} survey NLP methods for
+symbolic music and motivate treating tokenization as a consequential
+modelling decision rather than preprocessing.
+
+\paragraph{Gap.}
+Prior work introduces these metrics, models, and tokenizers, but does not
+systematically characterise \emph{what an FMD pipeline becomes blind or
+sensitive to as a function of those choices}, nor caution against comparing
+raw FMD across embedding spaces. We address both.
+
+% =====================================================================
+\section{Background: the Fr\'echet Music Distance}
+\label{sec:background}
+% =====================================================================
+Given two embedding sets with empirical means $\mu_1,\mu_2$ and covariances
+$\Sigma_1,\Sigma_2$, FMD is the squared Fr\'echet distance between the
+fitted Gaussians:
+\begin{equation}
+\fmd = \lVert \mu_1-\mu_2\rVert_2^2 \;+\;
+\operatorname{Tr}\!\Big(\Sigma_1+\Sigma_2-2(\Sigma_1\Sigma_2)^{1/2}\Big).
+\label{eq:fmd}
+\end{equation}
+We regularise covariances with a small ridge ($\varepsilon=10^{-4}$ on the
+diagonal) and fall back to an eigenvalue evaluation of
+$\operatorname{Tr}(\Sigma_1\Sigma_2)^{1/2}=\sum_i\sqrt{\lambda_i}$ when the
+matrix square root returns non-negligible imaginary parts.
+
+Equation~\eqref{eq:fmd} is \emph{not scale-free}. If one model emits
+unit-norm vectors while another emits vectors of norm $\sim\!15$, both the
+mean term and the trace term scale with the geometry of the
+space.\footnote{Concretely, scaling all embeddings of a configuration by a
+constant $c$ multiplies $\fmd$ by $c^2$; an $L_2$-normalised space ($\lVert
+e\rVert=1$) and an unnormalised one are related by exactly such a (here,
+non-constant but systematically large) factor.} Consequently the
+\emph{magnitude} of an FMD score carries information about the embedding
+space at least as much as about the music. This is the formal reason
+cross-model comparison of raw FMD is unsound, and the motivation for the
+scale-invariant analyses of \S\ref{sec:method}.
+
+% =====================================================================
+\section{Methodology}
+\label{sec:method}
+% =====================================================================
+
+\subsection{Configurations}
+We evaluate four pipelines (Table~\ref{tab:configs}) chosen so that pairs
+differ in exactly one factor. \texttt{MusicBERT-REMI} and
+\texttt{MusicBERT-TSD} share a model and differ only in the MidiTok
+tokenizer, isolating tokenization. \texttt{CLaMP2-MTF} and
+\texttt{CLaMP1-ABC} change the model and its native representation. All
+four models emit $768$-dimensional embeddings, so Equation~\eqref{eq:fmd}
+is dimensionally identical across them; only the geometry differs.
+
+\begin{table}[t]
+\centering
+\caption{The four FMD configurations. ABC notation has no velocity channel
+by construction; CLaMP embeddings are $L_2$-normalised, MusicBERT's are
+not.}
+\label{tab:configs}
+\small
+\begin{tabular}{@{}lllc@{}}
+\toprule
+Config & Model & Input & Norm. \\
+\midrule
+\texttt{MusicBERT-REMI} & MusicBERT & REMI tokens (MidiTok) & no \\
+\texttt{MusicBERT-TSD}  & MusicBERT & TSD tokens (MidiTok)  & no \\
+\texttt{CLaMP2-MTF}     & CLaMP-2   & MIDI-text format      & yes \\
+\texttt{CLaMP1-ABC}     & CLaMP-1   & ABC notation          & yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We use the released checkpoints (\texttt{manoskary/musicbert},
+\texttt{sander-wood/clamp2}, \texttt{clamp-small-512}). For CLaMP, MTF is
+rendered from raw MIDI and ABC via \texttt{music21}, each bar-patched by the
+M3 character patcher.\footnote{The M3 patcher transliterates its input with
+\texttt{unidecode} before character-patching; this is a required
+dependency of the CLaMP pipeline.} For MusicBERT, a MidiTok token stream is
+rendered to a string of token identifiers and encoded, returning the
+\texttt{[CLS]} state; we flag this rendering as a limitation
+(\S\ref{sec:limitations}).
+
+\subsection{Datasets and perturbations}
+We use six datasets: \textbf{MAESTRO}~\cite{hawthorne2019maestro}
+(expressive classical piano), \textbf{POP909}~\cite{wang2020pop909}, and
+four Lakh-derived genre subsets (\emph{classical, jazz, rock, rap}); $80$
+files each, fixed seed. This yields $\binom{6}{2}=15$ dataset pairs, above
+the $n\ge 10$ threshold at which the rank-agreement statistic below is
+reported as interpretable. The perturbation study runs on MAESTRO, which is
+rich in the attributes we ablate.
+
+Each perturbation removes one expressive attribute while leaving pitch and
+note structure intact: \emph{velocity flattening} (all velocities $\to64$),
+\emph{time quantization} (onsets/durations to a $16$th-note grid),
+\emph{tempo flattening} ($\to120$\,BPM), and \emph{all combined}.
+
+\subsection{Scale-invariant analyses}
+Because raw FMD is not comparable across configurations
+(\S\ref{sec:background}), every cross-configuration quantity we report is
+scale-invariant.
+
+\paragraph{Noise floor and SNR.}
+For configuration $c$ on a dataset we randomly split the files into halves
+$A,B$ and define the noise floor $\eta_c=\fmd_c(A,B)$ (a stable pipeline
+gives $\eta_c\!\approx\!0$). For perturbation $p$ we report the
+dimensionless ratio
+\begin{equation}
+\snr_c(p)=\frac{\fmd_c(\text{original},\,\text{perturbed}_p)}{\eta_c},
+\label{eq:snr}
+\end{equation}
+whose denominator absorbs the geometric scale of the embedding space.
+$\snr_c(p)\ge 1$ means the perturbation moves the distribution more than
+within-dataset resampling does.
+
+\paragraph{Permutation significance.}
+To test whether a perturbation has \emph{any} systematic effect we use a
+two-sample permutation test: pool the original and perturbed embeddings,
+randomly relabel them into two groups of the original sizes, recompute FMD,
+and repeat ($200$ permutations); the $p$-value is the fraction of permuted
+FMDs at least as large as the observed one.\footnote{The permutation test
+is matched in sample size ($80$ vs.\ $80$) and free of the upward tie-bias
+of bootstrap resampling, so it is the appropriate significance test here;
+the split-half floor of Eq.~\eqref{eq:snr} is retained only as the
+effect-size scale.} We call an attribute \emph{detected} when it is
+permutation-significant ($p<0.05$) \emph{and} exceeds the noise floor
+($\snr\ge1$). A bootstrap ($100$ resamples) gives the FMD confidence
+interval.
+
+\paragraph{Rank agreement.}
+For each configuration we rank the $15$ dataset pairs by FMD and compute
+Spearman's $\rho$ between configurations. Because $\rho$ depends only on
+rank order it is invariant to the embedding scale, making it a sound way to
+ask whether two pipelines order corpora the same way despite incomparable
+magnitudes. Finally, a bootstrap ($50$ resamples, $N=80$) of the
+MAESTRO--POP909 distance gives the scale-invariant coefficient of variation
+$\mathrm{CV}=\sigma/\mu$.
+
+% =====================================================================
+\section{Results}
+\label{sec:results}
+% =====================================================================
+
+\subsection{Noise floors differ by $\sim\!60\times$ for geometric reasons}
+Table~\ref{tab:selfsim} reports split-half FMD. The two CLaMP
+configurations sit near $0.02$--$0.04$; the two MusicBERT configurations
+near $1.2$--$2.3$. This $\sim\!60\times$ gap is \emph{not} evidence that
+CLaMP is ``$60\times$ more consistent''; it is the expected consequence of
+$L_2$-normalised vs.\ unnormalised embeddings entering the scale-sensitive
+Equation~\eqref{eq:fmd} (\S\ref{sec:background}). It is exactly why a
+per-pipeline noise floor is required before any cross-configuration
+statement. Figure~\ref{fig:floor} shows the same data on a log axis.
+
+\begin{table}[t]
+\centering
+\caption{Self-similarity (split-half FMD). Lower is more stable. The
+CLaMP/MusicBERT gap is a geometric artifact of embedding normalisation, not
+a musical property. Generated from \texttt{self\_similarity.csv}.}
+\label{tab:selfsim}
+\small
+\inputtable{tab_self_similarity.tex}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\linewidth]{fig1_noise_floor.png}
+\caption{Per-configuration noise floor (split-half FMD), log scale. The
+$\sim\!60\times$ CLaMP/MusicBERT separation reflects embedding geometry and
+is divided out by the SNR of Eq.~\eqref{eq:snr}.}
+\label{fig:floor}
+\end{figure}
+
+\subsection{Velocity is the only detected attribute --- and only where it is represented}
+Table~\ref{tab:pert} gives the perturbation FMD, its SNR, bootstrap CI, and
+permutation $p$; Figure~\ref{fig:snr} visualises the SNR and
+Figure~\ref{fig:forest} the per-condition significance. Three points.
+
+\textbf{(1)~Velocity.} Flattening velocity is the only perturbation whose
+SNR exceeds $1$, and it is permutation-significant in exactly the three
+representations that encode velocity --- \texttt{MusicBERT-REMI}
+($\snr=3.16$, $p<0.01$), \texttt{MusicBERT-TSD} ($1.35$, $p<0.01$) and
+\texttt{CLaMP2-MTF} ($1.18$, $p=0.02$) --- while \texttt{CLaMP1-ABC} stays
+at the noise floor ($0.67$, not detected). This is mechanistic: ABC
+notation has no velocity channel, so flattening velocity changes nothing in
+the ABC string and the embedding barely moves.\footnote{ABC does register a
+small \emph{systematic} shift for some perturbations (tempo and combined,
+permutation $p<0.05$), but always \emph{below} its own sampling-noise floor
+($\snr<1$) --- systematic yet negligible, and well below the velocity
+response of the other three pipelines.}
+
+\textbf{(2)~Microtiming and tempo.} $16$th-note quantization (SNR
+$0.05$--$0.66$) and tempo flattening (SNR $0.06$--$0.83$) do not exceed the
+noise floor for any configuration at $n=80$; even CLaMP-2/MTF, the most
+timing-sensitive, does not cross the threshold. The \emph{combined}
+perturbation (SNR up to $3.30$) simply tracks the velocity column ---
+de-expression here is dominated by loss of dynamics.
+
+\textbf{(3)~Tokenizer.} Holding MusicBERT fixed, REMI is markedly more
+velocity-sensitive than TSD ($\snr=3.16$ vs.\ $1.42$): the tokenizer alone
+reshapes the sensitivity profile.
+
+\begin{table}[t]
+\centering
+\caption{Perturbation sensitivity on MAESTRO: raw FMD, SNR
+(Eq.~\ref{eq:snr}), bootstrap $95\%$ CI, and permutation $p$. \textbf{Bold}
+SNR marks a \emph{detected} attribute ($\snr\ge1$ and $p<0.05$). Generated
+from \texttt{perturbation\_sensitivity.csv}.}
+\label{tab:pert}
+\small
+\inputtable{tab_perturbation.tex}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig2_snr_heatmap.png}
+\caption{Perturbation SNR. Velocity is detected by every velocity-bearing
+representation but is invisible to ABC; timing and tempo are below the floor
+everywhere.}
+\label{fig:snr}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.95\linewidth]{fig4_perturbation_significance.png}
+\caption{Per-condition SNR with bootstrap $95\%$ CI (log axis). The dashed
+line is the detection threshold $\snr=1$; red marks permutation-significant
+effects.}
+\label{fig:forest}
+\end{figure}
+
+\subsection{Rankings agree only between detail-preserving representations}
+Table~\ref{tab:spearman} and Figure~\ref{fig:spear} report the Spearman
+rank agreement between configurations over the $15$ dataset pairs. The
+rankings of \texttt{MusicBERT-REMI} and \texttt{CLaMP2-MTF} --- a token
+model and a contrastive model, in incomparable embedding spaces --- agree
+strongly ($\rho=0.825$, $p<0.001$), as do, more weakly,
+\texttt{MusicBERT-TSD} and \texttt{CLaMP2-MTF} ($\rho=0.525$, $p=0.044$).
+In sharp contrast, \texttt{CLaMP1-ABC} agrees with \emph{no} configuration
+($\rho\le0.15$, $p>0.6$; $\rho=0.04$ vs.\ MTF). Two pipelines that both
+preserve performance detail order corpora the same way even though their
+distances are numerically incomparable; a pipeline that discards that
+detail orders them differently. ``Stylistic distance,'' as measured by FMD,
+is thus representation-dependent. The underlying magnitudes
+(Table~\ref{tab:cross}, reported as separation ratios so they are
+comparable across configurations) show the same picture: ABC compresses all
+genre pairs to $\sim\!0.5$--$0.8\times$ its own noise floor, i.e.\ near
+indistinguishability.
+
+\begin{table}[t]
+\centering
+\caption{Cross-configuration Spearman rank agreement over $15$ dataset
+pairs (interpretable at $n\ge10$). \textbf{Bold} $\rho$ marks $p<0.05$.
+Generated from \texttt{spearman\_ranking\_agreement.csv}.}
+\label{tab:spearman}
+\small
+\inputtable{tab_spearman.tex}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.72\linewidth]{fig5_spearman_heatmap.png}
+\caption{Cross-configuration rank agreement (Spearman $\rho$, $n=15$).
+REMI and MTF agree strongly; ABC agrees with none.}
+\label{fig:spear}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Cross-dataset separation ratio (FMD normalised by each
+configuration's noise floor; $>1$ = above sampling noise), so values are
+comparable across configurations. Generated from \texttt{cross\_dataset\_fmd.csv}.}
+\label{tab:cross}
+\small
+\inputtable{tab_cross_dataset.tex}
+\end{table}
+
+\subsection{Bootstrap stability}
+Table~\ref{tab:boot} reports the bootstrap of the MAESTRO--POP909 distance.
+Read through the scale-invariant CV, the configurations are comparably
+stable ($11$--$20\%$), with \texttt{MusicBERT-TSD} the most variable. We do
+\emph{not} compare the mean columns across the CLaMP/MusicBERT boundary:
+those magnitudes live in incomparable spaces.
+
+\begin{table}[t]
+\centering
+\caption{Bootstrap stability of the MAESTRO--POP909 FMD ($50$ resamples,
+$N=80$). CV is scale-invariant and comparable across configurations; the
+mean and CI are not. Generated from \texttt{bootstrap\_stability.csv}.}
+\label{tab:boot}
+\small
+\inputtable{tab_bootstrap.tex}
+\end{table}
+
+% =====================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =====================================================================
+\paragraph{What an FMD score actually measures.}
+The results support a simple ordering of causes. The input representation
+sets a \emph{ceiling} on detectability --- an attribute the representation
+discards (velocity under ABC) is invisible no matter how good the model is
+--- and within that ceiling the model and tokenizer modulate how strongly
+the surviving attributes register. The rank-agreement result sharpens this:
+two representations that both keep performance detail (REMI, MTF) induce the
+\emph{same} corpus ordering despite living in incomparable spaces, while a
+score-like representation (ABC) induces a different, flatter one.
+Practically, ``is my FMD sensitive to dynamics?'' is answered first by
+``does my representation encode velocity at all?''.
+
+\paragraph{A negative result worth stating.}
+Earlier analyses of this data reported, for example, that one model was
+``$63\times$ more consistent'' or ``$730\times$ more expressive'' than
+another. Such statements divide raw FMD across the normalisation boundary
+and are scale artifacts: $L_2$ normalisation shrinks every distance CLaMP
+produces and the lack of it inflates every distance MusicBERT produces,
+independent of musical content. The honest, comparable statements are the
+SNR-, permutation-, and rank-based ones above. We highlight this because the
+same trap awaits anyone benchmarking generative systems with FMD scores
+computed from different backbones.
+
+\paragraph{Practitioner guidance.}
+\emph{(i)}~Match the representation to the attribute under study: to
+evaluate dynamics use a velocity-bearing representation (REMI/TSD tokens or
+MTF), never ABC; ABC is appropriate when one \emph{wants} invariance to
+performance nuance (e.g.\ score- or folk-structure similarity).
+\emph{(ii)}~Never compare raw FMD across embedding models; if a cross-model
+statement is unavoidable, use SNR, Spearman, or CV. \emph{(iii)}~Treat
+microtiming/tempo FMD with suspicion at small $n$: neither cleared the noise
+floor in any configuration here.
+
+% =====================================================================
+\section{Limitations and Threats to Validity}
+\label{sec:limitations}
+% =====================================================================
+\begin{itemize}\itemsep2pt
+\item \textbf{MusicBERT input rendering.} Our MusicBERT pipelines encode
+MidiTok token \emph{identifiers} as text via the model's subword tokenizer
+rather than the native OctupleMIDI encoding; this likely contributes to
+MusicBERT's high, unnormalised noise floor and should be read as a
+tokenization-sensitivity baseline, not as MusicBERT used canonically.
+\item \textbf{Sample size vs.\ dimension.} With $n=40$--$80$ samples and
+$d=768$ dimensions, the covariance in Equation~\eqref{eq:fmd} is
+rank-deficient and ridge-regularised; absolute FMD magnitudes (especially
+for unnormalised embeddings) are biased upward. The SNR, permutation, and CV
+framings mitigate but do not remove this; larger $n$ would tighten every
+estimate.
+\item \textbf{ABC on dense polyphony.} \texttt{music21}'s ABC rendering is
+lossy for dense piano textures such as MAESTRO, which both reflects a real
+property (ABC discards performance detail) and limits how much
+\texttt{CLaMP1-ABC} can ever encode.
+\item \textbf{Single perturbation corpus and one strength per attribute.}
+Sensitivity is measured on MAESTRO at one perturbation strength; a
+dose--response sweep and replication on the other corpora would turn the
+binary detected/undetected verdict into detection thresholds.
+\item \textbf{Genre-subset provenance.} The four genre datasets are
+Lakh-derived; instrument normalisation mitigates but does not eliminate
+provenance confounds in the cross-dataset ranking.
+\end{itemize}
+
+% =====================================================================
+\section{Conclusion}
+% =====================================================================
+We profiled four Fr\'echet Music Distance pipelines by perturbing musically
+interpretable attributes and by comparing cross-dataset rankings, using only
+scale-invariant statistics because raw FMD is not comparable across
+embedding spaces --- a point we both explain and demonstrate. The decisive
+variable is the input representation: velocity is detected only where it is
+represented (SNR up to $3.2$; invisible to ABC), microtiming and tempo stay
+below the noise floor everywhere, and detail-preserving representations rank
+corpora alike ($\rho=0.825$, $p<0.001$) while ABC agrees with none. We
+recommend reporting FMD \emph{sensitivity}, not just FMD, and provide a
+small, reusable, fully scripted protocol for doing so.
+
+% =====================================================================
+\section*{Reproducibility}
+% =====================================================================
+All numbers derive from
+\texttt{results/reports/sensitivity\_pivot/} (CSV/JSON), produced by
+\texttt{python main.py --mode sensitivity}. Every table in this paper is
+\texttt{\textbackslash input} from
+\texttt{scripts/generate\_draft\_tables.py} and every figure from
+\texttt{scripts/generate\_draft\_figures.py}, so no result is transcribed by
+hand. Configurations, datasets, perturbations, and seeds are fixed in
+\texttt{configs/sensitivity\_pivot.yaml}.
+
+% =====================================================================
+\begin{thebibliography}{99}
+\small
+
+\bibitem{retkowski2025fmd}
+J.~Retkowski, J.~St\k{e}pniak, and M.~Modrzejewski,
+``Fr\'echet Music Distance: A Metric for Generative Symbolic Music
+Evaluation,'' 2025. Code: \texttt{github.com/jryban/frechet-music-distance}.
+
+\bibitem{heusel2017fid}
+M.~Heusel, H.~Ramsauer, T.~Unterthiner, B.~Nessler, and S.~Hochreiter,
+``GANs Trained by a Two Time-Scale Update Rule Converge to a Local Nash
+Equilibrium,'' in \emph{NeurIPS}, 2017.
+
+\bibitem{kilgour2019fad}
+K.~Kilgour, M.~Zuluaga, D.~Roblek, and M.~Sharifi,
+``Fr\'echet Audio Distance: A Reference-Free Metric for Evaluating Music
+Enhancement Algorithms,'' in \emph{Interspeech}, 2019.
+
+\bibitem{dowson1982frechet}
+D.~C.~Dowson and B.~V.~Landau,
+``The Fr\'echet Distance between Multivariate Normal Distributions,''
+\emph{Journal of Multivariate Analysis}, vol.~12, no.~3, 1982.
+
+\bibitem{zeng2021musicbert}
+M.~Zeng, X.~Tan, R.~Wang, Z.~Ju, T.~Qin, and T.-Y.~Liu,
+``MusicBERT: Symbolic Music Understanding with Large-Scale Pre-Training,''
+in \emph{Findings of ACL-IJCNLP}, 2021.
+
+\bibitem{wu2023clamp}
+S.~Wu, D.~Yu, X.~Tan, and M.~Sun,
+``CLaMP: Contrastive Language--Music Pre-training for Cross-Modal Symbolic
+Music Information Retrieval,'' in \emph{ISMIR}, 2023.
+
+\bibitem{wu2024clamp2}
+S.~Wu et al.,
+``CLaMP~2: Multimodal Music Information Retrieval Across 101 Languages Using
+Large Language Models,'' 2024.
+
+\bibitem{fradet2021miditok}
+N.~Fradet, J.-P.~Briot, F.~Chhel, A.~El~Fallah~Seghrouchni, and
+N.~Gutowski,
+``MidiTok: A Python Package for MIDI File Tokenization,'' in
+\emph{ISMIR Late-Breaking Demo}, 2021. Code:
+\texttt{github.com/Natooz/MidiTok}.
+
+\bibitem{huang2020remi}
+Y.-S.~Huang and Y.-H.~Yang,
+``Pop Music Transformer: Beat-Based Modeling and Generation of Expressive
+Pop Piano Compositions'' (REMI), in \emph{ACM Multimedia}, 2020.
+
+\bibitem{hawthorne2019maestro}
+C.~Hawthorne et al.,
+``Enabling Factorized Piano Music Modeling and Generation with the MAESTRO
+Dataset,'' in \emph{ICLR}, 2019.
+
+\bibitem{wang2020pop909}
+Z.~Wang et al.,
+``POP909: A Pop-Song Dataset for Music Arrangement Generation,'' in
+\emph{ISMIR}, 2020.
+
+\bibitem{le2024nlpsurvey}
+D.~V.~T.~Le, L.~Bigo, M.~Keller, and D.~Herremans,
+``Natural Language Processing Methods for Symbolic Music Generation and
+Information Retrieval: a Survey,'' \emph{arXiv:2402.17467}, 2024.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,26 @@
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Configuration & Perturbation & FMD & SNR & 95\% CI & perm.\ $p$ \\
+\midrule
+\texttt{MusicBERT-REMI} & Velocity removed & 7.3166 & \textbf{3.16} & [7.294,\,10.732] & $<$0.01 \\
+\texttt{MusicBERT-REMI} & Timing quantized & 0.1043 & {0.05} & [0.730,\,2.217] & 1.00 \\
+\texttt{MusicBERT-REMI} & Tempo flattened & 0.1483 & {0.06} & [0.755,\,1.825] & 1.00 \\
+\texttt{MusicBERT-REMI} & All combined & 7.6272 & \textbf{3.30} & [7.528,\,9.427] & $<$0.01 \\
+\addlinespace
+\texttt{MusicBERT-TSD} & Velocity removed & 3.1343 & \textbf{1.35} & [3.387,\,5.348] & $<$0.01 \\
+\texttt{MusicBERT-TSD} & Timing quantized & 0.2585 & {0.11} & [0.718,\,2.315] & 1.00 \\
+\texttt{MusicBERT-TSD} & Tempo flattened & 0.3293 & {0.14} & [0.642,\,2.872] & 1.00 \\
+\texttt{MusicBERT-TSD} & All combined & 3.9613 & \textbf{1.71} & [3.844,\,6.011] & $<$0.01 \\
+\addlinespace
+\texttt{CLaMP2-MTF} & Velocity removed & 0.0464 & \textbf{1.18} & [0.050,\,0.074] & 0.02 \\
+\texttt{CLaMP2-MTF} & Timing quantized & 0.0259 & {0.66} & [0.034,\,0.055] & 0.08 \\
+\texttt{CLaMP2-MTF} & Tempo flattened & 0.0050 & {0.13} & [0.013,\,0.030] & 1.00 \\
+\texttt{CLaMP2-MTF} & All combined & 0.0608 & \textbf{1.55} & [0.065,\,0.087] & $<$0.01 \\
+\addlinespace
+\texttt{CLaMP1-ABC} & Velocity removed & 0.0166 & {0.67} & [0.020,\,0.036] & 0.06 \\
+\texttt{CLaMP1-ABC} & Timing quantized & 0.0154 & {0.62} & [0.018,\,0.034] & 0.09 \\
+\texttt{CLaMP1-ABC} & Tempo flattened & 0.0206 & {0.83} & [0.021,\,0.040] & 0.03 \\
+\texttt{CLaMP1-ABC} & All combined & 0.0223 & {0.90} & [0.023,\,0.049] & $<$0.01 \\
+\addlinespace
+\bottomrule
+\end{tabular}

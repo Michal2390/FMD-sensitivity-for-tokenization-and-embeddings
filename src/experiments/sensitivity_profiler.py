@@ -253,6 +253,81 @@ class SensitivityProfiler:
         )
         return embeddings
 
+    # ─── Bootstrap helpers (perturbation significance) ──────────────────
+
+    def _noise_floor_distribution(
+        self, emb: np.ndarray, n_resamples: int, rng: np.random.Generator
+    ) -> np.ndarray:
+        """Null distribution of within-dataset FMD (split-half bootstrap).
+
+        Repeatedly splits a single embedding set into two random halves and
+        measures their FMD. This is the sampling noise a perturbation must
+        exceed to count as detected; its mean is the per-configuration
+        noise floor used for the SNR.
+        """
+        n = emb.shape[0]
+        half = n // 2
+        vals = []
+        for _ in range(n_resamples):
+            idx = rng.permutation(n)
+            a = emb[idx[:half]]
+            b = emb[idx[half:2 * half]]
+            vals.append(float(self.fmd.compute_fmd(a, b)))
+        return np.array(vals)
+
+    def _perturbation_bootstrap(
+        self,
+        emb_orig: np.ndarray,
+        emb_pert: np.ndarray,
+        n_resamples: int,
+        rng: np.random.Generator,
+    ) -> np.ndarray:
+        """Bootstrap distribution of FMD(original, perturbed).
+
+        Resamples the two embedding sets independently (FMD compares
+        distributions, not paired points, so unpaired resampling is the
+        correct bootstrap and avoids any mis-alignment when a file fails
+        under one condition but not the other).
+        """
+        n_o, n_p = emb_orig.shape[0], emb_pert.shape[0]
+        vals = []
+        for _ in range(n_resamples):
+            io = rng.choice(n_o, n_o, replace=True)
+            ip = rng.choice(n_p, n_p, replace=True)
+            vals.append(float(self.fmd.compute_fmd(emb_orig[io], emb_pert[ip])))
+        return np.array(vals)
+
+    def _permutation_pvalue(
+        self,
+        emb_orig: np.ndarray,
+        emb_pert: np.ndarray,
+        observed_fmd: float,
+        n_perm: int,
+        rng: np.random.Generator,
+    ) -> float:
+        """Two-sample permutation test for FMD(original, perturbed).
+
+        Under H0 (the perturbation has no distributional effect) the
+        'original'/'perturbed' labels are exchangeable. We pool the two sets,
+        randomly relabel into two groups of the original sizes, and recompute
+        FMD; the p-value is the fraction of permuted FMDs at least as large as
+        the observed one. This is matched-sample-size and free of the
+        bootstrap tie-inflation, so it is the appropriate significance test
+        (unlike the split-half floor, which is only an effect-size reference).
+        """
+        pooled = np.vstack([emb_orig, emb_pert])
+        n_a = emb_orig.shape[0]
+        total = pooled.shape[0]
+        count = 0
+        for _ in range(n_perm):
+            idx = rng.permutation(total)
+            a = pooled[idx[:n_a]]
+            b = pooled[idx[n_a:]]
+            if self.fmd.compute_fmd(a, b) >= observed_fmd:
+                count += 1
+        # add-one estimator: never reports an impossible p == 0
+        return (count + 1) / (n_perm + 1)
+
     # ─── Step 3: Self-Similarity ────────────────────────────────────────
 
     def run_self_similarity(self) -> pd.DataFrame:
@@ -424,6 +499,11 @@ class SensitivityProfiler:
         original_pert = self.perturbations[0]  # Should be "original"
         assert original_pert.name == "original", f"First perturbation should be 'original', got '{original_pert.name}'"
 
+        pb_cfg = self.pivot_cfg.get("perturbation_bootstrap", {})
+        n_boot = int(pb_cfg.get("n_resamples", 100))
+        n_perm = int(pb_cfg.get("n_permutations", 200))
+        rng = np.random.default_rng(int(pb_cfg.get("seed", self.seed)))
+
         rows = []
 
         for cfg in tqdm(self.configurations, desc="Perturbation sensitivity"):
@@ -433,6 +513,11 @@ class SensitivityProfiler:
                 logger.warning(f"No original embeddings for {cfg.name}")
                 continue
 
+            # Per-configuration noise floor (null distribution) — computed once.
+            null_dist = self._noise_floor_distribution(emb_original, n_boot, rng)
+            noise_floor_mean = float(null_dist.mean())
+            noise_floor_ci_upper = float(np.percentile(null_dist, 97.5))
+
             for pert in self.perturbations[1:]:  # Skip "original"
                 emb_perturbed = self._extract_embeddings(midi_files, cfg, pert)
                 if emb_perturbed.size == 0:
@@ -440,15 +525,45 @@ class SensitivityProfiler:
                     continue
 
                 fmd_val = float(self.fmd.compute_fmd(emb_original, emb_perturbed))
+
+                # Bootstrap CI of the perturbation FMD and significance test
+                # against the noise floor (does the perturbation move the
+                # distribution more than within-dataset resampling does?).
+                boot_dist = self._perturbation_bootstrap(
+                    emb_original, emb_perturbed, n_boot, rng
+                )
+                snr = fmd_val / noise_floor_mean if noise_floor_mean > 1e-12 else float("nan")
+                # Significance via a proper two-sample permutation test; the
+                # split-half floor is kept only as the SNR effect-size scale.
+                perm_p = self._permutation_pvalue(
+                    emb_original, emb_perturbed, fmd_val, n_perm, rng
+                )
+                # "Detected" = systematically different (permutation-significant)
+                # AND larger than within-dataset sampling noise (SNR >= 1).
+                detected = bool(perm_p < 0.05 and snr >= 1.0)
+
                 rows.append({
                     "configuration": cfg.name,
                     "perturbation": pert.name,
                     "description": pert.description,
                     "fmd_vs_original": fmd_val,
+                    "fmd_boot_mean": float(boot_dist.mean()),
+                    "fmd_ci_lower": float(np.percentile(boot_dist, 2.5)),
+                    "fmd_ci_upper": float(np.percentile(boot_dist, 97.5)),
+                    "noise_floor_mean": noise_floor_mean,
+                    "noise_floor_ci_upper": noise_floor_ci_upper,
+                    "snr": snr,
+                    "perm_p_value": perm_p,
+                    "significant": detected,
                     "n_original": emb_original.shape[0],
                     "n_perturbed": emb_perturbed.shape[0],
+                    "n_bootstrap": n_boot,
+                    "n_permutations": n_perm,
                 })
-                logger.info(f"  {cfg.name} | {pert.name}: FMD = {fmd_val:.4f}")
+                logger.info(
+                    f"  {cfg.name} | {pert.name}: FMD={fmd_val:.4f} "
+                    f"SNR={snr:.2f} perm_p={perm_p:.3f} {'DET' if detected else 'ns'}"
+                )
 
         df = pd.DataFrame(rows)
         out_path = self.output_dir / "perturbation_sensitivity.csv"
