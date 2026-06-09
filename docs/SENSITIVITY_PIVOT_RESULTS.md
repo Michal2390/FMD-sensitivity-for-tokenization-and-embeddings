@@ -1,91 +1,69 @@
-# Sensitivity Pivot — Wyniki (prawdziwe datasety, 2026-06-08)
+# FMD Sensitivity Study - Methodology Status
 
-## Źródła danych
+This document replaces the previous sensitivity-pivot result note. The older
+tables included a `CLaMP2-REMI` configuration, which is not a valid main-study
+configuration: CLaMP-2 does not consume MidiTok REMI tokens as its native music
+input. Those numbers must not be used in the paper.
 
-| Dataset | Plików | Źródło |
-|---------|--------|--------|
-| **maestro** | 1276 | [MAESTRO v3](https://storage.googleapis.com/magentadata/datasets/maestro/v3.0.0/maestro-v3.0.0-midi.zip) |
-| **pop909** | 2898 | [POP909-Dataset](https://github.com/music-x-lab/POP909-Dataset) |
-| **folk** | 1034 | [Nottingham Dataset](https://github.com/jukedeck/nottingham-dataset) |
-| **midicaps_classical** | 300 | [MidiCaps](https://huggingface.co/datasets/amaai-lab/MidiCaps) — tag `classical` |
+## Paper Title
 
-W eksperymencie: **80 losowych plików** per dataset (seed=42).
+**FMD Sensitivity to Tokenization and Embedding Configuration**
 
-## Konfiguracje
+## Valid Configuration Families
 
-- **CLaMP2-MTF** — MIDI → MTF (`mido`) → M3 patches
-- **CLaMP2-REMI** — MidiTok REMI → text patches
-- **CLaMP1-ABC** — MIDI → ABC (`music21`) → bar patches
+| Family | Valid examples | Scientific interpretation |
+|--------|----------------|---------------------------|
+| MidiTok tokenizer sensitivity | `MusicBERT-REMI`, `MusicBERT-TSD`, `MusicBERT-Octuple`, `MusicBERT-MIDI-Like` | Same embedding model, different tokenization schemes. |
+| Model-native representation sensitivity | `CLaMP2-MTF`, `CLaMP1-ABC`, optionally `MERT-audio` | Different model/input representation pipelines. |
 
----
+Invalid for main paper results:
 
-## Krok 3: Self-Similarity
+- `CLaMP2-REMI`
+- `CLaMP1-REMI`
+- Any result that zero-pads or SVD-aligns embedding spaces before FMD
+- Any result based on synthetic fallback embeddings
+- Any claim that nFMD makes FMD fairly comparable across embedding models
 
-| Dataset | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC |
-|---------|-----------|------------|-----------|
-| MAESTRO | 0.017 | 0.010 | 0.029 |
-| POP909 | 0.024 | 0.010 | 0.033 |
-| Folk | 0.094 | 0.011 | 0.026 |
-| MidiCaps classical | 0.129 | 0.039 | 0.034 |
+## Current Pivot Configurations
 
-Wszystkie < 0.15 — konfiguracje stabilne.
+- **MusicBERT-REMI** - MusicBERT over MidiTok REMI tokens.
+- **MusicBERT-TSD** - MusicBERT over MidiTok TSD tokens.
+- **CLaMP2-MTF** - CLaMP-2 native MTF/M3 representation from MIDI.
+- **CLaMP1-ABC** - CLaMP-1 ABC notation via `music21`.
 
----
+## Statistical Design
 
-## Krok 4: Cross-Dataset Ranking (6 par)
+The paper must not rely on significance tests over three configuration values.
+The defended analysis should use repeated observations from:
 
-| Para | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC |
-|------|-----------|------------|-----------|
-| MAESTRO–POP909 | 0.073 | 0.051 | 0.017 |
-| MAESTRO–Folk | **0.729** | 0.066 | 0.015 |
-| MAESTRO–Classical | 0.272 | 0.077 | 0.015 |
-| POP909–Folk | **0.624** | 0.102 | 0.016 |
-| POP909–Classical | 0.219 | 0.089 | 0.015 |
-| Folk–Classical | 0.472 | 0.084 | 0.014 |
+- multiple dataset pairs,
+- bootstrap resampling over pieces,
+- perturbation profiles per configuration,
+- optional mixed-effects models with dataset pair as a random effect.
 
-### Spearman τ (n=6)
+Recommended primary outputs:
 
-| Para konfiguracji | τ |
-|-------------------|---|
-| CLaMP2-MTF vs CLaMP2-REMI | 0.26 |
-| CLaMP2-MTF vs CLaMP1-ABC | −0.37 |
-| CLaMP2-REMI vs CLaMP1-ABC | −0.09 |
+- raw FMD per dataset pair and configuration,
+- bootstrap confidence intervals,
+- rank agreement across dataset pairs,
+- perturbation sensitivity heatmaps,
+- clear separation between tokenizer effects and model/representation effects.
 
-MTF widzi duże dystanse stylistyczne (MAESTRO–Folk 0.73); ABC/REMI spłaszczają ranking (~0.015).
+## Interpretation Rules
 
----
+- Raw FMD is valid within a single embedding space.
+- Cross-configuration comparisons are interpreted as ranking/sensitivity changes,
+  not as universally calibrated distances.
+- ABC does not preserve velocity; low velocity sensitivity for `CLaMP1-ABC` is an
+  expected representation property, not evidence that velocity is irrelevant.
+- MTF preserves more MIDI message information and should be evaluated as a
+  model-native representation, not as a tokenizer.
 
-## Krok 5: Perturbation Sensitivity (MAESTRO)
+## Regeneration
 
-| Perturbacja | CLaMP2-MTF | CLaMP2-REMI | CLaMP1-ABC |
-|-------------|-----------|------------|-----------|
-| no_velocity | **0.063** | 0.053 | 0.020 |
-| quantized_time | **0.118** | 0.000 | 0.014 |
-| constant_tempo | 0.000 | 0.000 | 0.015 |
-| all_combined | **0.207** | 0.055 | 0.016 |
+Regenerate results only after the strict paper pipeline passes without synthetic
+fallbacks or invalid configuration warnings:
 
-**Wnioski:**
-- MTF najsilniej reaguje na velocity i kwantyzację czasu na prawdziwym MAESTRO
-- REMI reaguje na velocity, nie na timing
-- ABC praktycznie niewrażliwe na wszystkie perturbacje (strata informacji w konwersji)
-
----
-
-## Krok 6: Bootstrap (MAESTRO vs POP909, n=50)
-
-| Konfiguracja | FMD mean ± std | 95% CI |
-|-------------|---------------|--------|
-| CLaMP2-MTF | 0.080 ± 0.004 | [0.073, 0.088] |
-| CLaMP2-REMI | 0.055 ± 0.003 | [0.050, 0.062] |
-| CLaMP1-ABC | 0.027 ± 0.003 | [0.021, 0.031] |
-
----
-
-## Synteza
-
-1. Na prawdziwych danych MTF daje wyraźniejszą separację stylistyczną i wrażliwość na perturbacje.
-2. MAESTRO–Folk FMD = 0.73 (MTF) potwierdza duży kontrast klasyczny vs folk.
-3. Kwantyzacja czasu na MAESTRO jest wykrywalna przez MTF (FMD=0.12) — na syntetykach było ~0.02.
-4. Rekomendacja: **CLaMP2+MTF** do oceny MIDI z dynamiką i timingiem; **CLaMP1+ABC** tylko do struktury partytury.
-
-**Czas uruchomienia:** ~116 min (CPU, 80 plików/dataset).
+```bash
+python main.py --mode sensitivity
+```

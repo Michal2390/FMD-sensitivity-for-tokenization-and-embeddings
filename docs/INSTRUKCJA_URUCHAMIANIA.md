@@ -1,6 +1,14 @@
 # Instrukcja uruchamiania (sensitivity pivot, czerwiec 2026)
 
-Aktualna wersja projektu skupia się na **sensitivity profiling** — profilowaniu wrażliwości FMD na perturbacje MIDI w trzech konfiguracjach: CLaMP2-MTF, CLaMP2-REMI, CLaMP1-ABC.
+Aktualna wersja projektu skupia się na **paper-grade sensitivity profiling** - profilowaniu wrażliwości FMD na tokenizację i konfigurację embeddingów bez mieszania tokenizerów z natywnymi wejściami CLaMP.
+
+Poprawne konfiguracje pivotu:
+- `MusicBERT-REMI`
+- `MusicBERT-TSD`
+- `CLaMP2-MTF`
+- `CLaMP1-ABC`
+
+Nie używaj starych wyników `CLaMP2-REMI`: CLaMP-2 nie konsumuje tokenów REMI jako natywnego wejścia.
 
 Główny punkt wejścia: `main.py --mode sensitivity`  
 Konfiguracja: `configs/sensitivity_pivot.yaml`
@@ -96,7 +104,7 @@ python main.py --mode sensitivity
 Kroki wykonywane automatycznie:
 1. Self-similarity sanity check
 2. Cross-dataset ranking (6 par datasetów)
-3. Perturbation sensitivity (5 perturbacji × 3 konfiguracje)
+3. Perturbation sensitivity (5 perturbacji x poprawne konfiguracje)
 4. Bootstrap stability
 5. Generowanie wykresów
 

@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import experiments.paper_pipeline as pipeline_mod
+from experiments.study_config import validate_embedding_input
 
 
 class _FakeDatasetManager:
@@ -33,6 +34,9 @@ class _FakeTokenizerPipeline:
 class _FakeEmbeddings:
     def __init__(self, config):
         self.config = config
+
+    def extract_embeddings(self, token_sequences, model_name, **_kwargs):
+        return np.zeros((len(token_sequences), 8), dtype=np.float32)
 
 
 class _FakeFMD:
@@ -117,10 +121,40 @@ def test_build_variants_count(runner):
     assert len(variants) == 2 * 2 * 4
 
 
+def test_build_variants_keeps_clamp_model_native(runner):
+    variants = runner.build_variants(
+        tokenizers=["REMI", "TSD"],
+        models=["CLaMP-2"],
+        preprocessing_grid=[(False, False)],
+    )
+    assert len(variants) == 1
+    assert variants[0].model == "CLaMP-2"
+    assert variants[0].input_format == "MTF"
+    assert variants[0].tokenizer is None
+
+
+def test_rejects_invalid_clamp_remi_configuration():
+    with pytest.raises(ValueError, match="CLaMP-2"):
+        validate_embedding_input("CLaMP-2", input_format="REMI", tokenizer="REMI")
+
+    with pytest.raises(ValueError, match="CLaMP-1"):
+        validate_embedding_input("CLaMP-1", input_format="MIDITOK", tokenizer="REMI")
+
+
 def test_parse_pairs_handles_mixed_formats():
     raw = [("a", "b"), "('c', 'd')", "(e, f)"]
     pairs = pipeline_mod.PaperExperimentRunner._parse_pairs(raw)
     assert pairs == [("a", "b"), ("c", "d"), ("e", "f")]
+
+
+def test_pairwise_rejects_dimension_alignment(runner):
+    distributions = {
+        "a": np.zeros((4, 8), dtype=np.float32),
+        "b": np.zeros((4, 16), dtype=np.float32),
+    }
+    rows, summary = runner._pairwise_fmd_rows(distributions, axis="model", group_name="REMI")
+    assert rows[0]["fmd"] is None
+    assert summary[0]["n_pairs"] == 0
 
 
 def test_run_pairwise_and_outputs(runner):
@@ -217,6 +251,18 @@ def test_hard_strict_raises_immediately(monkeypatch, light_config):
         local_runner.run_pairwise_benchmark(variants)
 
 
+def test_hard_strict_rejects_synthetic_embedding_fallback(monkeypatch, light_config):
+    monkeypatch.setattr(pipeline_mod, "DatasetManager", _FakeDatasetManager)
+    monkeypatch.setattr(pipeline_mod, "MIDIPreprocessor", _FakePreprocessor)
+    monkeypatch.setattr(pipeline_mod, "TokenizationPipeline", _FakeTokenizerPipeline)
+    monkeypatch.setattr(pipeline_mod, "EmbeddingExtractor", None)
+    monkeypatch.setattr(pipeline_mod, "FrechetMusicDistance", _FakeFMD)
+
+    light_config["paper"]["fallback_mode"] = "hard_strict"
+    with pytest.raises(RuntimeError, match="EmbeddingExtractor"):
+        pipeline_mod.PaperExperimentRunner(light_config)
+
+
 def test_split_rows_and_effects(runner):
     variants = runner.build_variants(tokenizers=["REMI", "Octuple"], models=["MusicBERT"], preprocessing_grid=[(False, False)])
     rows = runner.run_pairwise_benchmark(variants)
@@ -227,5 +273,3 @@ def test_split_rows_and_effects(runner):
     effects = runner.compute_variant_effects(split["all"])
     assert "tokenizer_deltas" in effects
     assert "model_deltas" in effects
-
-

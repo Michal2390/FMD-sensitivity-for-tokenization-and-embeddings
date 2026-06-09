@@ -223,7 +223,12 @@ class FrechetMusicDistance:
         embeddings1: np.ndarray,
         embeddings2: np.ndarray,
     ) -> Dict[str, float]:
-        """Compute Normalized FMD (nFMD) — scale-invariant across model architectures.
+        """Compute legacy normalized FMD diagnostics.
+
+        This method is retained for old exploratory reports only. It must not be
+        presented as making FMD comparable across different embedding models or
+        representation spaces; dividing by covariance traces or mean norms does
+        not solve the cross-space comparability problem.
 
         Returns raw FMD plus two normalizations:
           - nfmd_trace: FMD / (Tr(Σ₁) + Tr(Σ₂))   — normalizes by total embedding variance
@@ -237,6 +242,10 @@ class FrechetMusicDistance:
             Dict with keys: fmd, nfmd_trace, nfmd_norm, and all components
             from compute_fmd_components.
         """
+        logger.warning(
+            "compute_nfmd() is a legacy diagnostic and is not valid as a fair "
+            "cross-model normalization for paper results."
+        )
         components = self.compute_fmd_components(embeddings1, embeddings2)
         fmd = components["fmd"]
         trace_sum = components["trace_cov1"] + components["trace_cov2"]

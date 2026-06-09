@@ -1,20 +1,26 @@
 # Sensitivity Pivot Configuration (corrected, June 2026)
 #
-# 3 configurations — honest naming:
-#   A: CLaMP-2 + MTF  (native MIDI Text Format from raw MIDI)
-#   B: CLaMP-2 + REMI (MidiTok REMI tokens → text patches; isolates tokenization)
-#   C: CLaMP-1 + ABC  (music21 ABC bar-patching; isolates model)
+# Paper-grade configurations with honest input semantics:
+#   A: MusicBERT + REMI (MidiTok tokenization sensitivity baseline)
+#   B: MusicBERT + TSD  (same model, different MidiTok tokenizer)
+#   C: CLaMP-2 + MTF   (native MIDI Text Format from raw MIDI)
+#   D: CLaMP-1 + ABC   (music21 ABC bar-patching; no velocity channel)
 
 configurations:
+  - name: "MusicBERT-REMI"
+    model: "MusicBERT"
+    input_format: "MIDITOK"
+    tokenizer: "REMI"
+    description: "MusicBERT over MidiTok REMI tokens"
+  - name: "MusicBERT-TSD"
+    model: "MusicBERT"
+    input_format: "MIDITOK"
+    tokenizer: "TSD"
+    description: "MusicBERT over MidiTok TSD tokens"
   - name: "CLaMP2-MTF"
     model: "CLaMP-2"
     input_format: "MTF"
     description: "CLaMP-2 native MTF from MIDI (lossless, preserves velocity)"
-  - name: "CLaMP2-REMI"
-    model: "CLaMP-2"
-    input_format: "REMI"
-    tokenizer: "REMI"
-    description: "CLaMP-2 with MidiTok REMI token text (lossy tokenization)"
   - name: "CLaMP1-ABC"
     model: "CLaMP-1"
     input_format: "ABC"
@@ -69,6 +75,7 @@ bootstrap:
   dataset_pair: ["maestro", "pop909"]
 
 min_pairs_for_spearman: 6
+strict_paper_mode: true
 
 seed: 42
 max_files_per_dataset: 80

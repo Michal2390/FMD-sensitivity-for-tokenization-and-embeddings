@@ -33,6 +33,10 @@ except Exception as _e:
     EmbeddingExtractor = None
     logger.warning(f"Embeddings extractor import failed: {_e}. Falling back to synthetic extractor.")
 from metrics.fmd import FMDRanking, FrechetMusicDistance
+from experiments.study_config import (
+    MIDITOK_FORMAT,
+    validate_embedding_input,
+)
 try:
     from preprocessing.processor import MIDIPreprocessor
 except Exception as _e:
@@ -50,16 +54,18 @@ except Exception as _e:
 class PipelineVariant:
     """Single pipeline configuration used in experiments."""
 
-    tokenizer: str
     model: str
+    input_format: str
+    tokenizer: str | None
     remove_velocity: bool
     hard_quantization: bool
 
     @property
     def name(self) -> str:
         """Compact string label for reports."""
+        label = self.input_format if self.tokenizer is None else self.tokenizer
         return (
-            f"tok={self.tokenizer}|model={self.model}|"
+            f"input={label}|model={self.model}|"
             f"vel={'off' if self.remove_velocity else 'on'}|"
             f"quant={'on' if self.hard_quantization else 'off'}"
         )
@@ -70,15 +76,22 @@ class PaperExperimentRunner:
 
     def __init__(self, config: Dict):
         self.config = config
+        paper_cfg = config.get("paper", {})
+        fallback_mode = str(paper_cfg.get("fallback_mode", "synthetic")).strip().lower()
+        strict_runtime = fallback_mode in {"strict", "hard_strict"}
 
         # Dataset manager (fallback if project-specific manager not available)
         if DatasetManager is not None:
             try:
                 self.dataset_manager = DatasetManager(config)
             except Exception as _e:
+                if strict_runtime:
+                    raise RuntimeError("DatasetManager is required in strict paper mode") from _e
                 logger.warning(f"Failed to initialize DatasetManager: {_e}; using fallback dataset manager.")
                 self.dataset_manager = self._fallback_dataset_manager()
         else:
+            if strict_runtime:
+                raise RuntimeError("DatasetManager import failed in strict paper mode")
             logger.warning("DatasetManager not available; using fallback dataset manager.")
             self.dataset_manager = self._fallback_dataset_manager()
 
@@ -87,9 +100,13 @@ class PaperExperimentRunner:
             try:
                 self.preprocessor = MIDIPreprocessor(config)
             except Exception as _e:
+                if strict_runtime:
+                    raise RuntimeError("MIDIPreprocessor is required in strict paper mode") from _e
                 logger.warning(f"Failed to initialize MIDIPreprocessor: {_e}; using fallback preprocessor.")
                 self.preprocessor = self._fallback_preprocessor()
         else:
+            if strict_runtime:
+                raise RuntimeError("MIDIPreprocessor import failed in strict paper mode")
             logger.warning("MIDIPreprocessor not available; using fallback preprocessor.")
             self.preprocessor = self._fallback_preprocessor()
 
@@ -98,9 +115,13 @@ class PaperExperimentRunner:
             try:
                 self.tokenization = TokenizationPipeline(config)
             except Exception as _e:
+                if strict_runtime:
+                    raise RuntimeError("TokenizationPipeline is required in strict paper mode") from _e
                 logger.warning(f"Failed to initialize TokenizationPipeline: {_e}; using fallback tokenization.")
                 self.tokenization = self._fallback_tokenization_pipeline()
         else:
+            if strict_runtime:
+                raise RuntimeError("TokenizationPipeline import failed in strict paper mode")
             logger.warning("TokenizationPipeline not available; using fallback tokenization pipeline.")
             self.tokenization = self._fallback_tokenization_pipeline()
 
@@ -110,21 +131,24 @@ class PaperExperimentRunner:
             try:
                 self.embeddings = EmbeddingExtractor(config)
             except Exception as _e:
+                if strict_runtime:
+                    raise RuntimeError("EmbeddingExtractor is required in strict paper mode") from _e
                 logger.warning(f"Failed to initialize EmbeddingExtractor: {_e}; using synthetic fallback.")
                 self.embeddings = self._synthetic_fallback_extractor()
         else:
+            if strict_runtime:
+                raise RuntimeError("EmbeddingExtractor import failed in strict paper mode")
             logger.warning("EmbeddingExtractor not available; using synthetic fallback extractor.")
             self.embeddings = self._synthetic_fallback_extractor()
 
         self.fmd = FrechetMusicDistance(config)
 
-        paper_cfg = config.get("paper", {})
         self.max_files = int(paper_cfg.get("max_files_per_dataset", 8))
         self.synthetic_fallback_samples = int(paper_cfg.get("synthetic_fallback_samples", 12))
         self.seed = int(paper_cfg.get("seed", 42))
         self.dataset_names = self._dataset_names()
         self.compare_all_pairs = bool(paper_cfg.get("compare_all_pairs", False))
-        self.fallback_mode = str(paper_cfg.get("fallback_mode", "synthetic")).strip().lower()
+        self.fallback_mode = fallback_mode
         self.progress_log_every = int(paper_cfg.get("progress_log_every", 25))
         self.bootstrap_cfg = paper_cfg.get("bootstrap_ci", {})
         self.bootstrap_enabled = bool(self.bootstrap_cfg.get("enabled", True))
@@ -153,10 +177,32 @@ class PaperExperimentRunner:
         if preprocessing_grid is None:
             preprocessing_grid = [(False, False), (True, False), (False, True), (True, True)]
 
-        variants = [
-            PipelineVariant(tok, model, remove_vel, hard_quant)
-            for tok, model, (remove_vel, hard_quant) in product(tokenizers, models, preprocessing_grid)
-        ]
+        variants: List[PipelineVariant] = []
+        for model, (remove_vel, hard_quant) in product(models, preprocessing_grid):
+            if model in {"CLaMP-1", "CLaMP-2"}:
+                spec = validate_embedding_input(model=model)
+                variants.append(
+                    PipelineVariant(
+                        model=spec.model,
+                        input_format=spec.input_format,
+                        tokenizer=spec.tokenizer,
+                        remove_velocity=remove_vel,
+                        hard_quantization=hard_quant,
+                    )
+                )
+                continue
+
+            for tok in tokenizers:
+                spec = validate_embedding_input(model=model, input_format=MIDITOK_FORMAT, tokenizer=tok)
+                variants.append(
+                    PipelineVariant(
+                        model=spec.model,
+                        input_format=spec.input_format,
+                        tokenizer=spec.tokenizer,
+                        remove_velocity=remove_vel,
+                        hard_quantization=hard_quant,
+                    )
+                )
         logger.info(f"Built {len(variants)} variants")
         return variants
 
@@ -275,6 +321,35 @@ class PaperExperimentRunner:
         midi_data = self.preprocessor.filter_note_range(midi_data)
         midi_data = self.preprocessor.normalize_instruments(midi_data)
         return midi_data
+
+    def _tokens_for_variant(self, midi_data, variant: PipelineVariant) -> List[int]:
+        if variant.input_format != MIDITOK_FORMAT:
+            return []
+        if not variant.tokenizer:
+            raise ValueError(f"Variant {variant.name} requires a MidiTok tokenizer")
+        tokenizer = self.tokenization.tokenizers[variant.tokenizer]
+        return tokenizer.encode_midi_object(midi_data)
+
+    def _miditok_tokenizer_for_variant(self, variant: PipelineVariant):
+        if variant.input_format != MIDITOK_FORMAT or not variant.tokenizer:
+            return None
+        tokenizer = self.tokenization.tokenizers[variant.tokenizer]
+        return getattr(tokenizer, "miditok_tokenizer", None)
+
+    def _extract_variant_embeddings(
+        self,
+        token_sequences: Sequence[List[int]],
+        midi_data_list: Sequence | None,
+        variant: PipelineVariant,
+    ) -> np.ndarray:
+        input_formats = [variant.input_format] * len(token_sequences)
+        return self.embeddings.extract_embeddings(
+            token_sequences=list(token_sequences),
+            model_name=variant.model,
+            midi_data_list=list(midi_data_list) if midi_data_list is not None else None,
+            input_formats=input_formats,
+            miditok_tokenizer=self._miditok_tokenizer_for_variant(variant),
+        )
 
     @staticmethod
     def _segment_label(path: Path) -> str:
@@ -418,7 +493,7 @@ class PaperExperimentRunner:
             def __init__(self, dim: int):
                 self.dim = int(dim)
 
-            def extract_embeddings(self, token_sequences: Sequence[Sequence[int]], model_name: str = ""):
+            def extract_embeddings(self, token_sequences: Sequence[Sequence[int]], model_name: str = "", **_kwargs):
                 embs = []
                 for seq in token_sequences:
                     try:
@@ -568,65 +643,19 @@ class PaperExperimentRunner:
             emb_left = distributions[left]
             emb_right = distributions[right]
             try:
-                # Ensure 2D arrays and use float64 for numeric stability
                 emb_left_arr = np.atleast_2d(emb_left).astype(np.float64)
                 emb_right_arr = np.atleast_2d(emb_right).astype(np.float64)
-
-                n_left = emb_left_arr.shape[0]
-                n_right = emb_right_arr.shape[0]
                 d_left = emb_left_arr.shape[1] if emb_left_arr.size else 0
                 d_right = emb_right_arr.shape[1] if emb_right_arr.size else 0
+                if d_left != d_right:
+                    raise ValueError(
+                        f"Cannot compute FMD across different embedding dimensions: {d_left} vs {d_right}. "
+                        "Do not use SVD/zero-padding normalization for paper results."
+                    )
+                if d_left <= 0:
+                    raise ValueError("Cannot compute FMD for empty embedding dimensions")
 
-                # If dimensions already match, compute directly
-                if d_left == d_right and d_left > 0:
-                    fmd_value = float(self.fmd.compute_fmd(emb_left_arr, emb_right_arr))
-                    n_left_used = n_left
-                    n_right_used = n_right
-
-                else:
-                    # If the two embedding sets correspond to the same samples (same n),
-                    # align their spaces with an SVD-based CCA-like projection and compute FMD in that shared latent space.
-                    if n_left == n_right and n_left >= 2 and d_left > 0 and d_right > 0:
-                        A = emb_left_arr - np.mean(emb_left_arr, axis=0, keepdims=True)
-                        B = emb_right_arr - np.mean(emb_right_arr, axis=0, keepdims=True)
-                        M = A.T @ B  # cross-covariance (d_left x d_right)
-                        try:
-                            U, svals, Vt = np.linalg.svd(M, full_matrices=False)
-                            k = min(len(svals), n_left, d_left, d_right)
-                            if k < 1:
-                                raise RuntimeError("Insufficient rank for alignment")
-                            A_proj = A @ U[:, :k]
-                            B_proj = B @ Vt.T[:, :k]
-                            fmd_value = float(self.fmd.compute_fmd(A_proj, B_proj))
-                            n_left_used = n_left
-                            n_right_used = n_right
-                        except Exception as _e:
-                            # Fallback to zero-padding if alignment fails
-                            if d_left < d_right:
-                                pad = np.zeros((n_left, d_right - d_left), dtype=emb_left_arr.dtype)
-                                emb_left_align = np.concatenate([emb_left_arr, pad], axis=1)
-                                emb_right_align = emb_right_arr
-                            else:
-                                pad = np.zeros((n_right, d_left - d_right), dtype=emb_right_arr.dtype)
-                                emb_right_align = np.concatenate([emb_right_arr, pad], axis=1)
-                                emb_left_align = emb_left_arr
-                            fmd_value = float(self.fmd.compute_fmd(emb_left_align, emb_right_align))
-                            n_left_used = n_left
-                            n_right_used = n_right
-
-                    else:
-                        # Unable to align via SVD (different sample counts). Use zero-padding as pragmatic fallback.
-                        if d_left < d_right:
-                            pad = np.zeros((n_left, d_right - d_left), dtype=emb_left_arr.dtype)
-                            emb_left_align = np.concatenate([emb_left_arr, pad], axis=1)
-                            emb_right_align = emb_right_arr
-                        else:
-                            pad = np.zeros((n_right, d_left - d_right), dtype=emb_right_arr.dtype)
-                            emb_right_align = np.concatenate([emb_right_arr, pad], axis=1)
-                            emb_left_align = emb_left_arr
-                        fmd_value = float(self.fmd.compute_fmd(emb_left_align, emb_right_align))
-                        n_left_used = n_left
-                        n_right_used = n_right
+                fmd_value = float(self.fmd.compute_fmd(emb_left_arr, emb_right_arr))
 
                 rows.append(
                     {
@@ -635,8 +664,8 @@ class PaperExperimentRunner:
                         "left": left,
                         "right": right,
                         "fmd": fmd_value,
-                        "n_left": int(n_left_used),
-                        "n_right": int(n_right_used),
+                        "n_left": int(emb_left_arr.shape[0]),
+                        "n_right": int(emb_right_arr.shape[0]),
                     }
                 )
                 values.append(fmd_value)
@@ -726,9 +755,14 @@ class PaperExperimentRunner:
         if not all_models:
             raise ValueError("No models selected for per-song analysis")
 
+        first_spec = validate_embedding_input(
+            all_models[0],
+            tokenizer=None if all_models[0] in {"CLaMP-1", "CLaMP-2"} else all_tokenizers[0],
+        )
         base_variant = PipelineVariant(
-            tokenizer=all_tokenizers[0],
-            model=all_models[0],
+            model=first_spec.model,
+            input_format=first_spec.input_format,
+            tokenizer=first_spec.tokenizer,
             remove_velocity=remove_velocity,
             hard_quantization=hard_quantization,
         )
@@ -741,6 +775,7 @@ class PaperExperimentRunner:
             raise RuntimeError(
                 f"Not enough usable segments in {midi_path} for per-song analysis (got {len(segments)})"
             )
+        segment_by_index = {int(segment["index"]): segment for segment in segments}
 
         if output_dir is None:
             output_dir = Path(self.config.get("results", {}).get("reports_dir", "results/reports")) / "per_song"
@@ -772,10 +807,25 @@ class PaperExperimentRunner:
                 )
             else:
                 for model_name in all_models:
+                    spec = validate_embedding_input(model_name, tokenizer=all_tokenizers[0])
+                    if spec.input_format != MIDITOK_FORMAT:
+                        logger.warning(
+                            f"Skipping tokenizer axis for {model_name}: model-native {spec.input_format} "
+                            "does not consume MidiTok tokenizers"
+                        )
+                        continue
                     distributions: Dict[str, np.ndarray] = {}
                     for tokenizer_name in all_tokenizers:
                         seqs = [token_maps[tokenizer_name][idx] for idx in common_indices]
-                        embeddings = self.embeddings.extract_embeddings(seqs, model_name)
+                        variant = PipelineVariant(
+                            model=model_name,
+                            input_format=MIDITOK_FORMAT,
+                            tokenizer=tokenizer_name,
+                            remove_velocity=remove_velocity,
+                            hard_quantization=hard_quantization,
+                        )
+                        midi_segments = [segment_by_index[idx]["midi"] for idx in common_indices]
+                        embeddings = self._extract_variant_embeddings(seqs, midi_segments, variant)
                         distributions[tokenizer_name] = embeddings
                         tokenizer_segment_stats.extend(
                             [
@@ -834,7 +884,24 @@ class PaperExperimentRunner:
                 token_sequences = [token_maps[tokenizer_name][idx] for idx in common_indices]
                 distributions: Dict[str, np.ndarray] = {}
                 for model_name in all_models:
-                    embeddings = self.embeddings.extract_embeddings(token_sequences, model_name)
+                    try:
+                        spec = validate_embedding_input(
+                            model_name,
+                            tokenizer=None if model_name in {"CLaMP-1", "CLaMP-2"} else tokenizer_name,
+                        )
+                    except ValueError as exc:
+                        logger.warning(f"Skipping incompatible model axis cell: {exc}")
+                        continue
+                    variant = PipelineVariant(
+                        model=model_name,
+                        input_format=spec.input_format,
+                        tokenizer=spec.tokenizer,
+                        remove_velocity=remove_velocity,
+                        hard_quantization=hard_quantization,
+                    )
+                    midi_segments = [segment_by_index[idx]["midi"] for idx in common_indices]
+                    seqs = token_sequences if spec.input_format == MIDITOK_FORMAT else [[] for _ in common_indices]
+                    embeddings = self._extract_variant_embeddings(seqs, midi_segments, variant)
                     distributions[model_name] = embeddings
                     model_segment_stats.extend(
                         [
@@ -1498,11 +1565,10 @@ class PaperExperimentRunner:
                 midi_data = self._preprocess_midi_file(midi_path, variant)
                 if midi_data is None:
                     continue
-                tokenizer = self.tokenization.tokenizers[variant.tokenizer]
-                tokens = tokenizer.encode_midi_object(midi_data)
-                if not tokens:
+                tokens = self._tokens_for_variant(midi_data, variant)
+                if variant.input_format == MIDITOK_FORMAT and not tokens:
                     continue
-                vec = self.embeddings.extract_embeddings([tokens], variant.model)[0]
+                vec = self._extract_variant_embeddings([tokens], [midi_data], variant)[0]
                 vectors.append(vec)
                 real_count += 1
             except Exception as exc:
@@ -1592,6 +1658,7 @@ class PaperExperimentRunner:
                     {
                         "variant": variant.name,
                         "tokenizer": variant.tokenizer,
+                        "input_format": variant.input_format,
                         "model": variant.model,
                         "remove_velocity": variant.remove_velocity,
                         "hard_quantization": variant.hard_quantization,
@@ -1921,6 +1988,7 @@ class PaperExperimentRunner:
         pairwise_fields = [
             "variant",
             "tokenizer",
+            "input_format",
             "model",
             "remove_velocity",
             "hard_quantization",
@@ -2161,6 +2229,8 @@ class PaperExperimentRunner:
         """Fast smoke benchmark for one-click run in IDE."""
         tokenizers = [self.config["tokenization"]["tokenizers"][0]["type"]]
         models = [self.config["embeddings"]["models"][0]["name"]]
+        if models[0] in {"CLaMP-1", "CLaMP-2"}:
+            tokenizers = []
         variants = self.build_variants(
             tokenizers=tokenizers,
             models=models,
@@ -2187,13 +2257,13 @@ class PaperExperimentRunner:
     # ------------------------------------------------------------------
 
     def run_lakh_validation(self) -> Dict:
-        """Run full 32-variant FMD sensitivity validation on Lakh MIDI.
+        """Run paper-grade FMD sensitivity validation on Lakh MIDI.
 
         Workflow:
         1. Ensure Lakh data + Tagtraum annotations are available.
         2. Populate ``data/raw/lakh_rock/`` and ``data/raw/lakh_classical/``.
-        3. Build 32 variants (4 tok × 2 model × 4 preprocess).
-        4. For each variant: preprocess → tokenize → embed → cache.
+        3. Build validated model/input variants.
+        4. For each variant: preprocess → represent/tokenize if needed → embed.
         5. Compute FMD(rock, classical) per variant with bootstrap CI.
         6. Run sensitivity analysis (ANOVA, Tukey, η², Cohen's d).
         7. Run embedding diagnostics (cosine, PCA/t-SNE, token stats).
@@ -2250,12 +2320,11 @@ class PaperExperimentRunner:
                         midi_data = self._preprocess_midi_file(midi_path, variant)
                         if midi_data is None:
                             continue
-                        tokenizer = self.tokenization.tokenizers[variant.tokenizer]
-                        tokens = tokenizer.encode_midi_object(midi_data)
-                        if not tokens:
+                        tokens = self._tokens_for_variant(midi_data, variant)
+                        if variant.input_format == MIDITOK_FORMAT and not tokens:
                             continue
                         seqs.append(tokens)
-                        vec = self.embeddings.extract_embeddings([tokens], variant.model)[0]
+                        vec = self._extract_variant_embeddings([tokens], [midi_data], variant)[0]
                         vectors.append(vec)
                     except Exception as exc:
                         logger.warning(f"Skip {midi_path}: {exc}")
@@ -2294,6 +2363,7 @@ class PaperExperimentRunner:
                 pairwise_rows.append({
                     "variant": variant.name,
                     "tokenizer": variant.tokenizer,
+                    "input_format": variant.input_format,
                     "model": variant.model,
                     "remove_velocity": variant.remove_velocity,
                     "hard_quantization": variant.hard_quantization,
@@ -2315,6 +2385,7 @@ class PaperExperimentRunner:
                 pairwise_rows.append({
                     "variant": variant.name,
                     "tokenizer": variant.tokenizer,
+                    "input_format": variant.input_format,
                     "model": variant.model,
                     "remove_velocity": variant.remove_velocity,
                     "hard_quantization": variant.hard_quantization,

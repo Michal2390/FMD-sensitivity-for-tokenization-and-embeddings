@@ -1,8 +1,8 @@
-"""Sensitivity Profiler — implements the professor's 7-step pivot plan.
+"""Sensitivity Profiler - paper-grade FMD sensitivity study.
 
 Steps:
-  1. Define 3 configurations (CLaMP2-MTF, CLaMP2-REMI, CLaMP1-ABC)
-  2. Use 3-4 datasets with clear stylistic relations
+  1. Define honest model/input configurations (MidiTok models, CLaMP MTF/ABC)
+  2. Use at least 4 datasets with clear stylistic relations
   3. Self-similarity sanity check (split-half FMD ≈ 0)
   4. Cross-dataset ranking with Spearman τ between configs
   5. Perturbation sensitivity profiling
@@ -19,17 +19,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-import pandas as pd
 from loguru import logger
-from scipy.stats import spearmanr
-from tqdm import tqdm
 
-from data.manager import DatasetManager
-from embeddings.extractor import EmbeddingExtractor
-from metrics.fmd import FrechetMusicDistance
-from preprocessing.processor import MIDIPreprocessor
-from tokenization.tokenizer import TokenizationPipeline
 from utils.config import load_config
+from experiments.study_config import (
+    MIDITOK_FORMAT,
+    validate_embedding_input,
+)
 
 
 @dataclass
@@ -37,7 +33,7 @@ class SensitivityConfig:
     """A single configuration (model + input representation) to evaluate."""
     name: str
     model: str
-    input_format: str  # MTF, ABC, REMI
+    input_format: str  # MIDITOK, MTF, ABC
     tokenizer: Optional[str] = None
     description: str = ""
 
@@ -76,10 +72,22 @@ class SensitivityProfiler:
         self.pivot_cfg = load_config(pivot_config_path)
 
         # Infrastructure
+        print("[Progress] importing sensitivity infrastructure", flush=True)
+        from data.manager import DatasetManager
+        from embeddings.extractor import EmbeddingExtractor
+        from metrics.fmd import FrechetMusicDistance
+        from preprocessing.processor import MIDIPreprocessor
+        from tokenization.tokenizer import TokenizationPipeline
+
+        print("[Progress] constructing DatasetManager", flush=True)
         self.dataset_manager = DatasetManager(main_config)
+        print("[Progress] constructing MIDIPreprocessor", flush=True)
         self.preprocessor = MIDIPreprocessor(main_config)
+        print("[Progress] constructing TokenizationPipeline", flush=True)
         self.tokenization = TokenizationPipeline(main_config)
+        print("[Progress] constructing EmbeddingExtractor (models may download/load now)", flush=True)
         self.embeddings = EmbeddingExtractor(main_config)
+        print("[Progress] constructing FrechetMusicDistance", flush=True)
         self.fmd = FrechetMusicDistance(main_config)
 
         # Pivot parameters
@@ -90,17 +98,24 @@ class SensitivityProfiler:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.plots_dir.mkdir(parents=True, exist_ok=True)
 
-        # Parse configurations
-        self.configurations = [
-            SensitivityConfig(
-                name=c["name"],
+        # Parse and validate configurations. This deliberately rejects the old
+        # invalid CLaMP2-REMI setup: CLaMP-2 consumes MTF/M3, not MidiTok REMI.
+        self.configurations = []
+        for c in self.pivot_cfg["configurations"]:
+            spec = validate_embedding_input(
                 model=c["model"],
-                input_format=c["input_format"],
+                input_format=c.get("input_format"),
                 tokenizer=c.get("tokenizer"),
-                description=c.get("description", ""),
             )
-            for c in self.pivot_cfg["configurations"]
-        ]
+            self.configurations.append(
+                SensitivityConfig(
+                    name=c["name"],
+                    model=spec.model,
+                    input_format=spec.input_format,
+                    tokenizer=spec.tokenizer,
+                    description=c.get("description", ""),
+                )
+            )
 
         # Parse datasets (required + optional that exist on disk)
         self.datasets = [d["name"] for d in self.pivot_cfg["datasets"] if not d.get("optional", False)]
@@ -198,11 +213,12 @@ class SensitivityProfiler:
                     if perturbation.constant_tempo:
                         midi_data = self.preprocessor.normalize_tempo(midi_data, target_bpm=120.0)
 
-                # Tokenize when REMI path is used; MTF/ABC use midi_data directly
+                # Tokenize only when a MidiTok-based model is used; CLaMP MTF/ABC
+                # use midi_data directly and must not be labelled as REMI.
                 tokens: List[int] = []
-                if config.input_format == "REMI":
+                if config.input_format == MIDITOK_FORMAT:
                     if not config.tokenizer:
-                        raise ValueError(f"Config {config.name} requires tokenizer for REMI format")
+                        raise ValueError(f"Config {config.name} requires a MidiTok tokenizer")
                     tokenizer = self.tokenization.tokenizers[config.tokenizer]
                     tokens = tokenizer.encode_midi_object(midi_data)
                     if not tokens:
@@ -223,7 +239,7 @@ class SensitivityProfiler:
             return np.array([])
 
         miditok_tokenizer = None
-        if config.input_format == "REMI" and config.tokenizer:
+        if config.input_format == MIDITOK_FORMAT and config.tokenizer:
             miditok_tokenizer = self.tokenization.tokenizers[config.tokenizer].miditok_tokenizer
 
         input_formats = [config.input_format] * len(token_sequences)
@@ -244,6 +260,9 @@ class SensitivityProfiler:
 
         Expected: FMD ≈ 0 for each split. If high → configuration is unstable.
         """
+        import pandas as pd
+        from tqdm import tqdm
+
         logger.info("=" * 60)
         logger.info("STEP 3: Self-Similarity Sanity Check")
         logger.info("=" * 60)
@@ -293,6 +312,10 @@ class SensitivityProfiler:
 
         Returns ranking table + Spearman τ agreement matrix.
         """
+        import pandas as pd
+        from scipy.stats import spearmanr
+        from tqdm import tqdm
+
         logger.info("=" * 60)
         logger.info("STEP 4: Cross-Dataset Ranking")
         logger.info("=" * 60)
@@ -384,6 +407,9 @@ class SensitivityProfiler:
         Args:
             dataset_name: Dataset to use for perturbation analysis (default: maestro)
         """
+        import pandas as pd
+        from tqdm import tqdm
+
         logger.info("=" * 60)
         logger.info("STEP 5: Perturbation Sensitivity Profiling")
         logger.info(f"  Dataset: {dataset_name}")
@@ -438,6 +464,9 @@ class SensitivityProfiler:
         Resample N times, compute FMD each time, report mean ± std.
         Shows which configuration is more stable with limited data.
         """
+        import pandas as pd
+        from tqdm import tqdm
+
         logger.info("=" * 60)
         logger.info("STEP 6: Bootstrap Stability Analysis")
         logger.info("=" * 60)
@@ -550,6 +579,7 @@ class SensitivityProfiler:
             import matplotlib
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
+            import pandas as pd
             import seaborn as sns
         except ImportError:
             logger.warning("matplotlib/seaborn not available, skipping plots")
@@ -666,5 +696,3 @@ class SensitivityProfiler:
         logger.info("=" * 60)
 
         return result
-
-

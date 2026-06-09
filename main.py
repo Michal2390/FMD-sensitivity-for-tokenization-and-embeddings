@@ -13,10 +13,6 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
-from experiments.paper_pipeline import PaperExperimentRunner
-from experiments.publication_plots import generate_publication_plots
-from experiments.sensitivity_profiler import SensitivityProfiler
-from data.manager import DatasetManager
 from utils.config import get_logger, load_config, setup_logging
 
 
@@ -79,6 +75,8 @@ class FMDSensitivityAnalysis:
 
     def run_paper_benchmark(self, full: bool = False):
         """Run paper-oriented comparison benchmark and report generation."""
+        from experiments.paper_pipeline import PaperExperimentRunner
+
         runner = PaperExperimentRunner(self.config)
         if full:
             self.logger.info("Running full paper benchmark")
@@ -98,6 +96,8 @@ class FMDSensitivityAnalysis:
 
     def run_publication_plots(self):
         """Generate publication-ready plots from latest paper outputs."""
+        from experiments.publication_plots import generate_publication_plots
+
         self.logger.info("Generating publication plots")
         outputs = generate_publication_plots(self.config)
         if not outputs:
@@ -110,6 +110,8 @@ class FMDSensitivityAnalysis:
 
     def run_fetch_data(self, dataset_names: list[str] | None = None) -> bool:
         """Download MIDI datasets from configured external sources."""
+        from data.manager import DatasetManager
+
         manager = DatasetManager(self.config)
         configured = [d["name"] for d in self.config.get("data", {}).get("datasets", [])]
         targets = dataset_names or configured
@@ -135,6 +137,8 @@ class FMDSensitivityAnalysis:
 
     def run_lakh_validation(self):
         """Run Lakh MIDI 32-variant sensitivity validation (rock vs classical)."""
+        from experiments.paper_pipeline import PaperExperimentRunner
+
         self.logger.info("Running Lakh MIDI validation pipeline")
         runner = PaperExperimentRunner(self.config)
         result = runner.run_lakh_validation()
@@ -167,8 +171,13 @@ class FMDSensitivityAnalysis:
             step: Optional specific step to run ('self-similarity', 'ranking',
                   'perturbation', 'bootstrap', 'plots'). If None, runs all steps.
         """
+        print("[Progress] importing SensitivityProfiler", flush=True)
+        from experiments.sensitivity_profiler import SensitivityProfiler
+
+        print("[Progress] constructing SensitivityProfiler", flush=True)
         self.logger.info("Running sensitivity pivot pipeline")
         profiler = SensitivityProfiler(self.config, "configs/sensitivity_pivot.yaml")
+        print("[Progress] SensitivityProfiler constructed", flush=True)
 
         if step is None:
             result = profiler.run_all()
@@ -200,6 +209,8 @@ class FMDSensitivityAnalysis:
         output_dir: str | None = None,
     ):
         """Run a per-song FMD sensitivity benchmark."""
+        from experiments.paper_pipeline import PaperExperimentRunner
+
         runner = PaperExperimentRunner(self.config)
         result = runner.run_single_song_analysis(
             midi_path=Path(midi_file),

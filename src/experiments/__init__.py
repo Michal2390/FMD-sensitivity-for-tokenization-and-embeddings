@@ -1,7 +1,8 @@
-"""Experiments module."""
+"""Experiments package.
 
-from .paper_pipeline import PaperExperimentRunner, PipelineVariant
-from .publication_plots import generate_publication_plots
-from .sensitivity_profiler import SensitivityProfiler
+Keep this package initializer lightweight. Import experiment classes directly
+from their modules so unit tests do not require optional heavy dependencies
+such as torch, matplotlib or pretty_midi at package import time.
+"""
 
-__all__ = ["PaperExperimentRunner", "PipelineVariant", "generate_publication_plots", "SensitivityProfiler"]
+__all__: list[str] = []

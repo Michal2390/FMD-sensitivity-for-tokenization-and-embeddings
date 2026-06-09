@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 import torch
@@ -148,23 +148,15 @@ def pretty_midi_to_abc_text(midi_data) -> str:
         path = tmp.name
         midi_data.write(path)
 
-    abc_path = tempfile.mktemp(suffix=".abc")
+    with tempfile.NamedTemporaryFile(suffix=".abc", delete=False) as abc_tmp:
+        abc_path = abc_tmp.name
     try:
         score = music21.converter.parse(path)
         score.write("abc", fp=abc_path)
         with open(abc_path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
-    except Exception:
-        # Minimal fallback ABC from note events
-        notes = []
-        for inst in midi_data.instruments:
-            if inst.is_drum:
-                continue
-            for note in inst.notes:
-                notes.append((note.start, note.pitch, note.end - note.start))
-        notes.sort(key=lambda x: x[0])
-        body = " ".join(f"{p}/{max(1, int(d * 4))}" for _, p, d in notes[:256])
-        return f"X:1\nT:Generated\nM:4/4\nL:1/8\nK:C\n{body}\n"
+    except Exception as exc:
+        raise RuntimeError("CLaMP-1 ABC conversion failed; refusing pseudo-ABC fallback") from exc
     finally:
         if os.path.exists(abc_path):
             os.unlink(abc_path)
