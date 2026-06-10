@@ -19,7 +19,7 @@
 
 We profiled **4 FMD configurations** across **6 datasets** (15 pairs) and **5 controlled perturbations** of MIDI. Three things stand out:
 
-1. **🎚️ Input representation decides what FMD can see.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) - and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). ABC notation, which has no velocity channel, stays at noise.
+1. **🎚️ Input representation decides what FMD can see - causally.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) - and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). The **same-model control** nails it: CLaMP-2 detects velocity under MTF (SNR 1.18, p=0.02) but is blind under ABC (0.67, n.s.) - same weights, same music, different representation. The whole profile **replicates on POP909** (velocity SNR up to 4.15).
 2. **🤝 Representations that preserve performance detail rank genres the same way.** Cross-dataset rankings of **REMI and CLaMP-2/MTF agree strongly (Spearman ρ = 0.825, p < 0.001)**, while **ABC agrees with no one (ρ ≈ 0.04-0.15, p > 0.6)**.
 3. **⚠️ Raw FMD is NOT comparable across embedding models.** CLaMP embeddings are L2-normalised (unit sphere → small FMD); MusicBERT's are not (→ large FMD). The ~60× gap is geometry, not music - so we compare via **scale-invariant** statistics (SNR, Spearman, CV), never raw magnitude.
 
@@ -44,7 +44,7 @@ An earlier version of this study mislabelled configurations (a "CLaMP-2 + REMI" 
 
 ## 🧪 Experimental Design
 
-### 🔧 4 Configurations (honest input semantics)
+### 🔧 4 configurations + 1 same-model control (honest input semantics)
 
 | Config | Model | Input | Isolates | Norm. |
 |:------:|:-----:|:------|:---------|:-----:|
@@ -52,6 +52,9 @@ An earlier version of this study mislabelled configurations (a "CLaMP-2 + REMI" 
 | 🅱️ **MusicBERT-TSD** | MusicBERT | MidiTok TSD tokens | tokenizer effect (same model) | no |
 | 🅲 **CLaMP2-MTF** | CLaMP-2 | MIDI-Text Format (native) | model effect, expressive path | yes |
 | 🅳 **CLaMP1-ABC** | CLaMP-1 | ABC notation (`music21`) | score-like path (no velocity) | yes |
+| 🆎 **CLaMP2-ABC** (control) | CLaMP-2 | ABC notation (`music21`) | representation vs model (same model as 🅲, same input as 🅳) | yes |
+
+> The control is legitimate, not off-distribution: CLaMP-2's M3 encoder is trained on **both** ABC and MTF. Within CLaMP-2, MTF vs ABC isolates the *representation*; within ABC, CLaMP-2 vs CLaMP-1 isolates the *model*.
 
 Encoding details: [`src/embeddings/clamp_formats.py`](src/embeddings/clamp_formats.py). All models output 768-d embeddings.
 
@@ -86,14 +89,18 @@ Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× hig
 
 `SNR > 1` means the perturbation moves the distribution more than within-dataset sampling noise. Significance is a **two-sample permutation test** (200 permutations); CIs are bootstrap (100 resamples).
 
-| Perturbation | MusicBERT-REMI | MusicBERT-TSD | CLaMP2-MTF | CLaMP1-ABC |
-|:--|:--:|:--:|:--:|:--:|
-| 🔇 **Velocity removed** | **3.16** ✓ | **1.35** ✓ | **1.18** ✓ | 0.67 |
-| 📐 Timing quantized | 0.05 | 0.11 | 0.66 | 0.62 |
-| ⏱️ Tempo flattened | 0.06 | 0.14 | 0.13 | 0.83 |
-| 💀 All combined | **3.30** ✓ | **1.71** ✓ | **1.55** ✓ | 0.90 |
+MAESTRO (primary study); ✓ = SNR > 1 **and** permutation-significant (p < 0.05):
 
-> 🎯 **Velocity is the only attribute detected above the noise floor - and only where it is represented.** ✓ = SNR > 1 **and** permutation-significant (p < 0.05). REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel and stays at noise (0.67, p = 0.06).** Microtiming and tempo fall at/below the floor for every configuration. The *combined* effect simply tracks velocity. (ABC does show a tiny *systematic* shift for tempo/combined - permutation p < 0.05 - but always **below** its own sampling noise, i.e. systematic yet negligible.)
+| Perturbation | MusicBERT-REMI | MusicBERT-TSD | CLaMP2-MTF | CLaMP1-ABC | CLaMP2-ABC (control) |
+|:--|:--:|:--:|:--:|:--:|:--:|
+| 🔇 **Velocity removed** | **3.16** ✓ | **1.35** ✓ | **1.18** ✓ | 0.54 | 0.67 |
+| 📐 Timing quantized | 0.05 | 0.11 | 0.66 | 0.48 | 0.65 |
+| ⏱️ Tempo flattened | 0.06 | 0.14 | 0.13 | 0.69 | 0.69 |
+| 💀 All combined | **3.30** ✓ | **1.71** ✓ | **1.55** ✓ | 0.67 | 0.64 |
+
+> 🎯 **Velocity is the only attribute detected above the noise floor - and only where it is represented.** REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel and stays at noise** under *both* models. The `CLaMP2-ABC` control column is the causal clincher: same model as `CLaMP2-MTF`, only the representation differs - and the velocity response vanishes. Microtiming and tempo fall at/below the floor for every configuration; the *combined* effect simply tracks velocity.
+
+**Replication on POP909** (full table: `perturbation_sensitivity_pop909.csv`): the same pattern, stronger - velocity SNR **4.15 / 2.01 / 1.70** (all p < 0.01) for REMI/TSD/MTF; both ABC pipelines n.s. Bonus sanity check: POP909 is already grid-quantized, so the quantization perturbation is a no-op there and FMD = 0.000 exactly for the token pipelines.
 
 ### 3️⃣ Cross-dataset ranking + Spearman agreement ⭐ - the rigorous backbone
 
@@ -133,7 +140,7 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 
 | # | Finding | Evidence |
 |:-:|:--|:--|
-| 1️⃣ | **Input representation sets a ceiling on what FMD can detect** | velocity SNR 1.2-3.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.67 in ABC |
+| 1️⃣ | **Input representation sets a ceiling on what FMD can detect - causally** | velocity SNR 1.2-4.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.49-0.78 (n.s.) in ABC; same-model control switches the response off; replicated on POP909 |
 | 2️⃣ | **Rankings agree only between detail-preserving representations** | REMI↔MTF ρ=0.825 (p<0.001); ABC↔all ρ≈0 |
 | 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.35; ranking ρ=0.44 |
 | 4️⃣ | **Raw FMD is not cross-model comparable** | noise floors differ ~60× from normalisation, not music |

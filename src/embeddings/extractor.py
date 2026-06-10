@@ -583,12 +583,14 @@ class CLaMP2Model(EmbeddingModel):
                 raise ValueError("CLaMP-2 MTF format requires midi_data")
             text = pretty_midi_to_mtf_text(midi_data)
             return text_to_patch_tensor(text, patch_size=PATCH_SIZE_CLAMP2)
-        if input_format == "REMI":
-            if miditok_tokenizer is None:
-                raise ValueError("CLaMP-2 REMI format requires miditok_tokenizer")
-            text = tokens_to_symbolic_text(tokens, miditok_tokenizer)
+        if input_format == "ABC":
+            # M3 is trained on ABC as well as MTF, so ABC is an in-distribution
+            # input; this enables the same-model representation control.
+            if midi_data is None:
+                raise ValueError("CLaMP-2 ABC format requires midi_data")
+            text = pretty_midi_to_abc_text(midi_data)
             return text_to_patch_tensor(text, patch_size=PATCH_SIZE_CLAMP2)
-        raise ValueError(f"CLaMP-2 requires input_format MTF or REMI, got '{input_format}'")
+        raise ValueError(f"CLaMP-2 requires input_format MTF or ABC, got '{input_format}'")
 
     def encode(
         self,

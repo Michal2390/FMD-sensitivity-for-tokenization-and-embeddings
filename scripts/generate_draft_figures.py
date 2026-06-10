@@ -36,7 +36,7 @@ plt.rcParams.update({
     "savefig.bbox": "tight",
 })
 
-CONFIG_ORDER = ["MusicBERT-REMI", "MusicBERT-TSD", "CLaMP2-MTF", "CLaMP1-ABC"]
+CONFIG_ORDER = ["MusicBERT-REMI", "MusicBERT-TSD", "CLaMP2-MTF", "CLaMP1-ABC", "CLaMP2-ABC"]
 PERT_ORDER = ["no_velocity", "quantized_time", "constant_tempo", "all_combined"]
 PERT_LABEL = {
     "no_velocity": "Velocity\nremoved",
@@ -58,10 +58,11 @@ present = [c for c in CONFIG_ORDER if c in pert["configuration"].unique()]
 
 
 def fig1_noise_floor():
+    cfgs = [c for c in CONFIG_ORDER if c in ss["configuration"].unique()]
     piv = ss.pivot_table(index="configuration", columns="dataset",
-                         values="split_half_fmd").reindex(present)
+                         values="split_half_fmd").reindex(cfgs)
     datasets = list(piv.columns)
-    x = np.arange(len(present))
+    x = np.arange(len(cfgs))
     w = 0.8 / max(len(datasets), 1)
     fig, ax = plt.subplots(figsize=(7.2, 3.8))
     for i, d in enumerate(datasets):
@@ -69,7 +70,7 @@ def fig1_noise_floor():
     ax.set_yscale("log")
     ax.set_ylabel("Split-half FMD  (log scale)")
     ax.set_title("Per-configuration noise floor (self-similarity)")
-    ax.set_xticks(x); ax.set_xticklabels(present, rotation=20, ha="right")
+    ax.set_xticks(x); ax.set_xticklabels(cfgs, rotation=20, ha="right")
     ax.legend(frameon=False, fontsize=8, ncol=2)
     ax.grid(axis="y", ls=":", alpha=0.5)
     fig.savefig(OUT / "fig1_noise_floor.png"); plt.close(fig)
@@ -117,16 +118,17 @@ def fig2_snr_heatmap():
 
 
 def fig3_bootstrap_cv():
-    bo = boot.set_index("configuration").reindex(present)
-    colors = ["#C44E52" if "MusicBERT" in c else "#55A868" for c in present]
+    cfgs = [c for c in CONFIG_ORDER if c in boot["configuration"].unique()]
+    bo = boot.set_index("configuration").reindex(cfgs)
+    colors = ["#C44E52" if "MusicBERT" in c else "#55A868" for c in cfgs]
     fig, ax = plt.subplots(figsize=(6.2, 3.6))
-    ax.bar(range(len(present)), bo["cv"] * 100, color=colors)
-    for i, c in enumerate(present):
+    ax.bar(range(len(cfgs)), bo["cv"] * 100, color=colors)
+    for i, c in enumerate(cfgs):
         ax.text(i, bo.loc[c, "cv"] * 100 + 0.4, f"{bo.loc[c,'cv']*100:.1f}%",
                 ha="center", fontsize=9)
     ax.set_ylabel("Coefficient of variation (%)")
     ax.set_title("Bootstrap stability of cross-dataset FMD\n(MAESTRO vs POP909, 50 resamples)")
-    ax.set_xticks(range(len(present))); ax.set_xticklabels(present, rotation=20, ha="right")
+    ax.set_xticks(range(len(cfgs))); ax.set_xticklabels(cfgs, rotation=20, ha="right")
     ax.grid(axis="y", ls=":", alpha=0.5)
     fig.savefig(OUT / "fig3_bootstrap_cv.png"); plt.close(fig)
 
@@ -173,7 +175,8 @@ def fig5_spearman_heatmap():
     sp = pd.read_csv(spear_path)
     if sp.empty:
         print("  [skip] fig5: spearman empty"); return
-    cfgs = present
+    in_sp = set(sp["config_a"]) | set(sp["config_b"])
+    cfgs = [c for c in CONFIG_ORDER if c in in_sp]
     M = np.full((len(cfgs), len(cfgs)), np.nan)
     for i, a in enumerate(cfgs):
         M[i, i] = 1.0

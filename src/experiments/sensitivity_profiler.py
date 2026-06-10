@@ -502,6 +502,13 @@ class SensitivityProfiler:
         n_perm = int(pb_cfg.get("n_permutations", 200))
         rng = np.random.default_rng(int(pb_cfg.get("seed", self.seed)))
 
+        # Incremental checkpointing: a multi-hour run must not lose every
+        # completed cell to a crash, so the CSV is rewritten after each config.
+        if dataset_name == "maestro":
+            out_path = self.output_dir / "perturbation_sensitivity.csv"
+        else:
+            out_path = self.output_dir / f"perturbation_sensitivity_{dataset_name}.csv"
+
         rows = []
 
         for cfg in tqdm(self.configurations, desc="Perturbation sensitivity"):
@@ -541,6 +548,7 @@ class SensitivityProfiler:
                 detected = bool(perm_p < 0.05 and snr >= 1.0)
 
                 rows.append({
+                    "dataset": dataset_name,
                     "configuration": cfg.name,
                     "perturbation": pert.name,
                     "description": pert.description,
@@ -563,8 +571,11 @@ class SensitivityProfiler:
                     f"SNR={snr:.2f} perm_p={perm_p:.3f} {'DET' if detected else 'ns'}"
                 )
 
+            # checkpoint after each completed configuration
+            pd.DataFrame(rows).to_csv(out_path, index=False)
+            logger.info(f"  [checkpoint] {len(rows)} rows -> {out_path}")
+
         df = pd.DataFrame(rows)
-        out_path = self.output_dir / "perturbation_sensitivity.csv"
         df.to_csv(out_path, index=False)
         logger.info(f"Perturbation sensitivity saved to {out_path}")
         return df

@@ -61,12 +61,14 @@ def validate_embedding_input(
         tokenizer = tokenizer or "REMI"
 
     if model == "CLaMP-2":
-        if resolved_format != MTF_FORMAT or tokenizer:
+        # CLaMP-2's M3 music encoder is trained on both MTF and ABC, so either
+        # native representation is valid; MidiTok tokenizers are not.
+        if resolved_format not in {MTF_FORMAT, ABC_FORMAT} or tokenizer:
             raise ValueError(
-                "CLaMP-2 must be configured as input_format=MTF with no MidiTok tokenizer. "
-                "It does not consume REMI/TSD/Octuple/MIDI-Like tokenizers."
+                "CLaMP-2 must be configured as input_format=MTF or ABC with no MidiTok "
+                "tokenizer. It does not consume REMI/TSD/Octuple/MIDI-Like tokenizers."
             )
-        return EmbeddingInputSpec(model=model, input_format=MTF_FORMAT, tokenizer=None)
+        return EmbeddingInputSpec(model=model, input_format=resolved_format, tokenizer=None)
 
     if model == "CLaMP-1":
         if resolved_format != ABC_FORMAT or tokenizer:

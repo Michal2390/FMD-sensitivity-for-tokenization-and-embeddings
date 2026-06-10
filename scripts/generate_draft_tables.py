@@ -20,7 +20,7 @@ REPORTS = Path("results/reports/sensitivity_pivot")
 OUT = REPORTS / "tables"
 OUT.mkdir(parents=True, exist_ok=True)
 
-CONFIG_ORDER = ["MusicBERT-REMI", "MusicBERT-TSD", "CLaMP2-MTF", "CLaMP1-ABC"]
+CONFIG_ORDER = ["MusicBERT-REMI", "MusicBERT-TSD", "CLaMP2-MTF", "CLaMP1-ABC", "CLaMP2-ABC"]
 PERT_ORDER = ["no_velocity", "quantized_time", "constant_tempo", "all_combined"]
 PERT_LABEL = {
     "no_velocity": "Velocity removed",
@@ -58,8 +58,9 @@ def table_self_similarity() -> None:
     _write("tab_self_similarity.tex", "\n".join(lines))
 
 
-def table_perturbation() -> None:
-    df = pd.read_csv(REPORTS / "perturbation_sensitivity.csv")
+def table_perturbation(csv_name: str = "perturbation_sensitivity.csv",
+                       out_name: str = "tab_perturbation.tex") -> None:
+    df = pd.read_csv(REPORTS / csv_name)
     pcol = "perm_p_value" if "perm_p_value" in df.columns else "boot_p_value"
     has_stats = "snr" in df.columns and pcol in df.columns
     lines = [
@@ -91,7 +92,13 @@ def table_perturbation() -> None:
             )
         lines.append(r"\addlinespace")
     lines += [r"\bottomrule", r"\end{tabular}"]
-    _write("tab_perturbation.tex", "\n".join(lines))
+    _write(out_name, "\n".join(lines))
+
+
+def table_perturbation_replication() -> None:
+    """POP909 replication of the perturbation study (separate CSV)."""
+    table_perturbation("perturbation_sensitivity_pop909.csv",
+                       "tab_perturbation_pop909.tex")
 
 
 def table_spearman() -> None:
@@ -170,7 +177,8 @@ def table_bootstrap() -> None:
 
 if __name__ == "__main__":
     print("Generating LaTeX tables from result CSVs:")
-    for fn in (table_self_similarity, table_perturbation, table_spearman,
+    for fn in (table_self_similarity, table_perturbation,
+               table_perturbation_replication, table_spearman,
                table_cross_dataset, table_bootstrap):
         try:
             fn()

@@ -25,6 +25,13 @@ configurations:
     model: "CLaMP-1"
     input_format: "ABC"
     description: "CLaMP-1 with ABC notation via music21 (no velocity in ABC)"
+  # Control configuration (keep LAST so the RNG stream of the four primary
+  # configs is unchanged): same model as CLaMP2-MTF, same representation as
+  # CLaMP1-ABC. Disentangles the model effect from the representation effect.
+  - name: "CLaMP2-ABC"
+    model: "CLaMP-2"
+    input_format: "ABC"
+    description: "CLaMP-2 with ABC notation (same-model representation control)"
 
 # 6 datasets → C(6,2) = 15 pairs.
 # Spearman rank-agreement between configurations is only flagged
