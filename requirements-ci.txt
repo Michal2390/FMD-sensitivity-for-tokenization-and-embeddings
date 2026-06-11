@@ -1,5 +1,8 @@
 # Lightweight CI requirements (no FluidSynth, no GPU)
-numpy>=1.24.0
+# numpy/symusic/miditok are pinned to the locally verified set: loose ">="
+# ranges sent pip's resolver into hours of backtracking (numpy 2.4 vs older
+# symusic wheels) once music21 no longer constrained the solution.
+numpy>=1.26.4,<2.5
 scipy>=1.10.0
 pandas>=2.0.0
 scikit-learn>=1.3.0
@@ -12,9 +15,9 @@ torchaudio>=2.0.0
 transformers>=4.30.0
 
 # Music Processing
-miditok>=3.0.0
+miditok==3.0.6.post1
 pretty_midi>=0.2.10
-symusic>=0.4.0
+symusic==0.6.0
 unidecode>=1.3.0
 
 # NLP / Sentence Transformers
