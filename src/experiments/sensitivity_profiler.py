@@ -607,11 +607,11 @@ class SensitivityProfiler:
 
         Crucially, each file is also encoded a SECOND time without any
         perturbation (the "retest" condition). The retest distance is the
-        per-file encoding-noise floor: pipelines whose input conversion is
-        nondeterministic (music21 ABC rendering) have a large retest
-        distance, and a perturbation only counts as a file-level effect if
-        it moves the embedding MORE than re-encoding the same unperturbed
-        file does. All contrasts are Wilcoxon signed-rank tests, Holm
+        per-file encoding-noise floor: any nondeterministic input
+        conversion shows up as a non-zero retest distance (this is how the
+        broken music21-based ABC export was caught), and a perturbation
+        only counts as a file-level effect if it moves the embedding MORE
+        than re-encoding the same unperturbed file does. All contrasts are Wilcoxon signed-rank tests, Holm
         corrected per dataset:
           - per configuration x perturbation: shift > retest (primary);
           - per configuration: velocity shift > tempo shift (secondary);

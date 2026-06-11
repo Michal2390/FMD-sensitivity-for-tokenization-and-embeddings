@@ -1,33 +1,30 @@
-# Instrukcja uruchamiania (sensitivity pivot, czerwiec 2026)
+# Instrukcja uruchamiania (czerwiec 2026)
 
-Aktualna wersja projektu skupia się na **paper-grade sensitivity profiling** - profilowaniu wrażliwości FMD na tokenizację i konfigurację embeddingów bez mieszania tokenizerów z natywnymi wejściami CLaMP.
+Projekt bada wrażliwość Frechet Music Distance (FMD) na wybór reprezentacji
+wejściowej (tokenizery MidiTok vs natywne MTF/ABC) i modelu embeddingów.
 
-Poprawne konfiguracje pivotu:
-- `MusicBERT-REMI`
-- `MusicBERT-TSD`
-- `CLaMP2-MTF`
-- `CLaMP1-ABC`
+Konfiguracje badania (5):
 
-Nie używaj starych wyników `CLaMP2-REMI`: CLaMP-2 nie konsumuje tokenów REMI jako natywnego wejścia.
+| Konfiguracja | Model | Wejście |
+|:-------------|:------|:--------|
+| `MusicBERT-REMI` | MusicBERT | tokeny REMI (MidiTok) |
+| `MusicBERT-TSD`  | MusicBERT | tokeny TSD (MidiTok) |
+| `CLaMP2-MTF`     | CLaMP-2   | MIDI Text Format |
+| `CLaMP1-ABC`     | CLaMP-1   | notacja ABC (własny renderer) |
+| `CLaMP2-ABC`     | CLaMP-2   | notacja ABC - kontrola same-model |
 
-Główny punkt wejścia: `main.py --mode sensitivity`  
-Konfiguracja: `configs/sensitivity_pivot.yaml`
+Główny punkt wejścia: `main.py` - Konfiguracja: `configs/sensitivity_pivot.yaml`
+Przewodnik po wynikach: `final_results.ipynb` (root repo)
 
 ---
 
 ## 1. Wymagania
 
 - Python **3.10+** (zalecane 3.11)
-- PowerShell (Windows) lub bash (Linux/macOS)
-- ~15 GB wolnego miejsca na dysku (datasety + modele HuggingFace)
-- Połączenie z internetem przy pierwszym uruchomieniu
-- **CPU:** pełny pipeline ~2 h | **GPU:** znacznie szybciej (opcjonalnie)
+- ~15 GB miejsca (datasety + modele HuggingFace przy pierwszym uruchomieniu)
+- **GPU:** pełne badanie ~3-4 h | **CPU:** odpowiednio dłużej
 
----
-
-## 2. Instalacja środowiska
-
-W katalogu projektu:
+## 2. Instalacja
 
 ```powershell
 python -m venv .venv
@@ -41,169 +38,104 @@ Szybki smoke test (bez ciężkich modeli):
 
 ```powershell
 python main.py --mode demo
-pytest tests\ -q -k "not integration"
+python main.py --mode tests
 ```
 
-> Jeśli PowerShell blokuje aktywację venv:  
+> Jeśli PowerShell blokuje aktywację venv:
 > `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 
----
+## 3. Dane (6 datasetów po >=80 plikow MIDI)
 
-## 3. Przygotowanie danych (4 datasety)
-
-Pivot wymaga **prawdziwych** plików MIDI - nie używaj syntetycznych placeholderów.
-
-### Krok A - MAESTRO + POP909 (automatyczne pobieranie)
+Badanie używa: `maestro`, `pop909` oraz czterech podzbiorów gatunkowych
+wyprowadzonych z Lakh MIDI: `classical`, `jazz`, `rock`, `rap`
+(katalogi w `data/raw/<nazwa>/`).
 
 ```powershell
 python main.py --mode fetch-data --datasets maestro pop909
 ```
 
-Oczekiwany wynik:
-- `data/raw/maestro/` - ~1276 plików `.midi`
-- `data/raw/pop909/` - ~2898 plików `.mid`
-
-### Krok B - Folk (Nottingham)
+Podzbiory gatunkowe przygotowuje `src/data/lakh_genre_loader.py` /
+`midicaps_loader.py` (wymagają lokalnych archiwów Lakh/MidiCaps).
+Weryfikacja liczebności:
 
 ```powershell
-python scripts\download_folk_dataset.py
+python -c "from pathlib import Path; ds=['maestro','pop909','classical','jazz','rock','rap']; [print(d, len(list(Path('data/raw',d).rglob('*.mid*')))) for d in ds]"
 ```
 
-Oczekiwany wynik: `data/raw/folk/` - ~1000+ plików `.mid`
+## 4. Uruchomienie badania
 
-### Krok C - MidiCaps classical (ręcznie)
-
-1. Pobierz archiwum z [HuggingFace MidiCaps](https://huggingface.co/datasets/amaai-lab/MidiCaps) (`midicaps.tar.gz`)
-2. Wypakuj do `data/raw/midicaps/`
-3. Wygeneruj podzbiór classical:
+### Pełne badanie (wszystkie kroki, oba korpusy perturbacji)
 
 ```powershell
-python -c "import sys; sys.path.insert(0,'src'); from utils.config import load_config; from data.midicaps_loader import MidiCapsGenreLoader; c=load_config('configs/config.yaml'); c['cross_validation']['midicaps']['genres']=['classical']; MidiCapsGenreLoader(c).populate_raw_datasets()"
+python scripts\run_full_study.py
 ```
 
-Oczekiwany wynik: `data/raw/midicaps_classical/` - ~300 plików `.mid`
+Kroki: self-similarity -> cross-dataset ranking (15 par, Spearman) ->
+perturbacje MAESTRO -> perturbacje POP909 (replikacja) -> bootstrap ->
+analiza per-plik (paired + retest) na obu korpusach.
+Wyniki sa checkpointowane po kazdej konfiguracji - przerwany run nie traci
+ukonczonych komorek.
 
-### Weryfikacja
+> Dluga sesja na Windows: uruchom jako proces odlaczony, np.
+> `Start-Process python -ArgumentList "-u","scripts\run_full_study.py" -RedirectStandardOutput logs\run.log`
 
-```powershell
-python -c "from pathlib import Path; ds=['maestro','pop909','folk','midicaps_classical']; [print(f'{d}: {len(list(Path(f\"data/raw/{d}\").rglob(\"*.mid*\")))}') for d in ds]"
-```
-
-Każdy dataset powinien mieć **≥ 80** plików (limit w configu).
-
----
-
-## 4. Uruchomienie głównego eksperymentu
-
-### Pełny pipeline (wszystkie kroki + wykresy)
+### Pojedyncze kroki
 
 ```powershell
-python main.py --mode sensitivity
-```
-
-Kroki wykonywane automatycznie:
-1. Self-similarity sanity check
-2. Cross-dataset ranking (6 par datasetów)
-3. Perturbation sensitivity (5 perturbacji x poprawne konfiguracje)
-4. Bootstrap stability
-5. Generowanie wykresów
-
-### Pojedyncze kroki (opcjonalnie)
-
-```powershell
+python main.py --mode sensitivity                              # kroki 3-7 (maestro)
 python main.py --mode sensitivity --sensitivity-step self-similarity
 python main.py --mode sensitivity --sensitivity-step ranking
 python main.py --mode sensitivity --sensitivity-step perturbation
+python main.py --mode sensitivity --sensitivity-step paired
 python main.py --mode sensitivity --sensitivity-step bootstrap
 python main.py --mode sensitivity --sensitivity-step plots
 ```
 
-### Tylko wykresy (gdy CSV już istnieją)
+### Tabele i figury do artykulu (z gotowych CSV, bez modeli)
 
 ```powershell
-python main.py --mode sensitivity --sensitivity-step plots
+python scripts\generate_draft_figures.py
+python scripts\generate_draft_tables.py
 ```
-
----
 
 ## 5. Wyniki
 
-### Raporty CSV/JSON
-
 ```
 results/reports/sensitivity_pivot/
-├── self_similarity.csv
-├── cross_dataset_fmd.csv
-├── spearman_ranking_agreement.csv
-├── perturbation_sensitivity.csv
-├── bootstrap_stability.csv
-└── sensitivity_pivot_summary.json
+├── self_similarity.csv                  # progi szumu (split-half), 6 datasetow x 5 konfiguracji
+├── cross_dataset_fmd.csv                # 15 par datasetow x 5 konfiguracji
+├── spearman_ranking_agreement.csv       # zgodnosc rankingow (n=15, p-value)
+├── perturbation_sensitivity.csv         # FMD, SNR, CI, permutacyjne p (maestro; *_pop909 = replikacja)
+├── paired_file_shifts.csv               # przesuniecia per-plik + retest (maestro; *_pop909)
+├── paired_file_tests.csv                # kontrasty Wilcoxona, korekta Holma (maestro; *_pop909)
+├── bootstrap_stability.csv              # srednia, CI, CV
+└── tables/*.tex                         # tabele LaTeX generowane do draft.tex
+
+results/plots/sensitivity_pivot/         # wykresy robocze pipeline'u
+results/plots/sensitivity_pivot/paper/   # figury publikacyjne (fig1-fig6)
 ```
 
-### Wykresy
+Interpretacja wynikow: `final_results.ipynb` (krok po kroku) oraz
+`docs/PAPER_FINDINGS.md` (mapa wynikow -> twierdzen artykulu).
+Artykul: `draft.tex` (kompilacja: `pdflatex draft.tex` z korzenia repo).
 
-```
-results/plots/sensitivity_pivot/
-├── perturbation_heatmap.png
-├── cross_dataset_bar.png
-├── bootstrap_stability.png
-└── self_similarity.png
-```
-
-### Opis wyników (PL)
-
-`docs/SENSITIVITY_PIVOT_RESULTS.md`
-
----
-
-## 6. Inne tryby (pomocnicze)
+## 6. Tryby pomocnicze
 
 | Tryb | Komenda | Opis |
 |:-----|:--------|:-----|
-| Demo | `python main.py --mode demo` | Szybki test FMD (bez modeli) |
-| Testy | `python main.py --mode tests` | Pełny pytest |
-| Pełny CI | `python main.py --mode full` | Testy + sensitivity pivot |
-| Fetch data | `python main.py --mode fetch-data` | Pobranie datasetów ze źródeł |
+| Demo | `python main.py --mode demo` | szybki test FMD (bez modeli) |
+| Testy | `python main.py --mode tests` | pelny pytest |
+| Pelny CI | `python main.py --mode full` | testy + sensitivity |
+| Fetch data | `python main.py --mode fetch-data` | pobranie datasetow |
 | Lint | `python main.py --mode lint` | black + flake8 |
-
----
 
 ## 7. Typowe problemy
 
-| Problem | Rozwiązanie |
+| Problem | Rozwiazanie |
 |:--------|:------------|
-| `python` nie działa | Użyj `py` zamiast `python` |
-| Brak GPU / CUDA | Pipeline działa na CPU (wolniej) |
-| CLaMP nie ładuje się | Sprawdź `pip install transformers torch mido music21` |
-| Pusty dataset | Uruchom ponownie krok 3 (fetch-data / folk / midicaps) |
-| `music21` błąd konwersji ABC | Upewnij się, że pliki MIDI są poprawne (nie puste) |
-| Długi czas | Zmniejsz `max_files_per_dataset` w `configs/sensitivity_pivot.yaml` |
-
----
-
-## 8. Czego NIE używać
-
-Usunięte z repo (nieaktualne):
-
-- `scripts/run_experiment.py` - stuby exp1-exp5
-- `scripts/generate_pivot_plots.py` - stare etykiety (CLaMP2-ABC)
-- `scripts/generate_starter_midis.py` - syntetyczne datasety
-- `scripts/run_nfmd_analysis.py` - odrzucony kierunek nFMD (raw FMD nie jest porównywalne między modelami)
-
----
-
-## 9. Szybka ściąga (copy-paste)
-
-```powershell
-# Od zera do wyników:
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install -e .
-python main.py --mode fetch-data --datasets maestro pop909
-python scripts\download_folk_dataset.py
-# (ręcznie: midicaps.tar.gz → data/raw/midicaps/ → komenda z kroku C)
-python main.py --mode sensitivity
-```
-
-**Czas:** ~116 min na CPU przy 80 plikach/dataset (wyniki z 2026-06-08).
+| `python` nie dziala | uzyj `py` zamiast `python` |
+| brak GPU / CUDA | pipeline dziala na CPU (wolniej) |
+| CLaMP nie laduje sie | `pip install -r requirements.txt` (wymagane m.in. `unidecode`, `mido`) |
+| pusty dataset | sprawdz `data/raw/<nazwa>/` i krok 3 |
+| dlugi czas | zmniejsz `max_files_per_dataset` w `configs/sensitivity_pivot.yaml` |
+| przerwany dlugi run | wyniki sa checkpointowane; uruchom ponownie brakujacy krok |

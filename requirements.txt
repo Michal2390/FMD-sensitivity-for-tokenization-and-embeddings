@@ -16,7 +16,6 @@ pretty_midi>=0.2.10
 mido>=1.3.0
 unidecode>=1.3.0
 symusic>=0.4.0
-music21>=9.1.0  # MIDI→ABC conversion for CLaMP-1
 midi2audio>=0.1.1  # Optional MIDI→audio helper; MERT path primarily uses pretty_midi.synthesize()
 
 # NLP / Sentence Transformers (fallback proxy models)

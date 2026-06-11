@@ -390,9 +390,9 @@ class _CLaMPMusicEncoder(torch.nn.Module):
 class CLaMP1Model(EmbeddingModel):
     """CLaMP-1 (sander-wood/clamp-small-512) — music encoder branch.
 
-    Converts MIDI tokens → ABC notation via music21, then applies
-    bar-patching to create fixed-size input patches for the model.
-    Output: 768-dim embedding after music_proj.
+    Renders MIDI to ABC notation (deterministic renderer in
+    clamp_formats), then applies bar-patching to create fixed-size input
+    patches for the model. Output: 768-dim embedding after music_proj.
     """
 
     HF_REPO = "sander-wood/clamp-small-512"

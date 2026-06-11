@@ -13,6 +13,8 @@
 
 > 📖 An FMD score is **not a property of the music alone** - it is produced by a *pipeline* (input representation → embedding model → Fréchet formula). We profile how that pipeline reshapes what FMD perceives, and give practical guidance for the music-generation community.
 
+> 🧭 **Start here:** [`final_results.ipynb`](final_results.ipynb) - a step-by-step, executable tour of every result (reads only the CSVs, no models/GPU needed). The paper is [`draft.tex`](draft.tex).
+
 ---
 
 ## ⚡ TL;DR
@@ -223,6 +225,7 @@ src/
   └── data/                             # dataset manager + genre/MidiCaps loaders
 scripts/{generate_draft_figures.py, generate_draft_tables.py}   # paper figures & tables from CSVs
 tests/                                  # unit tests (pytest) - all green
+final_results.ipynb                     # executable step-by-step tour of all results
 draft.tex                               # the paper
 results/reports|plots/sensitivity_pivot/   # CSV/JSON results + figures
 ```
