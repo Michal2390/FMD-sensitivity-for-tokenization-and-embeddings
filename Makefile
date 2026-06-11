@@ -1,4 +1,4 @@
-.PHONY: help install dev-install format lint type-check test clean run run-sensitivity run-plots
+.PHONY: help install dev-install format lint type-check test clean run run-study run-sensitivity run-plots figures notebook
 
 help:
 	@echo "FMD Sensitivity Analysis - Available Commands"
@@ -15,8 +15,11 @@ help:
 	@echo "  make test           - Run tests with pytest"
 	@echo ""
 	@echo "Experiments:"
-	@echo "  make run-sensitivity - Run full sensitivity pivot (main experiment)"
-	@echo "  make run-plots       - Regenerate sensitivity plots from CSV results"
+	@echo "  make run-study       - Run the COMPLETE study (all steps, both corpora)"
+	@echo "  make run-sensitivity - Run the sensitivity pipeline (steps 3-7, maestro)"
+	@echo "  make run-plots       - Regenerate working plots from CSV results"
+	@echo "  make figures         - Regenerate paper figures + LaTeX tables from CSVs"
+	@echo "  make notebook        - Rebuild and execute final_results.ipynb"
 	@echo "  make run             - Alias for run-sensitivity"
 	@echo ""
 	@echo "Maintenance:"
@@ -46,11 +49,22 @@ test-quick:
 
 run: run-sensitivity
 
+run-study:
+	python scripts/run_full_study.py
+
 run-sensitivity:
 	python main.py --mode sensitivity
 
 run-plots:
 	python main.py --mode sensitivity --sensitivity-step plots
+
+figures:
+	python scripts/generate_draft_figures.py
+	python scripts/generate_draft_tables.py
+
+notebook:
+	python scripts/build_results_notebook.py
+	python -c "import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; nb = nbformat.read('final_results.ipynb', as_version=4); ExecutePreprocessor(timeout=120).preprocess(nb, {'metadata': {'path': '.'}}); nbformat.write(nb, 'final_results.ipynb')"
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
