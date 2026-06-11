@@ -8,14 +8,20 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
+  HF_HUB_DOWNLOAD_TIMEOUT: "30"
 
 permissions:
   contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   run-check:
     name: Run/Import sanity check
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -53,6 +59,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     needs: run-check
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -64,7 +71,26 @@ jobs:
           pip install -r requirements-ci.txt
           pip install -e .
       - name: Run tests
-        run: pytest -q tests -x -k "not integration" --no-header -p no:cacheprovider --override-ini="addopts="
+        run: |
+          set -o pipefail
+          pytest -q tests -x -k "not integration" --no-header -p no:cacheprovider \
+            --override-ini="addopts=" --timeout=300 --timeout-method=thread \
+            2>&1 | tee /tmp/pytest.log
+      - name: Report test failure on the commit
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let log = '';
+            try { log = fs.readFileSync('/tmp/pytest.log', 'utf8'); } catch (e) { log = 'no pytest.log: ' + e; }
+            const tail = log.split('\n').slice(-100).join('\n').slice(-6500);
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: 'CI test failure (tail of pytest log):\n```\n' + tail + '\n```',
+            });
 
   ci-passed:
     name: CI Passed

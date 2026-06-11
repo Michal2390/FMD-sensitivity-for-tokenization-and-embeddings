@@ -247,6 +247,22 @@ results/reports|plots/sensitivity_pivot/   # CSV/JSON results + figures
 
 ---
 
+## 📝 Citation
+
+If you use this code or its results, please cite (see also [`CITATION.cff`](CITATION.cff)):
+
+```bibtex
+@misc{fereniec2026fmdsensitivity,
+  title  = {What Does the Fr{\'e}chet Music Distance Measure? A Sensitivity Study
+            of Tokenization and Embedding Choices for Symbolic Music},
+  author = {Fereniec, Micha{\l} and S{\k{e}}dzikowski, Bartosz},
+  year   = {2026},
+  url    = {https://github.com/Michal2390/FMD-sensitivity-for-tokenization-and-embeddings}
+}
+```
+
+---
+
 ## 🎓 Academic Context
 
 | | |

@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this code or its results, please cite it as below."
+title: "What Does the Frechet Music Distance Measure? A Sensitivity Study of Tokenization and Embedding Choices for Symbolic Music"
+authors:
+  - family-names: Fereniec
+    given-names: Michal
+  - family-names: Sedzikowski
+    given-names: Bartosz
+type: software
+repository-code: "https://github.com/Michal2390/FMD-sensitivity-for-tokenization-and-embeddings"
+license: MIT
+date-released: 2026-06-11
+keywords:
+  - Frechet Music Distance
+  - symbolic music evaluation
+  - MIDI tokenization
+  - music embeddings
+  - CLaMP
+  - MusicBERT
+abstract: >-
+  A sensitivity study of the Frechet Music Distance (FMD) across input
+  representations (MidiTok REMI/TSD tokens, MIDI Text Format, ABC notation)
+  and embedding models (MusicBERT, CLaMP-1/2). The input representation
+  causally gates which musical attributes FMD can perceive (velocity is
+  exactly invisible under ABC), while corpus-level style rankings remain
+  robust across pipelines; raw FMD magnitudes are not comparable across
+  embedding models.
