@@ -19,8 +19,8 @@
 
 We profiled **4 FMD configurations** across **6 datasets** (15 pairs) and **5 controlled perturbations** of MIDI. Three things stand out:
 
-1. **🎚️ Input representation decides what FMD can see - causally.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) - and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). The **same-model control** nails it: CLaMP-2 detects velocity under MTF (SNR 1.18, p=0.02) but is blind under ABC (0.67, n.s.) - same weights, same music, different representation. The whole profile **replicates on POP909** (velocity SNR up to 4.15).
-2. **🤝 Representations that preserve performance detail rank genres the same way.** Cross-dataset rankings of **REMI and CLaMP-2/MTF agree strongly (Spearman ρ = 0.825, p < 0.001)**, while **ABC agrees with no one (ρ ≈ 0.04-0.15, p > 0.6)**.
+1. **🎚️ Input representation decides what FMD can see - causally.** Removing note velocity is the *only* perturbation that moves the embedding distribution above the sampling-noise floor (SNR > 1) - and only in representations that actually encode velocity (REMI/TSD tokens, CLaMP-2 MTF). Under ABC - which has **no velocity channel** - the perturbed rendering is character-identical and **FMD = 0.0000 exactly**. The **same-model control** nails it: CLaMP-2 detects velocity under MTF (SNR 1.18, p=0.02) and is *structurally* blind under ABC - same weights, same music, different representation. A **per-file Wilcoxon analysis** (p ≈ 1e-13 on both corpora) and a full **POP909 replication** (velocity SNR up to 4.15) confirm it.
+2. **🤝 Corpus-level style rankings are robust across pipelines.** Despite radically different attribute sensitivity, **9 of 10 configuration pairs rank the 15 dataset pairs alike (ρ = 0.51-0.91; MTF ↔ ABC ρ = 0.907, p < 0.001)** - genre distances are carried by the pitch+rhythm core every representation shares. "Ranks styles sensibly" does **not** certify "sees the attribute you care about".
 3. **⚠️ Raw FMD is NOT comparable across embedding models.** CLaMP embeddings are L2-normalised (unit sphere → small FMD); MusicBERT's are not (→ large FMD). The ~60× gap is geometry, not music - so we compare via **scale-invariant** statistics (SNR, Spearman, CV), never raw magnitude.
 
 <p align="center">
@@ -79,7 +79,8 @@ Split-half FMD (should be ≈ 0 for a stable pipeline). MusicBERT sits ~60× hig
 | MusicBERT-REMI | 2.12 | 1.57 | 1.88 | 1.80 | 1.58 | 1.71 |
 | MusicBERT-TSD | 2.31 | 2.32 | 1.51 | 1.35 | 1.21 | 1.27 |
 | CLaMP2-MTF | 0.036 | 0.029 | 0.027 | 0.021 | 0.023 | 0.020 |
-| CLaMP1-ABC | 0.020 | 0.026 | 0.025 | 0.031 | 0.025 | 0.025 |
+| CLaMP1-ABC | 0.054 | 0.058 | 0.054 | 0.076 | 0.077 | 0.075 |
+| CLaMP2-ABC | 0.181 | 0.163 | 0.164 | 0.167 | 0.118 | 0.132 |
 
 <p align="center">
   <img src="results/plots/sensitivity_pivot/paper/fig1_noise_floor.png" alt="Per-configuration noise floor" width="560">
@@ -93,29 +94,37 @@ MAESTRO (primary study); ✓ = SNR > 1 **and** permutation-significant (p < 0.05
 
 | Perturbation | MusicBERT-REMI | MusicBERT-TSD | CLaMP2-MTF | CLaMP1-ABC | CLaMP2-ABC (control) |
 |:--|:--:|:--:|:--:|:--:|:--:|
-| 🔇 **Velocity removed** | **3.16** ✓ | **1.35** ✓ | **1.18** ✓ | 0.54 | 0.67 |
-| 📐 Timing quantized | 0.05 | 0.11 | 0.66 | 0.48 | 0.65 |
-| ⏱️ Tempo flattened | 0.06 | 0.14 | 0.13 | 0.69 | 0.69 |
-| 💀 All combined | **3.30** ✓ | **1.71** ✓ | **1.55** ✓ | 0.67 | 0.64 |
+| 🔇 **Velocity removed** | **3.16** ✓ | **1.35** ✓ | **1.18** ✓ | **0.00** | **0.00** |
+| 📐 Timing quantized | 0.05 | 0.11 | 0.66 | 0.13 | 0.22 |
+| ⏱️ Tempo flattened | 0.06 | 0.14 | 0.13 | 0.04 | 0.20 |
+| 💀 All combined | **3.30** ✓ | **1.71** ✓ | **1.55** ✓ | 0.17 | 0.41 |
 
-> 🎯 **Velocity is the only attribute detected above the noise floor - and only where it is represented.** REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel and stays at noise** under *both* models. The `CLaMP2-ABC` control column is the causal clincher: same model as `CLaMP2-MTF`, only the representation differs - and the velocity response vanishes. Microtiming and tempo fall at/below the floor for every configuration; the *combined* effect simply tracks velocity.
+> 🎯 **Velocity is the only attribute detected above the noise floor - and only where it is represented.** REMI/TSD tokens and MTF carry velocity → all three detected (p ≤ 0.02); **ABC has no velocity channel, so the perturbed rendering is character-identical and FMD = 0.0000 exactly** - structural blindness, not statistical. The `CLaMP2-ABC` control column is the causal clincher: same model as `CLaMP2-MTF`, only the representation differs - and the velocity response is exactly zero. Microtiming and tempo fall below the floor everywhere; the *combined* effect simply tracks velocity (ABC's tiny tempo/combined response comes from the `Q:` tempo marking in the ABC header).
 
-**Replication on POP909** (full table: `perturbation_sensitivity_pop909.csv`): the same pattern, stronger - velocity SNR **4.15 / 2.01 / 1.70** (all p < 0.01) for REMI/TSD/MTF; both ABC pipelines n.s. Bonus sanity check: POP909 is already grid-quantized, so the quantization perturbation is a no-op there and FMD = 0.000 exactly for the token pipelines.
+**Replication on POP909** (`perturbation_sensitivity_pop909.csv`): the same pattern, stronger - velocity SNR **4.15 / 2.01 / 1.70** (all p < 0.01) for REMI/TSD/MTF; exactly **0.00** under both ABC pipelines. Bonus sanity check: POP909 is already grid-quantized, so the quantization perturbation is a no-op there and FMD = 0.000 exactly for the token pipelines.
+
+### 🧷 Per-file paired analysis (Wilcoxon + retest noise floor)
+
+For every file we measure the cosine shift between its original and perturbed embedding, plus a **retest** (re-encoding the same unperturbed file = per-file noise floor; 0 for all pipelines - everything is deterministic). Velocity moves **essentially every individual file** in REMI/TSD/MTF (Holm-adjusted p ≈ 1e-13 on both corpora) and **exactly zero files** in ABC; the same-model control contrast (MTF > ABC within CLaMP-2) is significant at p ≈ 1e-13 on both corpora. Bonus: the file-level view is *more* sensitive than corpus-level FMD - MTF quantization shifts are per-file significant even though they stay below the FMD detection floor. The retest check also exposed (and let us fix) a silent ABC-conversion failure - build it into your pipelines.
 
 ### 3️⃣ Cross-dataset ranking + Spearman agreement ⭐ - the rigorous backbone
 
-FMD ranks the 15 dataset pairs differently depending on the pipeline. Rank agreement between configurations (scale-invariant, **n = 15**):
+Rank agreement between configurations over the 15 dataset pairs (scale-invariant, **n = 15**):
 
 | Pair of configurations | Spearman ρ | p | Reading |
 |:--|:--:|:--:|:--|
-| MusicBERT-REMI ↔ **CLaMP2-MTF** | **0.825** | **< 0.001** | 🟢 strong agreement |
-| MusicBERT-TSD ↔ CLaMP2-MTF | 0.525 | 0.044 | 🟡 moderate |
+| CLaMP2-MTF ↔ **CLaMP1-ABC** | **0.907** | **< 0.001** | 🟢 strong agreement |
+| CLaMP1-ABC ↔ CLaMP2-ABC | **0.907** | **< 0.001** | 🟢 strong |
+| MusicBERT-REMI ↔ CLaMP1-ABC | **0.868** | **< 0.001** | 🟢 strong |
+| CLaMP2-MTF ↔ CLaMP2-ABC | **0.836** | **< 0.001** | 🟢 strong |
+| MusicBERT-REMI ↔ CLaMP2-MTF | **0.825** | **< 0.001** | 🟢 strong |
+| MusicBERT-REMI ↔ CLaMP2-ABC | **0.811** | **< 0.001** | 🟢 strong |
+| MusicBERT-TSD ↔ CLaMP1-ABC | **0.621** | 0.013 | 🟡 moderate |
+| MusicBERT-TSD ↔ CLaMP2-MTF | **0.525** | 0.044 | 🟡 moderate |
+| MusicBERT-TSD ↔ CLaMP2-ABC | **0.514** | 0.050 | 🟡 moderate |
 | MusicBERT-REMI ↔ MusicBERT-TSD | 0.436 | 0.104 | ⚪ tokenizer changes ranking |
-| MusicBERT-TSD ↔ CLaMP1-ABC | 0.321 | 0.243 | ⚪ none |
-| MusicBERT-REMI ↔ CLaMP1-ABC | 0.146 | 0.603 | ⚪ none |
-| CLaMP2-MTF ↔ **CLaMP1-ABC** | 0.039 | 0.889 | 🔴 no agreement |
 
-> 🔑 **Representations that preserve performance detail (REMI, MTF) rank genres the same way; ABC ranks them differently and nearly flatly.** What FMD calls "stylistic distance" depends on the pipeline.
+> 🔑 **9 of 10 pairs agree significantly - corpus-level "stylistic distance" is robust across pipelines**, carried by the pitch+rhythm core every representation shares. Together with the perturbation result this is the paper's two-level story: a pipeline can rank styles "correctly" while being completely blind to dynamics. The only n.s. pair is REMI↔TSD - the tokenizer perturbs the ranking more than swapping model+representation does.
 
 <p align="center">
   <img src="results/plots/sensitivity_pivot/paper/fig5_spearman_heatmap.png" alt="Spearman rank agreement" width="460">
@@ -130,9 +139,10 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 | MusicBERT-REMI | 3.51 ± 0.53 | [2.66, 4.64] | 15.1% |
 | MusicBERT-TSD | 3.92 ± 0.79 | [2.74, 5.47] | 20.2% |
 | CLaMP2-MTF | 0.048 ± 0.007 | [0.039, 0.060] | 14.0% |
-| CLaMP1-ABC | 0.024 ± 0.003 | [0.019, 0.030] | 11.0% |
+| CLaMP1-ABC | 0.068 ± 0.005 | [0.059, 0.080] | 8.0% |
+| CLaMP2-ABC | 0.277 ± 0.022 | [0.243, 0.320] | 8.0% |
 
-> 📊 All four are comparably stable (CV 11-20%); MusicBERT-TSD is the noisiest. **Do not compare the mean columns across the CLaMP/MusicBERT boundary** - different spaces.
+> 📊 All five are comparably stable (CV 8-20%); MusicBERT-TSD is the noisiest, the ABC pipelines the most stable. **Do not compare the mean columns across the CLaMP/MusicBERT boundary** - different spaces.
 
 ---
 
@@ -140,19 +150,20 @@ Coefficient of variation (CV) is scale-invariant and *is* comparable across conf
 
 | # | Finding | Evidence |
 |:-:|:--|:--|
-| 1️⃣ | **Input representation sets a ceiling on what FMD can detect - causally** | velocity SNR 1.2-4.2 (p ≤ 0.02) in REMI/TSD/MTF vs 0.49-0.78 (n.s.) in ABC; same-model control switches the response off; replicated on POP909 |
-| 2️⃣ | **Rankings agree only between detail-preserving representations** | REMI↔MTF ρ=0.825 (p<0.001); ABC↔all ρ≈0 |
-| 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.35; ranking ρ=0.44 |
-| 4️⃣ | **Raw FMD is not cross-model comparable** | noise floors differ ~60× from normalisation, not music |
+| 1️⃣ | **Input representation sets a hard ceiling on what FMD can detect - causally** | velocity SNR 1.2-4.2 (p ≤ 0.02) in REMI/TSD/MTF vs **exactly 0.0000** in ABC; same-model control switches the response off; per-file Wilcoxon p ≈ 1e-13; replicated on POP909 |
+| 2️⃣ | **Corpus-level style rankings are robust across pipelines** | 9/10 config pairs significant, ρ = 0.51-0.91 (MTF↔ABC 0.907); ranking sanity ≠ attribute sensitivity |
+| 3️⃣ | **Tokenizer alone reshapes sensitivity** | REMI vs TSD velocity SNR 3.16 vs 1.35; only n.s. ranking pair is REMI↔TSD (ρ=0.44) |
+| 4️⃣ | **Raw FMD is not cross-model comparable** | noise floors differ by 1-2 orders of magnitude from normalisation, not music |
 
 ### 🎯 Practical recommendations
 
 | Goal | ✅ Use | ❌ Avoid | Why |
 |:--|:--|:--|:--|
-| 🎹 Dynamics / expression | MusicBERT-REMI or CLaMP-2/MTF | CLaMP-1/ABC | ABC discards velocity entirely |
-| 🎼 Score / folk structure | CLaMP-1/ABC | - | velocity-invariant by design |
-| 📊 Stylistic-distance ranking | CLaMP-2/MTF | CLaMP-1/ABC | ABC ranks genres nearly flatly |
+| 🎹 Dynamics / expression | MusicBERT-REMI or CLaMP-2/MTF | any ABC pipeline | ABC has no velocity channel - FMD = 0 exactly |
+| 🎼 Score / folk structure | CLaMP-1/ABC or CLaMP-2/ABC | - | velocity-invariant by design, ranks styles consistently |
+| 📊 Stylistic-distance ranking | any pipeline here except TSD | raw FMD across models | rankings agree (ρ 0.51-0.91); magnitudes don't transfer |
 | 🔁 Cross-model comparison | SNR / Spearman / CV | raw FMD magnitude | scale is geometry, not music |
+| 🧪 Pipeline sanity | per-file retest (encode twice) | trusting conversions blindly | caught a silent ABC-conversion failure here |
 
 ---
 
@@ -182,7 +193,9 @@ results/reports/sensitivity_pivot/      # CSV + JSON results
   ├── self_similarity.csv               # noise floor, 6 datasets × 4 configs
   ├── cross_dataset_fmd.csv             # 15 pairs × 4 configs
   ├── spearman_ranking_agreement.csv    # rank agreement (n=15, interpretable)
-  ├── perturbation_sensitivity.csv      # FMD, SNR, CI, permutation p
+  ├── perturbation_sensitivity.csv      # FMD, SNR, CI, permutation p (+ _pop909 replication)
+  ├── paired_file_shifts.csv            # per-file cosine shifts + retest floor (+ _pop909)
+  ├── paired_file_tests.csv             # Wilcoxon contrasts, Holm-corrected (+ _pop909)
   ├── bootstrap_stability.csv           # mean ± std, CI, CV
   └── tables/*.tex                      # auto-generated LaTeX tables
 results/plots/sensitivity_pivot/paper/  # publication figures (fig1…fig6)
