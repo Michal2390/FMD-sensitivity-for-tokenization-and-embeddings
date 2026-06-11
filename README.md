@@ -7,8 +7,8 @@
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python"></a>
   <a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white" alt="PyTorch"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Status-Results_Complete-success?style=for-the-badge" alt="Status"></a>
-  <a href="#"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/Michal2390/FMD-sensitivity-for-tokenization-and-embeddings/actions/workflows/ci.yml"><img src="https://github.com/Michal2390/FMD-sensitivity-for-tokenization-and-embeddings/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License"></a>
 </p>
 
 > 📖 An FMD score is **not a property of the music alone** - it is produced by a *pipeline* (input representation → embedding model → Fréchet formula). We profile how that pipeline reshapes what FMD perceives, and give practical guidance for the music-generation community.
