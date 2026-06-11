@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import re
 import tempfile
-from typing import List
+from typing import Dict, List
 
 import numpy as np
 import torch
@@ -140,27 +140,85 @@ def pretty_midi_to_mtf_text(midi_data, m3_compatible: bool = True) -> str:
         os.unlink(path)
 
 
-def pretty_midi_to_abc_text(midi_data) -> str:
-    """Convert PrettyMIDI to ABC notation text via music21."""
-    import music21
+_ABC_PITCH_CLASS = ["C", "^C", "D", "^D", "E", "F", "^F", "G", "^G", "A", "^A", "B"]
 
-    with tempfile.NamedTemporaryFile(suffix=".mid", delete=False) as tmp:
-        path = tmp.name
-        midi_data.write(path)
 
-    with tempfile.NamedTemporaryFile(suffix=".abc", delete=False) as abc_tmp:
-        abc_path = abc_tmp.name
-    try:
-        score = music21.converter.parse(path)
-        score.write("abc", fp=abc_path)
-        with open(abc_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
-    except Exception as exc:
-        raise RuntimeError("CLaMP-1 ABC conversion failed; refusing pseudo-ABC fallback") from exc
-    finally:
-        if os.path.exists(abc_path):
-            os.unlink(abc_path)
-        os.unlink(path)
+def _abc_pitch(midi_pitch: int) -> str:
+    """MIDI pitch -> ABC pitch token (middle C, MIDI 60, is 'C')."""
+    octave = midi_pitch // 12 - 1
+    name = _ABC_PITCH_CLASS[midi_pitch % 12]
+    if octave >= 5:
+        return name.lower() + "'" * (octave - 5)
+    return name + "," * (4 - octave)
+
+
+def pretty_midi_to_abc_text(midi_data, max_groups: int = 4096) -> str:
+    """Render PrettyMIDI as ABC notation text (deterministic, dependency-free).
+
+    music21 cannot export ABC (its ``write('abc')`` silently emits the
+    object repr), so ABC is rendered directly: a standard header
+    (X/M/L/Q/K) followed by notes quantized to a sixteenth-note grid
+    (L:1/16), simultaneous onsets grouped as ABC chords, rests for gaps,
+    and bar lines derived from the meter. By construction the rendering
+    carries pitch, rhythm, meter and the global tempo marking -- and, like
+    the ABC standard itself, no velocity channel. The output is a pure
+    function of the note content, so re-encoding the same file yields the
+    identical string.
+    """
+    if midi_data.time_signature_changes:
+        ts = midi_data.time_signature_changes[0]
+        num, den = ts.numerator, ts.denominator
+    else:
+        num, den = 4, 4
+
+    tempos = midi_data.get_tempo_changes()
+    tempo = float(tempos[1][0]) if len(tempos[1]) > 0 else 120.0
+    sixteenth = 60.0 / tempo / 4.0  # seconds per L:1/16 unit
+
+    header = f"X:1\nM:{num}/{den}\nL:1/16\nQ:{int(round(tempo))}\nK:C\n"
+
+    notes = [
+        (note.start, note.pitch, note.end)
+        for inst in midi_data.instruments
+        if not inst.is_drum
+        for note in inst.notes
+    ]
+    if not notes:
+        return header + "z16 |\n"
+
+    # Quantize onsets/durations to the sixteenth grid and group chords.
+    groups: Dict[int, List[int]] = {}
+    durations: Dict[int, int] = {}
+    for start, pitch, end in sorted(notes):
+        onset = int(round(start / sixteenth))
+        dur = max(1, int(round((end - start) / sixteenth)))
+        groups.setdefault(onset, []).append(pitch)
+        durations[onset] = max(durations.get(onset, 1), dur)
+
+    units_per_bar = max(1, num * 16 // den)
+    body_parts: List[str] = []
+    prev_end = 0
+    prev_bar = 0
+    for onset in sorted(groups)[:max_groups]:
+        gap = onset - prev_end
+        if gap > 0:
+            body_parts.append(f"z{gap}" if gap > 1 else "z")
+        bar = onset // units_per_bar
+        if bar > prev_bar:
+            body_parts.append("|")
+            if bar % 4 == 0:
+                body_parts.append("\n")
+            prev_bar = bar
+        pitches = sorted(set(groups[onset]))
+        dur = durations[onset]
+        dur_s = "" if dur == 1 else str(dur)
+        if len(pitches) == 1:
+            body_parts.append(_abc_pitch(pitches[0]) + dur_s)
+        else:
+            body_parts.append("[" + "".join(_abc_pitch(p) for p in pitches) + "]" + dur_s)
+        prev_end = onset + dur
+
+    return header + " ".join(body_parts) + " |\n"
 
 
 def tokens_to_symbolic_text(tokens: List[int], miditok_tokenizer) -> str:

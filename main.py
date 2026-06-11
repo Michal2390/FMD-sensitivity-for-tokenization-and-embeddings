@@ -109,6 +109,7 @@ class FMDSensitivityAnalysis:
             "self-similarity": profiler.run_self_similarity,
             "ranking": profiler.run_cross_dataset_ranking,
             "perturbation": profiler.run_perturbation_sensitivity,
+            "paired": profiler.run_paired_file_analysis,
             "bootstrap": profiler.run_bootstrap_stability,
             "plots": profiler.generate_plots,
         }
@@ -133,7 +134,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--sensitivity-step", type=str, default=None,
-        choices=["self-similarity", "ranking", "perturbation", "bootstrap", "plots"],
+        choices=["self-similarity", "ranking", "perturbation", "paired", "bootstrap", "plots"],
         help="Run a single step of the sensitivity pipeline (default: all)",
     )
     return parser

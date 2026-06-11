@@ -51,8 +51,8 @@ An earlier version of this study mislabelled configurations (a "CLaMP-2 + REMI" 
 | 🅰️ **MusicBERT-REMI** | MusicBERT | MidiTok REMI tokens | tokenization baseline | no |
 | 🅱️ **MusicBERT-TSD** | MusicBERT | MidiTok TSD tokens | tokenizer effect (same model) | no |
 | 🅲 **CLaMP2-MTF** | CLaMP-2 | MIDI-Text Format (native) | model effect, expressive path | yes |
-| 🅳 **CLaMP1-ABC** | CLaMP-1 | ABC notation (`music21`) | score-like path (no velocity) | yes |
-| 🆎 **CLaMP2-ABC** (control) | CLaMP-2 | ABC notation (`music21`) | representation vs model (same model as 🅲, same input as 🅳) | yes |
+| 🅳 **CLaMP1-ABC** | CLaMP-1 | ABC notation (own deterministic renderer) | score-like path (no velocity) | yes |
+| 🆎 **CLaMP2-ABC** (control) | CLaMP-2 | ABC notation (own deterministic renderer) | representation vs model (same model as 🅲, same input as 🅳) | yes |
 
 > The control is legitimate, not off-distribution: CLaMP-2's M3 encoder is trained on **both** ABC and MTF. Within CLaMP-2, MTF vs ABC isolates the *representation*; within ABC, CLaMP-2 vs CLaMP-1 isolates the *model*.
 

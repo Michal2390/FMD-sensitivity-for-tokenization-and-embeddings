@@ -268,13 +268,19 @@ Config & Model & Input & Norm. \\
 
 We use the released checkpoints (\texttt{manoskary/musicbert},
 \texttt{sander-wood/clamp2}, \texttt{clamp-small-512}). For CLaMP, MTF is
-rendered from raw MIDI and ABC via \texttt{music21}, each bar-patched by the
-M3 character patcher.\footnote{The M3 patcher transliterates its input with
-\texttt{unidecode} before character-patching; this is a required
-dependency of the CLaMP pipeline.} For MusicBERT, a MidiTok token stream is
-rendered to a string of token identifiers and encoded, returning the
-\texttt{[CLS]} state; we flag this rendering as a limitation
-(\S\ref{sec:limitations}).
+rendered from raw MIDI via \texttt{mido}, and ABC by our own deterministic
+renderer --- pitch, rhythm (sixteenth-note grid, \texttt{L:1/16}), meter,
+and the global tempo marking, with no velocity channel, exactly as in the
+ABC standard; both are bar-patched by the M3 character
+patcher.\footnote{We render ABC ourselves because \texttt{music21} offers
+no ABC \emph{export}: its \texttt{write('abc')} silently emits the object
+repr rather than notation. An earlier iteration of this study was affected,
+which the per-file retest analysis of \S\ref{sec:method} exposed
+immediately --- one practical argument for building such checks into
+evaluation pipelines. The M3 patcher additionally requires
+\texttt{unidecode}.} For MusicBERT, a MidiTok token stream is rendered to a
+string of token identifiers and encoded, returning the \texttt{[CLS]}
+state; we flag this rendering as a limitation (\S\ref{sec:limitations}).
 
 \subsection{Datasets and perturbations}
 We use six datasets: \textbf{MAESTRO}~\cite{hawthorne2019maestro}
@@ -322,6 +328,22 @@ effect-size scale.} We call an attribute \emph{detected} when it is
 permutation-significant ($p<0.05$) \emph{and} exceeds the noise floor
 ($\snr\ge1$). A bootstrap ($100$ resamples) gives the FMD confidence
 interval.
+
+\paragraph{Per-file paired analysis with a retest floor.}
+FMD is a distribution-level statistic; to show that its signal is not an
+artifact of fitting Gaussians at $n\ll d$, we add a sample-level view. For
+every file we measure the cosine distance between its original and
+perturbed embedding (cosine, being norm-free, is meaningful in every
+configuration), yielding $N$ paired observations per configuration and
+perturbation. Each file is also encoded a \emph{second} time without any
+perturbation; this \emph{retest} distance is the per-file encoding-noise
+floor, and a perturbation counts as a file-level effect only if it moves
+the embedding more than re-encoding the same unperturbed file does
+(one-sided Wilcoxon signed-rank, Holm-corrected per corpus). Files are
+aligned across conditions, and the same-model control contrast compares
+retest-corrected velocity shifts under MTF vs.\ ABC within CLaMP-2 ---
+embeddings of the same model, hence the same space, so no cross-space
+caveat applies.
 
 \paragraph{Rank agreement.}
 For each configuration we rank the $15$ dataset pairs by FMD and compute
@@ -680,10 +702,11 @@ rank-deficient and ridge-regularised; absolute FMD magnitudes (especially
 for unnormalised embeddings) are biased upward. The SNR, permutation, and CV
 framings mitigate but do not remove this; larger $n$ would tighten every
 estimate.
-\item \textbf{ABC on dense polyphony.} \texttt{music21}'s ABC rendering is
-lossy for dense piano textures such as MAESTRO, which both reflects a real
-property (ABC discards performance detail) and limits how much
-\texttt{CLaMP1-ABC} can ever encode.
+\item \textbf{ABC rendering granularity.} Our ABC renderer quantizes to a
+sixteenth-note grid and reduces dense polyphony to chorded onsets. This
+reflects the score-like nature of ABC (performance nuance is discarded by
+design), but it also means sub-sixteenth detail is invisible to the ABC
+pipelines by construction, independent of the embedding model.
 \item \textbf{One strength per attribute.} Each attribute is ablated at a
 single perturbation strength (e.g.\ one quantization grid); a
 dose--response sweep would turn the binary detected/undetected verdict

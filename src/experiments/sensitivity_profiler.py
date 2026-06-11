@@ -580,6 +580,224 @@ class SensitivityProfiler:
         logger.info(f"Perturbation sensitivity saved to {out_path}")
         return df
 
+    # ─── Step 5b: Per-file paired analysis ──────────────────────────────
+
+    @staticmethod
+    def _holm(p_values: List[float]) -> List[float]:
+        """Holm step-down correction; returns adjusted p-values in input order."""
+        m = len(p_values)
+        order = np.argsort(p_values)
+        adjusted = [0.0] * m
+        running_max = 0.0
+        for rank, idx in enumerate(order):
+            adj = min(1.0, (m - rank) * p_values[idx])
+            running_max = max(running_max, adj)
+            adjusted[idx] = running_max
+        return adjusted
+
+    def run_paired_file_analysis(self, dataset_name: str = "maestro") -> pd.DataFrame:
+        """Per-file paired perturbation analysis (cosine shifts + Wilcoxon).
+
+        Complements the distributional FMD study with a sample-level view:
+        for every file we measure the cosine distance between its original
+        and perturbed embedding, giving N paired observations per
+        configuration x perturbation. This sidesteps the n << d covariance
+        estimation entirely and shows the signal is not an artifact of a few
+        outlier files.
+
+        Crucially, each file is also encoded a SECOND time without any
+        perturbation (the "retest" condition). The retest distance is the
+        per-file encoding-noise floor: pipelines whose input conversion is
+        nondeterministic (music21 ABC rendering) have a large retest
+        distance, and a perturbation only counts as a file-level effect if
+        it moves the embedding MORE than re-encoding the same unperturbed
+        file does. All contrasts are Wilcoxon signed-rank tests, Holm
+        corrected per dataset:
+          - per configuration x perturbation: shift > retest (primary);
+          - per configuration: velocity shift > tempo shift (secondary);
+          - the control contrast: within CLaMP-2 (same model, same space),
+            retest-corrected velocity shifts under MTF vs under ABC.
+
+        Files are aligned across conditions per configuration: a file that
+        fails under any condition is dropped from all of them.
+        """
+        from scipy.stats import wilcoxon
+
+        def _safe_wilcoxon(a: np.ndarray, b: np.ndarray) -> Tuple[float, float]:
+            try:
+                stat, p = wilcoxon(a, b, alternative="greater")
+                return float(stat), float(p)
+            except ValueError:  # all differences zero
+                return float("nan"), 1.0
+
+        logger.info("=" * 60)
+        logger.info("STEP 5b: Per-file Paired Analysis (with retest noise floor)")
+        logger.info(f"  Dataset: {dataset_name}")
+        logger.info("=" * 60)
+
+        midi_files = self._load_dataset_midi(dataset_name)
+        if not midi_files:
+            logger.error(f"No MIDI files for dataset '{dataset_name}'")
+            return pd.DataFrame()
+
+        assert self.perturbations[0].name == "original"
+        original_pert = self.perturbations[0]
+        # original encoded twice (retest) + the four perturbations
+        conditions = [("original", original_pert), ("__retest__", original_pert)] + [
+            (p.name, p) for p in self.perturbations[1:]
+        ]
+        suffix = "" if dataset_name == "maestro" else f"_{dataset_name}"
+        shifts_path = self.output_dir / f"paired_file_shifts{suffix}.csv"
+        tests_path = self.output_dir / f"paired_file_tests{suffix}.csv"
+
+        shift_rows: List[Dict] = []
+        # per config: {condition: {file_name: shift}}, for the contrasts
+        shifts_by_cfg: Dict[str, Dict[str, Dict[str, float]]] = {}
+
+        for cfg in self.configurations:
+            per_cond_embs: Dict[str, List[np.ndarray]] = {name: [] for name, _ in conditions}
+            kept_files: List[str] = []
+
+            for midi_path in midi_files:
+                embs_this_file: Dict[str, np.ndarray] = {}
+                ok = True
+                for cond_name, pert in conditions:
+                    emb = self._extract_embeddings([midi_path], cfg, pert)
+                    if emb.size == 0:
+                        ok = False
+                        break
+                    embs_this_file[cond_name] = emb[0]
+                if ok:
+                    kept_files.append(midi_path.name)
+                    for name, vec in embs_this_file.items():
+                        per_cond_embs[name].append(vec)
+
+            n_kept = len(kept_files)
+            if n_kept < 10:
+                logger.warning(f"{cfg.name}: only {n_kept} aligned files, skipping")
+                continue
+
+            orig = np.stack(per_cond_embs["original"])
+            orig_unit = orig / (np.linalg.norm(orig, axis=1, keepdims=True) + 1e-12)
+            # corpus angular scale: median cosine distance between distinct files
+            sim = orig_unit @ orig_unit.T
+            iu = np.triu_indices(n_kept, k=1)
+            corpus_scale = float(np.median(1.0 - sim[iu]))
+
+            shifts_by_cfg[cfg.name] = {}
+            for cond_name, _ in conditions[1:]:  # retest + perturbations
+                arr = np.stack(per_cond_embs[cond_name])
+                arr_unit = arr / (np.linalg.norm(arr, axis=1, keepdims=True) + 1e-12)
+                shifts = 1.0 - np.sum(orig_unit * arr_unit, axis=1)
+                shifts_by_cfg[cfg.name][cond_name] = dict(zip(kept_files, shifts))
+                for fname, s in zip(kept_files, shifts):
+                    shift_rows.append({
+                        "dataset": dataset_name,
+                        "configuration": cfg.name,
+                        "perturbation": cond_name,
+                        "file": fname,
+                        "cosine_shift": float(s),
+                        "corpus_scale": corpus_scale,
+                        "normalized_shift": float(s / corpus_scale) if corpus_scale > 1e-12 else float("nan"),
+                    })
+                logger.info(
+                    f"  {cfg.name} | {cond_name}: median shift = {np.median(shifts):.5f} "
+                    f"({np.median(shifts) / corpus_scale:.2f}x corpus scale, n={n_kept})"
+                )
+
+            # checkpoint after each configuration
+            pd.DataFrame(shift_rows).to_csv(shifts_path, index=False)
+            logger.info(f"  [checkpoint] {len(shift_rows)} rows -> {shifts_path}")
+
+        # ── paired contrasts ────────────────────────────────────────────
+        test_rows: List[Dict] = []
+
+        def _paired(by_cond: Dict[str, Dict[str, float]], cond_a: str, cond_b: str):
+            common = sorted(set(by_cond[cond_a]) & set(by_cond[cond_b]))
+            a = np.array([by_cond[cond_a][f] for f in common])
+            b = np.array([by_cond[cond_b][f] for f in common])
+            return common, a, b
+
+        for cfg_name, by_cond in shifts_by_cfg.items():
+            if "__retest__" not in by_cond:
+                continue
+            # primary: each perturbation vs the retest noise floor
+            for pert in self.perturbations[1:]:
+                if pert.name not in by_cond:
+                    continue
+                common, a, b = _paired(by_cond, pert.name, "__retest__")
+                stat, p = _safe_wilcoxon(a, b)
+                test_rows.append({
+                    "dataset": dataset_name,
+                    "contrast": "exceeds_retest_noise",
+                    "configuration": cfg_name,
+                    "perturbation": pert.name,
+                    "n_files": len(common),
+                    "median_shift": float(np.median(a)),
+                    "median_ref": float(np.median(b)),
+                    "wilcoxon_stat": stat,
+                    "p_raw": p,
+                })
+            # secondary: velocity vs tempo
+            if "no_velocity" in by_cond and "constant_tempo" in by_cond:
+                common, a, b = _paired(by_cond, "no_velocity", "constant_tempo")
+                stat, p = _safe_wilcoxon(a, b)
+                test_rows.append({
+                    "dataset": dataset_name,
+                    "contrast": "velocity_gt_tempo",
+                    "configuration": cfg_name,
+                    "perturbation": "no_velocity",
+                    "n_files": len(common),
+                    "median_shift": float(np.median(a)),
+                    "median_ref": float(np.median(b)),
+                    "wilcoxon_stat": stat,
+                    "p_raw": p,
+                })
+
+        # control contrast on retest-corrected (excess) shifts, same model space
+        if "CLaMP2-MTF" in shifts_by_cfg and "CLaMP2-ABC" in shifts_by_cfg:
+            excess = {}
+            for name in ("CLaMP2-MTF", "CLaMP2-ABC"):
+                by_cond = shifts_by_cfg[name]
+                if "no_velocity" in by_cond and "__retest__" in by_cond:
+                    common = set(by_cond["no_velocity"]) & set(by_cond["__retest__"])
+                    excess[name] = {
+                        f: by_cond["no_velocity"][f] - by_cond["__retest__"][f] for f in common
+                    }
+            if len(excess) == 2:
+                common = sorted(set(excess["CLaMP2-MTF"]) & set(excess["CLaMP2-ABC"]))
+                if len(common) >= 10:
+                    a = np.array([excess["CLaMP2-MTF"][f] for f in common])
+                    b = np.array([excess["CLaMP2-ABC"][f] for f in common])
+                    stat, p = _safe_wilcoxon(a, b)
+                    test_rows.append({
+                        "dataset": dataset_name,
+                        "contrast": "control_mtf_gt_abc_velocity_excess",
+                        "configuration": "CLaMP2-MTF_vs_CLaMP2-ABC",
+                        "perturbation": "no_velocity",
+                        "n_files": len(common),
+                        "median_shift": float(np.median(a)),
+                        "median_ref": float(np.median(b)),
+                        "wilcoxon_stat": stat,
+                        "p_raw": p,
+                    })
+
+        if test_rows:
+            adjusted = self._holm([r["p_raw"] for r in test_rows])
+            for row, p_holm in zip(test_rows, adjusted):
+                row["p_holm"] = p_holm
+                row["significant"] = bool(p_holm < 0.05)
+                logger.info(
+                    f"  TEST {row['contrast']} | {row['configuration']}: "
+                    f"p_raw={row['p_raw']:.2e} p_holm={row['p_holm']:.2e} "
+                    f"{'SIG' if row['significant'] else 'ns'}"
+                )
+
+        tests_df = pd.DataFrame(test_rows)
+        tests_df.to_csv(tests_path, index=False)
+        logger.info(f"Paired tests saved to {tests_path}")
+        return tests_df
+
     # ─── Step 6: Bootstrap Stability ────────────────────────────────────
 
     def run_bootstrap_stability(self) -> pd.DataFrame:
